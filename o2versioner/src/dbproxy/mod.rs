@@ -1,3 +1,3 @@
 pub fn hi() {
-    println!("hi");
+    println!("hi, from dbproxy");
 }
