@@ -30,3 +30,4 @@ cargo check
 1. [The book](https://doc.rust-lang.org/book/title-page.html)  
 2. [Package Layout](https://doc.rust-lang.org/cargo/guide/project-layout.html)  
 3. [Actix Web](https://actix.rs/docs/getting-started/)
+4. [Naming Convention](https://doc.rust-lang.org/1.0.0/style/style/naming/README.html)
