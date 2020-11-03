@@ -1,5 +1,5 @@
-use o2versioner::*;
+use o2versioner::dbproxy::*;
 
 pub fn main() {
-    dbproxy::hi();
+    hi();
 }
