@@ -16,12 +16,22 @@ cargo run --bin scheduler
 cargo run --bin sequencer
 ```
 
-### 2.2 To build the entire library
+### 2.2 Project layout
+```
+src  
+ `-bin        # Executables
+ `-dbproxy    # dbproxy library
+ `-scheduler  # scheduler library
+ `-sequencer  # sequencer library
+ `-MORE_TO_ADD
+```
+
+### 2.3 To build the entire library
 ```sh
 cargo build
 ```
 
-### 2.3 To check the entire library
+### 2.4 To check the entire library
 ```sh
 cargo check
 ```
