@@ -1,4 +1,4 @@
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpServer};
 use env_logger;
 use log::info;
 use o2versioner::scheduler::*;
@@ -15,8 +15,12 @@ async fn main() -> std::io::Result<()> {
     init_logger();
     info!("Hello from scheduler exe");
 
-    HttpServer::new(|| App::new().route("/", web::get().to(appserver_handler::greet)))
-        .bind("127.0.0.1:8080")?
-        .run()
-        .await
+    HttpServer::new(|| {
+        App::new()
+            .service(appserver_handler::greet)
+            .service(appserver_handler::sql_handler)
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
 }
