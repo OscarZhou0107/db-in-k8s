@@ -1,3 +1,4 @@
+use actix_session::CookieSession;
 use actix_web::{App, HttpServer};
 use env_logger;
 use log::info;
@@ -17,6 +18,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
+            .wrap(CookieSession::private(&[0; 32]).secure(false))
             .service(appserver_handler::greet)
             .service(appserver_handler::sql_handler)
     })
