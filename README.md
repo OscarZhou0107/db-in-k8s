@@ -19,11 +19,11 @@ cargo run --bin sequencer
 ### 2.2 Project layout
 ```
 src  
- `-bin        # Executables
- `-dbproxy    # dbproxy library
- `-scheduler  # scheduler library
- `-sequencer  # sequencer library
- `-MORE_TO_ADD
+├── bin        # Executables
+├── common     # Common library
+├── dbproxy    # dbproxy library
+├── scheduler  # scheduler library
+├── sequencer  # sequencer library
 ```
 
 ### 2.3 To build the entire library
