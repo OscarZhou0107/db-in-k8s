@@ -23,7 +23,7 @@ src
 ├── common     # Common library
 ├── dbproxy    # dbproxy library
 ├── scheduler  # scheduler library
-├── sequencer  # sequencer library
+└── sequencer  # sequencer library
 ```
 
 ### 2.3 To build the entire library
