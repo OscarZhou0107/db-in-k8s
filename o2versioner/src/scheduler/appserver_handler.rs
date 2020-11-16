@@ -1,4 +1,4 @@
-use crate::common::sql::SqlData;
+use crate::common::sql::SqlStmt;
 use actix_session::Session;
 use actix_web::{get, post, web, HttpMessage, HttpRequest, Responder};
 use log::info;
@@ -9,6 +9,7 @@ use log::info;
 ///
 /// Test this handler on curl:
 /// curl 127.0.0.1:8080
+///
 #[get("/")]
 pub async fn greet(req: HttpRequest, session: Session) -> impl Responder {
     // access session data
@@ -54,14 +55,14 @@ pub async fn greet(req: HttpRequest, session: Session) -> impl Responder {
 #[post("/sql")]
 pub async fn sql_handler(
     req: HttpRequest,
-    sql_data: web::Json<SqlData>,
+    sql_stmt: web::Json<SqlStmt>,
     _session: Session,
 ) -> impl Responder {
     info!(
         "From '{}' on '{}' with '{:?}'. cookies is '{:?}'. req is {:?}.",
         req.peer_addr().unwrap(),
         req.uri(),
-        sql_data,
+        sql_stmt,
         req.cookies(),
         req
     );
@@ -70,7 +71,7 @@ pub async fn sql_handler(
         "From '{}' on '{}' with '{:?}'. cookies is '{:?}'. req is {:?}.",
         req.peer_addr().unwrap(),
         req.uri(),
-        sql_data,
+        sql_stmt,
         req.cookies(),
         req
     )
