@@ -23,7 +23,8 @@ src
 ├── common     # Common library
 ├── dbproxy    # dbproxy library
 ├── scheduler  # scheduler library
-└── sequencer  # sequencer library
+├── sequencer  # sequencer library
+└── lib.rs     # Declaration of the mods above
 ```
 
 ### 2.3 To build the entire library
