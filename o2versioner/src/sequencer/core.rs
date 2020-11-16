@@ -32,8 +32,23 @@ impl TableVNRecord {
     }
 }
 
+/// Sequencer state
+#[allow(dead_code)]
+#[derive(Default)]
+struct State {
+    vn_record: HashMap<String, TableVNRecord>,
+}
+
+impl State {
+    #[allow(dead_code)]
+    fn assign_vn(&mut self, _tx_table: &TxTable) -> TxVN {
+        Default::default()
+    }
+}
+
+/// Unit test for `TableVNRecord`
 #[cfg(test)]
-mod tests {
+mod tests_table_vn_record {
     use super::TableVNRecord;
 
     #[test]
@@ -164,15 +179,14 @@ mod tests {
     }
 }
 
-/// Sequencer state
-#[allow(dead_code)]
-struct State {
-    vn_record: HashMap<String, TableVNRecord>,
-}
+/// Unit test for `State`
+#[cfg(test)]
+mod tests_state {
+    use super::State;
 
-impl State {
-    #[allow(dead_code)]
-    fn assign_vn(&mut self, _tx_table: TxTable) -> TxVN {
-        Default::default()
+    #[test]
+    fn test_assign_vn() {
+        let mut state: State = Default::default();
+        let _txvn = state.assign_vn(&Default::default());
     }
 }
