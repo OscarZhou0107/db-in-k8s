@@ -1,0 +1,4 @@
+# Alias to ./o2versioner
+
+[workspace]
+members = ["o2versioner"]
