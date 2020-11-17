@@ -1,7 +1,6 @@
-use crate::common::sql::TxTable;
-use crate::common::version_number::{Operation, TableVN, TxVN, VN};
+use crate::common::sql::{Operation, TxTable};
+use crate::common::version_number::{TableVN, TxVN, VN};
 use std::collections::HashMap;
-use std::iter;
 
 /// Version number info for a single table
 #[derive(Default, Debug, Eq, PartialEq)]
@@ -45,16 +44,19 @@ struct State {
 
 impl State {
     #[allow(dead_code)]
-    fn assign_vn(&mut self, tx_table: &TxTable) -> TxVN {
+    fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
         TxVN {
-            table_vns: 
-                iter::empty::<_>()
-                .chain(tx_table.r_tables.iter().map(|table| (table, Operation::R)))
-                .chain(tx_table.w_tables.iter().map(|table| (table, Operation::W)))
-                .map(|(table, op)| TableVN {
-                    table: table.clone(),
-                    vn: self.vn_record.entry(table.clone()).or_default().assign(&op),
-                    op: op,
+            table_vns: tx_table
+                .table_ops
+                .into_iter()
+                .map(|table_op| TableVN {
+                    table: table_op.table.clone(),
+                    vn: self
+                        .vn_record
+                        .entry(table_op.table)
+                        .or_default()
+                        .assign(&table_op.op),
+                    op: table_op.op,
                 })
                 .collect(),
         }
@@ -202,6 +204,6 @@ mod tests_state {
     #[test]
     fn test_assign_vn() {
         let mut state: State = Default::default();
-        let _txvn = state.assign_vn(&Default::default());
+        let _txvn = state.assign_vn(Default::default());
     }
 }

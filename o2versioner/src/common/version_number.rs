@@ -1,11 +1,7 @@
+use super::sql::Operation;
+
 /// Version number
 pub type VN = u64;
-
-/// Enum representing either W (write) or R (read)
-pub enum Operation {
-    W,
-    R,
-}
 
 /// Version number of a table
 pub struct TableVN {
