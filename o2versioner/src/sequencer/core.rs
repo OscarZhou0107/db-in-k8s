@@ -200,10 +200,51 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
+    use crate::common::sql::{Operation, TableOp, TxTable};
+    use crate::common::version_number::{TableVN, TxVN};
 
     #[test]
     fn test_assign_vn() {
         let mut state: State = Default::default();
-        let _txvn = state.assign_vn(Default::default());
+
+        assert_eq!(
+            state.assign_vn(TxTable {
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("a"),
+                        op: Operation::W,
+                    },
+                    TableOp {
+                        table: String::from("b"),
+                        op: Operation::W,
+                    },
+                    TableOp {
+                        table: String::from("c"),
+                        op: Operation::R,
+                    },
+                ],
+            }),
+            TxVN {
+                table_vns: vec![
+                    TableVN {
+                        table: String::from("a"),
+                        vn: 0,
+                        op: Operation::W,
+                    },
+                    TableVN {
+                        table: String::from("b"),
+                        vn: 0,
+                        op: Operation::W,
+                    },
+                    TableVN {
+                        table: String::from("c"),
+                        vn: 0,
+                        op: Operation::R,
+                    }
+                ]
+            }
+        );
+
+        // Check for State or check for next TxVN
     }
 }

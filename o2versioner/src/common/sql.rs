@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// Enum representing either W (write) or R (read)
 #[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Operation {
     W,
     R,
