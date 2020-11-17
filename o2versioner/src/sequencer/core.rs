@@ -1,8 +1,7 @@
 use crate::common::sql::TxTable;
-use crate::common::version_number::TxVN;
-use crate::common::version_number::VN;
-
+use crate::common::version_number::{Operation, TableVN, TxVN, VN};
 use std::collections::HashMap;
+use std::iter;
 
 /// Version number info for a single table
 #[derive(Default, Debug, Eq, PartialEq)]
@@ -12,7 +11,6 @@ struct TableVNRecord {
 }
 
 impl TableVNRecord {
-    #[allow(dead_code)]
     fn assign_read(&mut self) -> VN {
         let vn_read = self.next_for_read;
 
@@ -21,7 +19,6 @@ impl TableVNRecord {
         return vn_read;
     }
 
-    #[allow(dead_code)]
     fn assign_write(&mut self) -> VN {
         let vn_write = self.next_for_write;
 
@@ -29,6 +26,13 @@ impl TableVNRecord {
         self.next_for_read = self.next_for_write;
 
         return vn_write;
+    }
+
+    fn assign(&mut self, op: &Operation) -> VN {
+        match op {
+            Operation::R => self.assign_read(),
+            Operation::W => self.assign_write(),
+        }
     }
 }
 
@@ -41,8 +45,19 @@ struct State {
 
 impl State {
     #[allow(dead_code)]
-    fn assign_vn(&mut self, _tx_table: &TxTable) -> TxVN {
-        Default::default()
+    fn assign_vn(&mut self, tx_table: &TxTable) -> TxVN {
+        TxVN {
+            table_vns: 
+                iter::empty::<_>()
+                .chain(tx_table.r_tables.iter().map(|table| (table, Operation::R)))
+                .chain(tx_table.w_tables.iter().map(|table| (table, Operation::W)))
+                .map(|(table, op)| TableVN {
+                    table: table.clone(),
+                    vn: self.vn_record.entry(table.clone()).or_default().assign(&op),
+                    op: op,
+                })
+                .collect(),
+        }
     }
 }
 
