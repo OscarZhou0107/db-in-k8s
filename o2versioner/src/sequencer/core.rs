@@ -207,6 +207,9 @@ mod tests_state {
     fn test_assign_vn() {
         let mut state: State = Default::default();
 
+        //                   a     b     c
+        // next_for_read     0     0     0
+        // next_for_write    0     0     0
         assert_eq!(
             state.assign_vn(TxTable {
                 table_ops: vec![
@@ -245,6 +248,113 @@ mod tests_state {
             }
         );
 
-        // Check for State or check for next TxVN
+        //                   a     b     c
+        // next_for_read     1     1     0
+        // next_for_write    1     1     1
+        assert_eq!(
+            state.assign_vn(TxTable {
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("b"),
+                        op: Operation::W,
+                    },
+                    TableOp {
+                        table: String::from("c"),
+                        op: Operation::R,
+                    }
+                ],
+            }),
+            TxVN {
+                table_vns: vec![
+                    TableVN {
+                        table: String::from("b"),
+                        vn: 1,
+                        op: Operation::W,
+                    },
+                    TableVN {
+                        table: String::from("c"),
+                        vn: 0,
+                        op: Operation::R,
+                    }
+                ]
+            }
+        );
+
+        //                   a     b     c
+        // next_for_read     1     2     0
+        // next_for_write    1     2     2
+        assert_eq!(
+            state.assign_vn(TxTable {
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("b"),
+                        op: Operation::R,
+                    },
+                    TableOp {
+                        table: String::from("c"),
+                        op: Operation::W,
+                    }
+                ],
+            }),
+            TxVN {
+                table_vns: vec![
+                    TableVN {
+                        table: String::from("b"),
+                        vn: 2,
+                        op: Operation::R,
+                    },
+                    TableVN {
+                        table: String::from("c"),
+                        vn: 2,
+                        op: Operation::W,
+                    }
+                ]
+            }
+        );
+
+        //                   a     b     c
+        // next_for_read     1     2     3
+        // next_for_write    1     3     3
+        assert_eq!(
+            state.assign_vn(TxTable {
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("a"),
+                        op: Operation::R,
+                    },
+                    TableOp {
+                        table: String::from("b"),
+                        op: Operation::R,
+                    },
+                    TableOp {
+                        table: String::from("c"),
+                        op: Operation::W,
+                    }
+                ],
+            }),
+            TxVN {
+                table_vns: vec![
+                    TableVN {
+                        table: String::from("a"),
+                        vn: 1,
+                        op: Operation::R,
+                    },
+                    TableVN {
+                        table: String::from("b"),
+                        vn: 2,
+                        op: Operation::R,
+                    },
+                    TableVN {
+                        table: String::from("c"),
+                        vn: 3,
+                        op: Operation::W,
+                    }
+                ]
+            }
+        );
+
+        //                   a     b     c
+        // next_for_read     1     2     4
+        // next_for_write    2     4     4
     }
 }
