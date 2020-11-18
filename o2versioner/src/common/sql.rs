@@ -8,9 +8,23 @@ pub enum Operation {
     R,
 }
 
-/// A Sql statement
+/// An Sql raw string
+///
+/// This string can be an invalid Sql statement.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SqlStmt(pub String);
+pub struct SqlRawString(pub String);
+
+impl SqlRawString {
+    /// Conversion to a `TxTable` if valid
+    /// 
+    /// Only the following Sql begin transaction syntax is valid:
+    /// 
+    /// `BEGIN {TRAN | TRANSACTION} [transaction_name] WITH MARK 'READ table_0 table_1 WRITE table_2' [;]`
+    #[allow(dead_code)]
+    pub fn to_tx_table(&self) -> Option<TxTable> {
+        return None;
+    }
+}
 
 pub struct TableOp {
     pub table: String,

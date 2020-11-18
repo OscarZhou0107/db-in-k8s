@@ -1,4 +1,4 @@
-use crate::common::sql::SqlStmt;
+use crate::common::sql::SqlRawString;
 use actix_session::Session;
 use actix_web::{get, post, web, HttpMessage, HttpRequest, Responder};
 use log::info;
@@ -55,14 +55,14 @@ pub async fn greet(req: HttpRequest, session: Session) -> impl Responder {
 #[post("/sql")]
 pub async fn sql_handler(
     req: HttpRequest,
-    sql_stmt: web::Json<SqlStmt>,
+    sql_raw_string: web::Json<SqlRawString>,
     _session: Session,
 ) -> impl Responder {
     info!(
         "From '{}' on '{}' with '{:?}'. cookies is '{:?}'. req is {:?}.",
         req.peer_addr().unwrap(),
         req.uri(),
-        sql_stmt,
+        sql_raw_string,
         req.cookies(),
         req
     );
@@ -71,7 +71,7 @@ pub async fn sql_handler(
         "From '{}' on '{}' with '{:?}'. cookies is '{:?}'. req is {:?}.",
         req.peer_addr().unwrap(),
         req.uri(),
-        sql_stmt,
+        sql_raw_string,
         req.cookies(),
         req
     )
