@@ -1,6 +1,7 @@
 use super::utility;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)
 #[allow(dead_code)]
@@ -45,10 +46,14 @@ impl SqlRawString {
     /// Only the following Sql begin transaction syntax is valid:
     ///
     /// `BEGIN {TRAN | TRANSACTION} [transaction_name] WITH MARK 'READ table_0 table_1 WRITE table_2' [;]`
+    ///
+    /// # Note
+    /// 1. If `add_uuid == True`, will append uuid to the end of `TxTable::tx_name`
+    /// 2. `add_uuid == False` should only be used for unit testing
     #[allow(dead_code)]
-    pub fn to_tx_table(&self) -> Option<TxTable> {
+    pub fn to_tx_table(&self, add_uuid: bool) -> Option<TxTable> {
         self.get_tx_data()
-            .map(|(tx_name, mark)| TxTable::from_string(tx_name, mark))
+            .map(|(tx_name, mark)| TxTable::from_string(tx_name, mark, add_uuid))
     }
 }
 
@@ -70,9 +75,18 @@ pub struct TxTable {
 }
 
 impl TxTable {
-    fn process_tx_name(mut tx_name: String) -> String {
-        // TODO: if tx_name is "", create a default name
+    /// Process the argument `tx_name` for use as the `TxTable.tx_name` field
+    ///
+    /// # Note
+    /// 1. If `add_uuid == True`, will append uuid to the end of the argument `tx_name`
+    /// 2. `add_uuid == False` should only be used for unit testing
+    /// 3. Will remove any whitespace from the argument `tx_name`
+    fn process_tx_name(mut tx_name: String, add_uuid: bool) -> String {
         utility::remove_whitespace(&mut tx_name);
+        if add_uuid {
+            tx_name.push_str("_");
+            tx_name.push_str(&Uuid::new_v4().to_string());
+        }
         tx_name
     }
 
@@ -80,9 +94,9 @@ impl TxTable {
         Vec::new()
     }
 
-    fn from_string(tx_name: String, mark: String) -> TxTable {
+    fn from_string(tx_name: String, mark: String, add_uuid: bool) -> TxTable {
         TxTable {
-            tx_name: TxTable::process_tx_name(tx_name),
+            tx_name: TxTable::process_tx_name(tx_name, add_uuid),
             table_ops: TxTable::process_table_ops(mark),
         }
     }
@@ -176,10 +190,30 @@ mod tests_sql_raw_string {
 /// Unit test for `TxTable`
 #[cfg(test)]
 mod tests_tx_table {
-    //use super::TxTable;
+    use super::TxTable;
 
     #[test]
-    fn test_process_tx_name() {}
+    fn test_process_tx_name() {
+        assert_eq!(
+            TxTable::process_tx_name(String::from("  tx_name  "), false),
+            String::from("tx_name")
+        );
+
+        assert_eq!(
+            TxTable::process_tx_name(String::from("  tx_name 1 2 3  "), false),
+            String::from("tx_name123")
+        );
+
+        assert_eq!(
+            TxTable::process_tx_name(String::from("   "), false),
+            String::from("")
+        );
+
+        assert_eq!(
+            TxTable::process_tx_name(String::from("tx_name"), false),
+            String::from("tx_name")
+        );
+    }
 
     #[test]
     fn test_process_table_ops() {}
