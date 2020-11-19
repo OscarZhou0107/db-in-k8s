@@ -1,3 +1,4 @@
+use super::utility;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +26,6 @@ impl SqlRawString {
     /// Parse the transaction name and mark if valid
     ///
     /// Return `Some((transaction_name, mark))` or None
-    #[allow(dead_code)]
     fn get_tx_data(&self) -> Option<(String, String)> {
         let sql_candidate = self.0.to_ascii_lowercase();
         let re =
@@ -47,7 +47,8 @@ impl SqlRawString {
     /// `BEGIN {TRAN | TRANSACTION} [transaction_name] WITH MARK 'READ table_0 table_1 WRITE table_2' [;]`
     #[allow(dead_code)]
     pub fn to_tx_table(&self) -> Option<TxTable> {
-        return None;
+        self.get_tx_data()
+            .map(|(tx_name, mark)| TxTable::from_string(tx_name, mark))
     }
 }
 
@@ -64,7 +65,27 @@ pub struct TableOp {
 ///
 #[derive(Default)]
 pub struct TxTable {
+    pub tx_name: String,
     pub table_ops: Vec<TableOp>,
+}
+
+impl TxTable {
+    fn process_tx_name(mut tx_name: String) -> String {
+        // TODO: if tx_name is "", create a default name
+        utility::remove_whitespace(&mut tx_name);
+        tx_name
+    }
+
+    fn process_table_ops(_mark: String) -> Vec<TableOp> {
+        Vec::new()
+    }
+
+    fn from_string(tx_name: String, mark: String) -> TxTable {
+        TxTable {
+            tx_name: TxTable::process_tx_name(tx_name),
+            table_ops: TxTable::process_table_ops(mark),
+        }
+    }
 }
 
 /// Unit test for `SqlRawString`
@@ -150,4 +171,19 @@ mod tests_sql_raw_string {
             )
         });
     }
+}
+
+/// Unit test for `TxTable`
+#[cfg(test)]
+mod tests_tx_table {
+    //use super::TxTable;
+
+    #[test]
+    fn test_process_tx_name() {}
+
+    #[test]
+    fn test_process_table_ops() {}
+
+    #[test]
+    fn test_from_string() {}
 }

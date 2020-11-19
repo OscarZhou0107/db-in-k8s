@@ -203,6 +203,13 @@ mod tests_state {
     use crate::common::sql::{Operation, TableOp, TxTable};
     use crate::common::version_number::{TableVN, TxVN};
 
+    fn new_tx_table(table_ops: Vec<TableOp>) -> TxTable {
+        TxTable {
+            tx_name: String::from("Default Tx Name"),
+            table_ops,
+        }
+    }
+
     #[test]
     fn test_assign_vn() {
         let mut state: State = Default::default();
@@ -211,22 +218,20 @@ mod tests_state {
         // next_for_read     0     0     0
         // next_for_write    0     0     0
         assert_eq!(
-            state.assign_vn(TxTable {
-                table_ops: vec![
-                    TableOp {
-                        table: String::from("a"),
-                        op: Operation::W,
-                    },
-                    TableOp {
-                        table: String::from("b"),
-                        op: Operation::W,
-                    },
-                    TableOp {
-                        table: String::from("c"),
-                        op: Operation::R,
-                    },
-                ],
-            }),
+            state.assign_vn(new_tx_table(vec![
+                TableOp {
+                    table: String::from("a"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("b"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("c"),
+                    op: Operation::R,
+                },
+            ])),
             TxVN {
                 table_vns: vec![
                     TableVN {
@@ -252,18 +257,16 @@ mod tests_state {
         // next_for_read     1     1     0
         // next_for_write    1     1     1
         assert_eq!(
-            state.assign_vn(TxTable {
-                table_ops: vec![
-                    TableOp {
-                        table: String::from("b"),
-                        op: Operation::W,
-                    },
-                    TableOp {
-                        table: String::from("c"),
-                        op: Operation::R,
-                    }
-                ],
-            }),
+            state.assign_vn(new_tx_table(vec![
+                TableOp {
+                    table: String::from("b"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("c"),
+                    op: Operation::R,
+                }
+            ],)),
             TxVN {
                 table_vns: vec![
                     TableVN {
@@ -284,18 +287,16 @@ mod tests_state {
         // next_for_read     1     2     0
         // next_for_write    1     2     2
         assert_eq!(
-            state.assign_vn(TxTable {
-                table_ops: vec![
-                    TableOp {
-                        table: String::from("b"),
-                        op: Operation::R,
-                    },
-                    TableOp {
-                        table: String::from("c"),
-                        op: Operation::W,
-                    }
-                ],
-            }),
+            state.assign_vn(new_tx_table(vec![
+                TableOp {
+                    table: String::from("b"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("c"),
+                    op: Operation::W,
+                }
+            ],)),
             TxVN {
                 table_vns: vec![
                     TableVN {
@@ -316,22 +317,20 @@ mod tests_state {
         // next_for_read     1     2     3
         // next_for_write    1     3     3
         assert_eq!(
-            state.assign_vn(TxTable {
-                table_ops: vec![
-                    TableOp {
-                        table: String::from("a"),
-                        op: Operation::R,
-                    },
-                    TableOp {
-                        table: String::from("b"),
-                        op: Operation::R,
-                    },
-                    TableOp {
-                        table: String::from("c"),
-                        op: Operation::W,
-                    }
-                ],
-            }),
+            state.assign_vn(new_tx_table(vec![
+                TableOp {
+                    table: String::from("a"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("b"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("c"),
+                    op: Operation::W,
+                }
+            ],)),
             TxVN {
                 table_vns: vec![
                     TableVN {
