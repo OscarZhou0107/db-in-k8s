@@ -1,5 +1,5 @@
-use o2versioner::sequencer::*;
+//use o2versioner::sequencer::*;
 
 pub fn main() {
-    hi();
+    println!("hi");
 }
