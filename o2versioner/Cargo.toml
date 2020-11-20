@@ -13,3 +13,5 @@ actix-session = "0.4"
 env_logger = "0.8"
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "0.2.23", features = ["full"] }
+mysql_async = { version = "0.25.0" }
