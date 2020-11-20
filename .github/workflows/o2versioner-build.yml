@@ -3,8 +3,12 @@ name: o2versioner-build
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'o2versioner/**'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'o2versioner/**'
 
 env:
   CARGO_TERM_COLOR: always
