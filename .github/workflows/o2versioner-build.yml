@@ -1,4 +1,4 @@
-name: Rust
+name: o2versioner-build
 
 on:
   push:
