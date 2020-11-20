@@ -45,9 +45,11 @@ struct State {
 impl State {
     #[allow(dead_code)]
     fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
+        let TxTable { tx_name, table_ops } = tx_table;
+
         TxVN {
-            table_vns: tx_table
-                .table_ops
+            tx_name,
+            table_vns: table_ops
                 .into_iter()
                 .map(|table_op| TableVN {
                     table: table_op.table.clone(),
@@ -205,7 +207,7 @@ mod tests_state {
 
     fn new_tx_table(table_ops: Vec<TableOp>) -> TxTable {
         TxTable {
-            tx_name: String::from("Default Tx Name"),
+            tx_name: String::from("tx007"),
             table_ops,
         }
     }
@@ -233,6 +235,7 @@ mod tests_state {
                 },
             ])),
             TxVN {
+                tx_name: String::from("tx007"),
                 table_vns: vec![
                     TableVN {
                         table: String::from("a"),
@@ -268,6 +271,7 @@ mod tests_state {
                 }
             ],)),
             TxVN {
+                tx_name: String::from("tx007"),
                 table_vns: vec![
                     TableVN {
                         table: String::from("b"),
@@ -298,6 +302,7 @@ mod tests_state {
                 }
             ],)),
             TxVN {
+                tx_name: String::from("tx007"),
                 table_vns: vec![
                     TableVN {
                         table: String::from("b"),
@@ -332,6 +337,7 @@ mod tests_state {
                 }
             ],)),
             TxVN {
+                tx_name: String::from("tx007"),
                 table_vns: vec![
                     TableVN {
                         table: String::from("a"),
