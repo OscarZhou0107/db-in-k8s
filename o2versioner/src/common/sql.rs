@@ -28,12 +28,11 @@ impl SqlRawString {
     ///
     /// Return `Some((transaction_name, mark))` or None
     fn get_tx_data(&self) -> Option<(String, String)> {
-        let sql_candidate = self.0.to_ascii_lowercase();
         let re =
             Regex::new(r"^\s*begin\s+(?:tran|transaction)\s+(\S*)\s*with\s+mark\s+'(.*)'\s*;?\s*$")
                 .unwrap();
 
-        re.captures(&sql_candidate).map(|caps| {
+        re.captures(&self.0.to_ascii_lowercase()).map(|caps| {
             (
                 caps.get(1).unwrap().as_str().to_owned(),
                 caps.get(2).unwrap().as_str().to_owned(),
@@ -142,7 +141,10 @@ impl TxTable {
 /// Unit test for `SqlRawString`
 #[cfg(test)]
 mod tests_sql_raw_string {
+    use super::Operation;
     use super::SqlRawString;
+    use super::TableOp;
+    use super::TxTable;
 
     #[test]
     fn test_get_tx_data() {
@@ -221,6 +223,109 @@ mod tests_sql_raw_string {
                 ))
             )
         });
+    }
+
+    #[test]
+    fn test_to_tx_table() {
+        assert_eq!(
+            SqlRawString::from(
+                "BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';"
+            )
+            .to_tx_table(false),
+            Some(TxTable {
+                tx_name: String::from("tx0"),
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("table1"),
+                        op: Operation::R
+                    },
+                    TableOp {
+                        table: String::from("table2"),
+                        op: Operation::W
+                    },
+                    TableOp {
+                        table: String::from("table3"),
+                        op: Operation::W
+                    },
+                ]
+            })
+        );
+
+        assert_eq!(
+            SqlRawString::from(
+                "BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';"
+            )
+            .to_tx_table(false),
+            Some(TxTable {
+                tx_name: String::from(""),
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("table1"),
+                        op: Operation::R
+                    },
+                    TableOp {
+                        table: String::from("table2"),
+                        op: Operation::W
+                    },
+                    TableOp {
+                        table: String::from("table3"),
+                        op: Operation::W
+                    },
+                ]
+            })
+        );
+
+        assert_eq!(
+            SqlRawString::from(
+                "BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'"
+            )
+            .to_tx_table(false),
+            Some(TxTable {
+                tx_name: String::from(""),
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("table1"),
+                        op: Operation::R
+                    },
+                    TableOp {
+                        table: String::from("table2"),
+                        op: Operation::W
+                    },
+                    TableOp {
+                        table: String::from("table3"),
+                        op: Operation::W
+                    },
+                ]
+            })
+        );
+
+        assert_eq!(
+            SqlRawString::from("BeGin TraNsaction with MarK ''").to_tx_table(false),
+            Some(TxTable {
+                tx_name: String::from(""),
+                table_ops: vec![]
+            })
+        );
+
+        assert_eq!(
+            SqlRawString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'")
+                .to_tx_table(false),
+            None
+        );
+
+        assert_eq!(
+            SqlRawString::from("BeGin TraNsaction with MarK").to_tx_table(false),
+            None
+        );
+
+        assert_eq!(
+            SqlRawString::from("select * from table0;").to_tx_table(false),
+            None
+        );
+
+        assert_eq!(SqlRawString::from("begin").to_tx_table(false), None);
+
+        assert_eq!(SqlRawString::from("").to_tx_table(false), None);
     }
 }
 
