@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)
 #[allow(dead_code)]
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Operation {
     W,
     R,
@@ -53,10 +53,11 @@ impl SqlRawString {
     #[allow(dead_code)]
     pub fn to_tx_table(&self, add_uuid: bool) -> Option<TxTable> {
         self.get_tx_data()
-            .map(|(tx_name, mark)| TxTable::from_string(tx_name, mark, add_uuid))
+            .map(|(tx_name, mark)| TxTable::from_str(&tx_name, &mark, add_uuid))
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct TableOp {
     pub table: String,
     pub op: Operation,
@@ -67,8 +68,7 @@ pub struct TableOp {
 /// # Notes
 /// 1. `table_ops` should have no duplications in terms of `TableOp::table`
 /// 2. Such duplication should only keep the one that `TableOp::op == Operation::W`
-///
-#[derive(Default)]
+#[derive(Default, Debug, Eq, PartialEq)]
 pub struct TxTable {
     pub tx_name: String,
     pub table_ops: Vec<TableOp>,
@@ -81,7 +81,8 @@ impl TxTable {
     /// 1. If `add_uuid == True`, will append uuid to the end of the argument `tx_name`
     /// 2. `add_uuid == False` should only be used for unit testing
     /// 3. Will remove any whitespace from the argument `tx_name`
-    fn process_tx_name(mut tx_name: String, add_uuid: bool) -> String {
+    fn process_tx_name(tx_name: &str, add_uuid: bool) -> String {
+        let mut tx_name = tx_name.to_ascii_lowercase();
         utility::remove_whitespace(&mut tx_name);
         if add_uuid {
             tx_name.push_str("_");
@@ -90,11 +91,47 @@ impl TxTable {
         tx_name
     }
 
-    fn process_table_ops(_mark: String) -> Vec<TableOp> {
-        Vec::new()
+    /// Process the argument `mark` for use as the `TxTable.table_ops` field
+    ///
+    /// # Note
+    /// 1. It supports multiple occurance for read or write keyword
+    /// 2. Any space-separated identifier are associated with the previous keyword if existed; else, will be discarded
+    /// 3. If no identifier is followed after a keyword, the keyword will be ignored
+    fn process_table_ops(mark: &str) -> Vec<TableOp> {
+        mark.to_ascii_lowercase()
+            .split_whitespace()
+            .skip_while(|token| *token != "read" && *token != "write")
+            .scan(None, |is_read_st, token| {
+                if token == "read" {
+                    *is_read_st = Some(true);
+                    return Some(None);
+                } else if token == "write" {
+                    *is_read_st = Some(false);
+                    return Some(None);
+                } else {
+                    // is_read_st can't be None here because
+                    // we should have met at least one key word
+                    if is_read_st.unwrap() {
+                        return Some(Some((token, Operation::R)));
+                    } else {
+                        return Some(Some((token, Operation::W)));
+                    }
+                }
+            })
+            .filter_map(|token_op| token_op)
+            .map(|(token, op)| TableOp {
+                table: token.to_owned(),
+                op,
+            })
+            .collect()
     }
 
-    fn from_string(tx_name: String, mark: String, add_uuid: bool) -> TxTable {
+    /// Construct a `TxTable` with raw string arguments `tx_name` and `mark`
+    /// which are then processed to form the `TxTable.tx_name` and `TxTable.table_ops` fields
+    ///
+    /// # Note
+    /// Refer to `TxTable::process_tx_name` and `TxTable::process_table_ops` for processing details
+    fn from_str(tx_name: &str, mark: &str, add_uuid: bool) -> TxTable {
         TxTable {
             tx_name: TxTable::process_tx_name(tx_name, add_uuid),
             table_ops: TxTable::process_table_ops(mark),
@@ -190,34 +227,305 @@ mod tests_sql_raw_string {
 /// Unit test for `TxTable`
 #[cfg(test)]
 mod tests_tx_table {
+    use super::Operation;
+    use super::TableOp;
     use super::TxTable;
 
     #[test]
     fn test_process_tx_name() {
-        assert_eq!(
-            TxTable::process_tx_name(String::from("  tx_name  "), false),
-            String::from("tx_name")
-        );
+        assert_eq!(TxTable::process_tx_name("  tx_name  ", false), *"tx_name");
 
         assert_eq!(
-            TxTable::process_tx_name(String::from("  tx_name 1 2 3  "), false),
-            String::from("tx_name123")
+            TxTable::process_tx_name("  tx_name 1 2 3  ", false),
+            *"tx_name123"
         );
 
-        assert_eq!(
-            TxTable::process_tx_name(String::from("   "), false),
-            String::from("")
-        );
+        assert_eq!(TxTable::process_tx_name("   ", false), *"");
 
-        assert_eq!(
-            TxTable::process_tx_name(String::from("tx_name"), false),
-            String::from("tx_name")
-        );
+        assert_eq!(TxTable::process_tx_name("tx_name", false), *"tx_name");
     }
 
     #[test]
-    fn test_process_table_ops() {}
+    fn test_process_table_ops() {
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 table_r_1 write table_w_0"),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops(" read     table_r_0   table_r_1    write  table_w_0 "),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("write table_w_0 read table_r_0 table_r_1"),
+            vec![
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops(
+                "write table_w_0write read table_r_0read writetable_r_1read"
+            ),
+            vec![
+                TableOp {
+                    table: String::from("table_w_0write"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("table_r_0read"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("writetable_r_1read"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("write read table_r_0 table_r_1"),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 table_r_1 write"),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(TxTable::process_table_ops("read write"), vec![]);
+
+        assert_eq!(TxTable::process_table_ops(""), vec![]);
+
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 read table_r_1 write table_w_0"),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 write table_w_0 read table_r_1 "),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 write read table_r_1 "),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 write read"),
+            vec![TableOp {
+                table: String::from("table_r_0"),
+                op: Operation::R,
+            },]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops("read table_r_0 writeread"),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("writeread"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops(
+                "read table_r_0 write table_w_0 read table_r_1 write table_w_1"
+            ),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_1"),
+                    op: Operation::W,
+                },
+            ]
+        );
+
+        assert_eq!(
+            TxTable::process_table_ops(
+                "table0 table1 table2 read table_r_0 table_r_1 write table_w_0"
+            ),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+            ]
+        );
+
+        assert_eq!(TxTable::process_table_ops("table0 table1 table2"), vec![]);
+    }
 
     #[test]
-    fn test_from_string() {}
+    fn test_from_str() {
+        assert_eq!(
+            TxTable::from_str("tx0", "read tr0 tr1 write tw0 tw1", false),
+            TxTable {
+                tx_name: String::from("tx0"),
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("tr0"),
+                        op: Operation::R
+                    },
+                    TableOp {
+                        table: String::from("tr1"),
+                        op: Operation::R
+                    },
+                    TableOp {
+                        table: String::from("tw0"),
+                        op: Operation::W
+                    },
+                    TableOp {
+                        table: String::from("tw1"),
+                        op: Operation::W
+                    },
+                ]
+            }
+        );
+
+        assert_eq!(
+            TxTable::from_str("tx1", "read tr0 write tw0 read tr1 write", false),
+            TxTable {
+                tx_name: String::from("tx1"),
+                table_ops: vec![
+                    TableOp {
+                        table: String::from("tr0"),
+                        op: Operation::R
+                    },
+                    TableOp {
+                        table: String::from("tw0"),
+                        op: Operation::W
+                    },
+                    TableOp {
+                        table: String::from("tr1"),
+                        op: Operation::R
+                    },
+                ]
+            }
+        );
+
+        assert_eq!(
+            TxTable::from_str("", "", false),
+            TxTable {
+                tx_name: String::from(""),
+                table_ops: vec![]
+            }
+        );
+    }
 }
