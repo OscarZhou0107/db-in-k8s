@@ -8,12 +8,12 @@ edition = "2018"
 
 
 [dependencies]
-actix-web = "3"
 actix-session = "0.4"
+actix-web = "3"
 env_logger = "0.8"
 log = "0.4"
+mysql_async = { version = "0.25.0" }
 regex = "1"
 serde = { version = "1.0", features = ["derive"] }
-uuid = { version = "0.8", features = ["v4"] }
 tokio = { version = "0.2.23", features = ["full"] }
-mysql_async = { version = "0.25.0" }
+uuid = { version = "0.8", features = ["v4"] }

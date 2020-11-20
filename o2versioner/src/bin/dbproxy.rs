@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use o2versioner::dbproxy::*;
 use std::{collections::HashMap, sync::Mutex};
 use mysql_async::prelude::*;
