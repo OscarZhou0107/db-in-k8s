@@ -1,6 +1,14 @@
 # dv-in-rust
 Distributed Versioning in Rust
 
+
+[![Build Status][actions-badge]][actions-url]
+
+
+[actions-badge]: https://github.com/lichen-liu/dv-in-rust/workflows/o2versioner-build/badge.svg
+[actions-url]: https://github.com/lichen-liu/dv-in-rust/actions?query=workflow%3Ao2versioner-build
+
+
 ## 1.0 Paper of reference
 Distributed Versioning: Consistent Replication for Scaling Back-end Databases of Dynamic Content Web Sites  
 [Link to Paper](https://www.eecg.utoronto.ca/~amza/papers/consistency.pdf)  
