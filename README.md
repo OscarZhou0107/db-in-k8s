@@ -71,8 +71,8 @@ Asynchronous: Tokio maps N spawned async functions (`tokio::spawn()`) onto K wor
 7. `.await` (or nonblocking) means yielding the current spawned async function, so that the current worker thread can
 execute other spanwed async functions. Blocking means the current spawned async function will fully occupy the current
 worker thread to spin and do nothing, basically wasting the worker thread pool resources.
-8. `tokio::spawn()` returns a `future`, and this `future` must also be properly `.await` for it to execute to complete.
-Similar to a thread join.
+8. `tokio::spawn()` returns a `future`, and this `future` must also be properly `.await` for it to execute to complete,
+similar to a thread join.
 
 ## References
 1. [The book](https://doc.rust-lang.org/book/title-page.html)  
