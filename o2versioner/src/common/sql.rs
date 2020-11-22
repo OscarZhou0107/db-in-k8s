@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)
 #[allow(dead_code)]
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum Operation {
     W,
     R,
@@ -56,7 +56,7 @@ impl SqlRawString {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
     pub table: String,
     pub op: Operation,
@@ -67,7 +67,7 @@ pub struct TableOp {
 /// # Notes
 /// 1. `table_ops` should have no duplications in terms of `TableOp::table`
 /// 2. Such duplication should only keep the one that `TableOp::op == Operation::W`
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxTable {
     pub tx_name: String,
     pub table_ops: Vec<TableOp>,

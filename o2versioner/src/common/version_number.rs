@@ -1,10 +1,11 @@
 use super::sql::Operation;
+use serde::{Deserialize, Serialize};
 
 /// Version number
 pub type VN = u64;
 
 /// Version number of a table
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableVN {
     pub table: String,
     pub vn: VN,
@@ -12,7 +13,7 @@ pub struct TableVN {
 }
 
 /// Version numbers of tables declared by a transaction
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
     pub tx_name: String,
     // A single vec storing all W and R `TableVN` for now
