@@ -37,7 +37,7 @@ impl TableVNRecord {
 
 /// Sequencer state
 #[allow(dead_code)]
-struct State {
+pub struct State {
     vn_record: HashMap<String, TableVNRecord>,
 }
 

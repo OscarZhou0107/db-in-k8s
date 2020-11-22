@@ -1,17 +1,21 @@
-#[allow(unused_imports)]
-use super::core;
+use super::core::State;
 use crate::comm::scheduler_sequencer;
 use futures::prelude::*;
 use log::info;
+use std::sync::{Arc, Mutex};
 use tokio::net::ToSocketAddrs;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
+
+type ArcState = Arc<Mutex<State>>;
 
 /// Main entrance for the sequencer
 ///
 /// 1. `addr` is the tcp port to bind to
 /// 2. `max_connection` can be specified to limit the max number of connections allowed
 pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
+    let state = Arc::new(Mutex::new(State::new()));
+
     let mut listener = TcpListener::bind(addr).await.unwrap();
 
     let mut cur_num_connection = 0;
@@ -23,7 +27,7 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
         cur_num_connection += 1;
 
         // Spawn a new thread for each tcp connection
-        spawned_tasks.push(tokio::spawn(process_connection(tcp_stream)));
+        spawned_tasks.push(tokio::spawn(process_connection(tcp_stream, state.clone())));
 
         // An optional max number of connections allowed
         if let Some(nmax) = max_connection {
@@ -41,7 +45,7 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(tcp_stream: TcpStream) {
+async fn process_connection(tcp_stream: TcpStream, _state: ArcState) {
     // Delimit frames from bytes using a length header
     let length_delimited = Framed::new(tcp_stream, LengthDelimitedCodec::new());
 
