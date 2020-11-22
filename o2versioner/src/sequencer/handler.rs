@@ -5,6 +5,10 @@ use tokio::net::ToSocketAddrs;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
+/// Main entrance for the sequencer
+///
+/// 1. `addr` is the tcp port to bind to
+/// 2. `max_connection` can be specified to limit the max number of connections allowed
 pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
     let mut listener = TcpListener::bind(addr).await.unwrap();
 
@@ -31,6 +35,10 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
     futures::future::join_all(spawned_tasks).await;
 }
 
+/// Process the `tcp_stream` for a single connection
+///
+/// Will process all messages sent via this `tcp_stream` on this tcp connection.
+/// Once this tcp connection is closed, this function will return
 async fn process_connection(tcp_stream: TcpStream) {
     // Delimit frames from bytes using a length header
     let length_delimited = Framed::new(tcp_stream, LengthDelimitedCodec::new());
