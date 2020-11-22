@@ -17,13 +17,15 @@ fn init_logger() {
 #[test]
 fn mock_sequencer_connection() {
     init_logger();
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async {
-        let sequencer_handle = tokio::spawn(handler::main("127.0.0.1:6379", Some(1)));
+    let port = "127.0.0.1:6389";
 
-        tokio::spawn(async {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async move {
+        let sequencer_handle = tokio::spawn(handler::main(port, Some(1)));
+
+        tokio::spawn(async move {
             // Connect to a socket
-            let socket = TcpStream::connect("127.0.0.1:6379").await.unwrap();
+            let socket = TcpStream::connect(port).await.unwrap();
 
             // Delimit frames from bytes using a length header
             let length_delimited = Framed::new(socket, LengthDelimitedCodec::new());
