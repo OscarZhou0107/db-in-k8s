@@ -51,6 +51,7 @@ o2versioner
 │  ├── dbproxy    # dbproxy library
 │  ├── scheduler  # scheduler library
 │  ├── sequencer  # sequencer library
+│  ├── util       # utility library
 │  └── lib.rs     # declaration of the mods above
 └── tests         # system level testing
 ```
