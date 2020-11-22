@@ -59,8 +59,10 @@ o2versioner
 ## Notes for Tokio, `async` and `.await`
 1. Everything is around `future` or `stream` (like `Vec<future>`).
 2. `future` and `stream` must be run to complete; otherwise their enclosed closures won't be executed.
-3. `.await` is used to execute the `future`.
-4. Functions or closures with `.await` inside must be declared with `async`.
+3. `future` needs to be executed eventually by `.await`. If a `inner: future` lives inside another `outer: future`,
+`outer.await` does not automatically imply `inner` will be executed nor `inner.await` is applied. In such case, `inner.await`
+needs to be applied manually inside `outer`.
+4. Functions or closures with `.await` inside must be declared with `async`, and they will return a `future`.
 5. `.await` means nonblockingly executing the future. The program is still executed from top to bottom as usual.
 `.await` only means the current thread won't be blocked or spinning to wait for the `future` to return.
 After `.await` is returned, the next line is executed.
