@@ -1,5 +1,5 @@
-use crate::common::sql::{Operation, TxTable};
-use crate::common::version_number::{TableVN, TxVN, VN};
+use crate::core::sql::{Operation, TxTable};
+use crate::core::version_number::{TableVN, TxVN, VN};
 use std::collections::HashMap;
 
 /// Version number info for a single table

@@ -28,7 +28,8 @@ cargo run --bin sequencer
 ```
 src  
 ├── bin        # Executables
-├── common     # Common library
+├── core       # communication-related
+├── core       # core data structure and algorithm
 ├── dbproxy    # dbproxy library
 ├── scheduler  # scheduler library
 ├── sequencer  # sequencer library

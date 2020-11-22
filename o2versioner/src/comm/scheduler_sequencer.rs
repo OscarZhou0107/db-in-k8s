@@ -1,5 +1,5 @@
-use crate::common::sql::TxTable;
-use crate::common::version_number::TxVN;
+use crate::core::sql::TxTable;
+use crate::core::version_number::TxVN;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
