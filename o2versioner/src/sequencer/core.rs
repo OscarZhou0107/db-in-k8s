@@ -1,5 +1,5 @@
-use crate::common::sql::{Operation, TxTable};
-use crate::common::version_number::{TableVN, TxVN, VN};
+use crate::core::sql::{Operation, TxTable};
+use crate::core::version_number::{TableVN, TxVN, VN};
 use std::collections::HashMap;
 
 /// Version number info for a single table
@@ -37,12 +37,18 @@ impl TableVNRecord {
 
 /// Sequencer state
 #[allow(dead_code)]
-#[derive(Default)]
 struct State {
     vn_record: HashMap<String, TableVNRecord>,
 }
 
 impl State {
+    #[allow(dead_code)]
+    pub fn new() -> State {
+        State {
+            vn_record: HashMap::new(),
+        }
+    }
+
     #[allow(dead_code)]
     fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
         let TxTable { tx_name, table_ops } = tx_table;
@@ -53,11 +59,7 @@ impl State {
                 .into_iter()
                 .map(|table_op| TableVN {
                     table: table_op.table.clone(),
-                    vn: self
-                        .vn_record
-                        .entry(table_op.table)
-                        .or_default()
-                        .assign(&table_op.op),
+                    vn: self.vn_record.entry(table_op.table).or_default().assign(&table_op.op),
                     op: table_op.op,
                 })
                 .collect(),
@@ -202,8 +204,8 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
-    use crate::common::sql::{Operation, TableOp, TxTable};
-    use crate::common::version_number::{TableVN, TxVN};
+    use crate::core::sql::{Operation, TableOp, TxTable};
+    use crate::core::version_number::{TableVN, TxVN};
 
     fn new_tx_table(table_ops: Vec<TableOp>) -> TxTable {
         TxTable {
@@ -214,7 +216,7 @@ mod tests_state {
 
     #[test]
     fn test_assign_vn() {
-        let mut state: State = Default::default();
+        let mut state = State::new();
 
         //                   a     b     c
         // next_for_read     0     0     0

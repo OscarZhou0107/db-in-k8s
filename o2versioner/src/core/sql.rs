@@ -1,11 +1,11 @@
-use super::utility;
+use crate::util::common;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)
 #[allow(dead_code)]
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum Operation {
     W,
     R,
@@ -20,7 +20,7 @@ pub struct SqlRawString(pub String);
 impl SqlRawString {
     /// Convenience constructor to build `SqlRawString` from `&str`
     #[allow(dead_code)]
-    fn from(raw_str: &str) -> SqlRawString {
+    pub fn from(raw_str: &str) -> SqlRawString {
         SqlRawString(raw_str.to_owned())
     }
 
@@ -28,9 +28,7 @@ impl SqlRawString {
     ///
     /// Return `Some((transaction_name, mark))` or None
     fn get_tx_data(&self) -> Option<(String, String)> {
-        let re =
-            Regex::new(r"^\s*begin\s+(?:tran|transaction)\s+(\S*)\s*with\s+mark\s+'(.*)'\s*;?\s*$")
-                .unwrap();
+        let re = Regex::new(r"^\s*begin\s+(?:tran|transaction)\s+(\S*)\s*with\s+mark\s+'(.*)'\s*;?\s*$").unwrap();
 
         re.captures(&self.0.to_ascii_lowercase()).map(|caps| {
             (
@@ -56,7 +54,7 @@ impl SqlRawString {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
     pub table: String,
     pub op: Operation,
@@ -67,7 +65,7 @@ pub struct TableOp {
 /// # Notes
 /// 1. `table_ops` should have no duplications in terms of `TableOp::table`
 /// 2. Such duplication should only keep the one that `TableOp::op == Operation::W`
-#[derive(Default, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxTable {
     pub tx_name: String,
     pub table_ops: Vec<TableOp>,
@@ -82,7 +80,7 @@ impl TxTable {
     /// 3. Will remove any whitespace from the argument `tx_name`
     fn process_tx_name(tx_name: &str, add_uuid: bool) -> String {
         let mut tx_name = tx_name.to_ascii_lowercase();
-        utility::remove_whitespace(&mut tx_name);
+        common::remove_whitespace(&mut tx_name);
         if add_uuid {
             tx_name.push_str("_");
             tx_name.push_str(&Uuid::new_v4().to_string());
@@ -150,43 +148,25 @@ mod tests_sql_raw_string {
     fn test_get_tx_data() {
         let tests = vec![
             (
-                SqlRawString::from(
-                    "BEGIN TRAN trans1 WITH MARK 'READ table_0 table_1 WRITE table_2';",
-                ),
+                SqlRawString::from("BEGIN TRAN trans1 WITH MARK 'READ table_0 table_1 WRITE table_2';"),
                 Some(("trans1", "READ table_0 table_1 WRITE table_2")),
             ),
             (
                 SqlRawString::from("BEGIN TRAN WITH MARK 'READ table_0 table_1 WRITE table_2';"),
                 Some(("", "READ table_0 table_1 WRITE table_2")),
             ),
+            (SqlRawString::from("BEGIN TRAN WITH MARK '';"), Some(("", ""))),
+            (SqlRawString::from("BEGIN TRAN WITH MARK ''"), Some(("", ""))),
             (
-                SqlRawString::from("BEGIN TRAN WITH MARK '';"),
-                Some(("", "")),
-            ),
-            (
-                SqlRawString::from("BEGIN TRAN WITH MARK ''"),
-                Some(("", "")),
-            ),
-            (
-                SqlRawString::from(
-                    "BEGIN TRANSACTION trans1 WITH MARK 'WRITE table_2 READ table_0 table_1';",
-                ),
+                SqlRawString::from("BEGIN TRANSACTION trans1 WITH MARK 'WRITE table_2 READ table_0 table_1';"),
                 Some(("trans1", "WRITE table_2 READ table_0 table_1")),
             ),
             (
-                SqlRawString::from(
-                    "BEGIN TRANSACTION WITH MARK 'WRITE table_2 READ table_0 table_1';",
-                ),
+                SqlRawString::from("BEGIN TRANSACTION WITH MARK 'WRITE table_2 READ table_0 table_1';"),
                 Some(("", "WRITE table_2 READ table_0 table_1")),
             ),
-            (
-                SqlRawString::from("BEGIN TRANSACTION WITH MARK '';"),
-                Some(("", "")),
-            ),
-            (
-                SqlRawString::from("BEGIN TRANSACTION WITH MARK ''"),
-                Some(("", "")),
-            ),
+            (SqlRawString::from("BEGIN TRANSACTION WITH MARK '';"), Some(("", ""))),
+            (SqlRawString::from("BEGIN TRANSACTION WITH MARK ''"), Some(("", ""))),
             (
                 SqlRawString::from("     BEGIN  TRANSACTION   WITH MARK '   READ   table_0'   ;  "),
                 Some(("", "   READ   table_0")),
@@ -194,22 +174,11 @@ mod tests_sql_raw_string {
             (SqlRawString::from("SELECT * FROM table_0;"), None),
             (SqlRawString::from("BGIN TRANSACTION WITH MARK ''"), None),
             (SqlRawString::from("BEGIN TRENSACTION WITH MARK ''"), None),
+            (SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
+            (SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
+            (SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK'';"), None),
             (
-                SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK;"),
-                None,
-            ),
-            (
-                SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK;"),
-                None,
-            ),
-            (
-                SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK'';"),
-                None,
-            ),
-            (
-                SqlRawString::from(
-                    "BEGIN TRANSACTION trans0 WITH MARK 'read table_2 write    table_0';",
-                ),
+                SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK 'read table_2 write    table_0';"),
                 Some(("trans0", "read table_2 write    table_0")),
             ),
         ];
@@ -217,10 +186,7 @@ mod tests_sql_raw_string {
         tests.into_iter().for_each(|(sql_raw_string, res)| {
             assert_eq!(
                 sql_raw_string.get_tx_data(),
-                res.map(|res_ref| (
-                    res_ref.0.to_ascii_lowercase(),
-                    res_ref.1.to_ascii_lowercase()
-                ))
+                res.map(|res_ref| (res_ref.0.to_ascii_lowercase(), res_ref.1.to_ascii_lowercase()))
             )
         });
     }
@@ -228,10 +194,8 @@ mod tests_sql_raw_string {
     #[test]
     fn test_to_tx_table() {
         assert_eq!(
-            SqlRawString::from(
-                "BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';"
-            )
-            .to_tx_table(false),
+            SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
+                .to_tx_table(false),
             Some(TxTable {
                 tx_name: String::from("tx0"),
                 table_ops: vec![
@@ -252,10 +216,8 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from(
-                "BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';"
-            )
-            .to_tx_table(false),
+            SqlRawString::from("BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';")
+                .to_tx_table(false),
             Some(TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![
@@ -276,10 +238,8 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from(
-                "BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'"
-            )
-            .to_tx_table(false),
+            SqlRawString::from("BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'")
+                .to_tx_table(false),
             Some(TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![
@@ -308,8 +268,7 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'")
-                .to_tx_table(false),
+            SqlRawString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'").to_tx_table(false),
             None
         );
 
@@ -318,10 +277,7 @@ mod tests_sql_raw_string {
             None
         );
 
-        assert_eq!(
-            SqlRawString::from("select * from table0;").to_tx_table(false),
-            None
-        );
+        assert_eq!(SqlRawString::from("select * from table0;").to_tx_table(false), None);
 
         assert_eq!(SqlRawString::from("begin").to_tx_table(false), None);
 
@@ -340,10 +296,7 @@ mod tests_tx_table {
     fn test_process_tx_name() {
         assert_eq!(TxTable::process_tx_name("  tx_name  ", false), *"tx_name");
 
-        assert_eq!(
-            TxTable::process_tx_name("  tx_name 1 2 3  ", false),
-            *"tx_name123"
-        );
+        assert_eq!(TxTable::process_tx_name("  tx_name 1 2 3  ", false), *"tx_name123");
 
         assert_eq!(TxTable::process_tx_name("   ", false), *"");
 
@@ -407,9 +360,7 @@ mod tests_tx_table {
         );
 
         assert_eq!(
-            TxTable::process_table_ops(
-                "write table_w_0write read table_r_0read writetable_r_1read"
-            ),
+            TxTable::process_table_ops("write table_w_0write read table_r_0read writetable_r_1read"),
             vec![
                 TableOp {
                     table: String::from("table_w_0write"),
@@ -531,9 +482,7 @@ mod tests_tx_table {
         );
 
         assert_eq!(
-            TxTable::process_table_ops(
-                "read table_r_0 write table_w_0 read table_r_1 write table_w_1"
-            ),
+            TxTable::process_table_ops("read table_r_0 write table_w_0 read table_r_1 write table_w_1"),
             vec![
                 TableOp {
                     table: String::from("table_r_0"),
@@ -555,9 +504,7 @@ mod tests_tx_table {
         );
 
         assert_eq!(
-            TxTable::process_table_ops(
-                "table0 table1 table2 read table_r_0 table_r_1 write table_w_0"
-            ),
+            TxTable::process_table_ops("table0 table1 table2 read table_r_0 table_r_1 write table_w_0"),
             vec![
                 TableOp {
                     table: String::from("table_r_0"),

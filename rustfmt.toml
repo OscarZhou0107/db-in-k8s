@@ -1,0 +1,2 @@
+# Make Rustfmt work when we have a super long line
+max_width = 120

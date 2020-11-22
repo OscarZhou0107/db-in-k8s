@@ -1,4 +1,4 @@
-use crate::common::sql::SqlRawString;
+use crate::core::sql::SqlRawString;
 use actix_session::Session;
 use actix_web::{get, post, web, HttpMessage, HttpRequest, Responder};
 use log::info;
