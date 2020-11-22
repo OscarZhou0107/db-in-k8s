@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)
-#[allow(dead_code)]
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum Operation {
     W,
@@ -47,7 +46,6 @@ impl SqlRawString {
     /// # Note
     /// 1. If `add_uuid == True`, will append uuid to the end of `TxTable::tx_name`
     /// 2. `add_uuid == False` should only be used for unit testing
-    #[allow(dead_code)]
     pub fn to_tx_table(&self, add_uuid: bool) -> Option<TxTable> {
         self.get_tx_data()
             .map(|(tx_name, mark)| TxTable::from_str(&tx_name, &mark, add_uuid))
@@ -94,6 +92,7 @@ impl TxTable {
     /// 1. It supports multiple occurance for read or write keyword
     /// 2. Any space-separated identifier are associated with the previous keyword if existed; else, will be discarded
     /// 3. If no identifier is followed after a keyword, the keyword will be ignored
+    /// 4. TODO: Fix conflict of a table being read and write at the same time
     fn process_table_ops(mark: &str) -> Vec<TableOp> {
         mark.to_ascii_lowercase()
             .split_whitespace()

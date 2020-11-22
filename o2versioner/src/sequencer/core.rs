@@ -36,21 +36,18 @@ impl TableVNRecord {
 }
 
 /// Sequencer state
-#[allow(dead_code)]
 pub struct State {
     vn_record: HashMap<String, TableVNRecord>,
 }
 
 impl State {
-    #[allow(dead_code)]
     pub fn new() -> State {
         State {
             vn_record: HashMap::new(),
         }
     }
 
-    #[allow(dead_code)]
-    fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
+    pub fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
         let TxTable { tx_name, table_ops } = tx_table;
 
         TxVN {

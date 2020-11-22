@@ -2,8 +2,11 @@ use env_logger;
 use futures::prelude::*;
 use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::sql::*;
+use o2versioner::core::version_number::*;
 use o2versioner::sequencer::handler;
 use tokio::net::TcpStream;
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::Framed;
 use tokio_util::codec::LengthDelimitedCodec;
 
@@ -31,11 +34,8 @@ fn mock_sequencer_connection() {
             let length_delimited = Framed::new(socket, LengthDelimitedCodec::new());
 
             // Deserialize/Serialize frames using JSON codec
-            let mut serded: tokio_serde::SymmetricallyFramed<_, scheduler_sequencer::Message, _> =
-                tokio_serde::SymmetricallyFramed::new(
-                    length_delimited,
-                    tokio_serde::formats::SymmetricalJson::default(),
-                );
+            let mut serded: SymmetricallyFramed<_, scheduler_sequencer::Message, _> =
+                SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
 
             // Send a message
             serded
@@ -56,6 +56,27 @@ fn mock_sequencer_connection() {
                     .to_tx_table(false)
                     .unwrap(),
                 ))
+                .await
+                .unwrap();
+
+            // Send a message
+            serded
+                .send(scheduler_sequencer::Message::TxVNResponse(TxVN {
+                    tx_name: String::from("tx2"),
+                    // A single vec storing all W and R `TableVN` for now
+                    table_vns: vec![
+                        TableVN {
+                            table: String::from("table0"),
+                            vn: 0,
+                            op: Operation::W,
+                        },
+                        TableVN {
+                            table: String::from("table1"),
+                            vn: 2,
+                            op: Operation::R,
+                        },
+                    ],
+                }))
                 .await
                 .unwrap();
         })

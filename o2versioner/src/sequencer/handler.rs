@@ -1,10 +1,12 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer;
 use futures::prelude::*;
-use log::info;
+use log::{info, warn};
 use std::sync::{Arc, Mutex};
 use tokio::net::ToSocketAddrs;
 use tokio::net::{TcpListener, TcpStream};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 type ArcState = Arc<Mutex<State>>;
@@ -45,21 +47,31 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(tcp_stream: TcpStream, _state: ArcState) {
+async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
     // Delimit frames from bytes using a length header
     let length_delimited = Framed::new(tcp_stream, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded: tokio_serde::SymmetricallyFramed<_, scheduler_sequencer::Message, _> =
-        tokio_serde::SymmetricallyFramed::new(
-            length_delimited,
-            tokio_serde::formats::SymmetricalJson::<scheduler_sequencer::Message>::default(),
-        );
+    let serded: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+        length_delimited,
+        SymmetricalJson::<scheduler_sequencer::Message>::default(),
+    );
 
     // Process a stream of incomming messages from a single tcp connection
     serded
         .for_each(|msg| {
-            info!("GOT: {:?}", msg);
+            match msg {
+                Ok(msg) => match msg {
+                    scheduler_sequencer::Message::TxVNRequest(tx_table) => {
+                        info!("Ready to process TxVNRequest on {:?}", tx_table);
+                        let mut state = state.lock().unwrap();
+                        let tx_vn = state.assign_vn(tx_table);
+                        info!("    {:?}", tx_vn);
+                    }
+                    other => warn!("Unsupported message {:?}", other),
+                },
+                Err(e) => warn!("Encoutered {} when decoding incoming TCP message", e),
+            }
             future::ready(())
         })
         .await;
