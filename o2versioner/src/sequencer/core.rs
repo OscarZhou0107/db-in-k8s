@@ -37,12 +37,18 @@ impl TableVNRecord {
 
 /// Sequencer state
 #[allow(dead_code)]
-#[derive(Default)]
 struct State {
     vn_record: HashMap<String, TableVNRecord>,
 }
 
 impl State {
+    #[allow(dead_code)]
+    pub fn new() -> State {
+        State {
+            vn_record: HashMap::new(),
+        }
+    }
+
     #[allow(dead_code)]
     fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
         let TxTable { tx_name, table_ops } = tx_table;
@@ -53,11 +59,7 @@ impl State {
                 .into_iter()
                 .map(|table_op| TableVN {
                     table: table_op.table.clone(),
-                    vn: self
-                        .vn_record
-                        .entry(table_op.table)
-                        .or_default()
-                        .assign(&table_op.op),
+                    vn: self.vn_record.entry(table_op.table).or_default().assign(&table_op.op),
                     op: table_op.op,
                 })
                 .collect(),
@@ -214,7 +216,7 @@ mod tests_state {
 
     #[test]
     fn test_assign_vn() {
-        let mut state: State = Default::default();
+        let mut state = State::new();
 
         //                   a     b     c
         // next_for_read     0     0     0

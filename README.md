@@ -26,6 +26,8 @@ cargo run --bin sequencer
 
 ### To build and test
 ```sh
+cargo test
+# To capture stdout
 cargo test -- --nocapture
 ```
 

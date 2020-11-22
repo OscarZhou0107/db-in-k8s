@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use super::core;
 use crate::comm::scheduler_sequencer;
 use futures::prelude::*;
 use log::info;
