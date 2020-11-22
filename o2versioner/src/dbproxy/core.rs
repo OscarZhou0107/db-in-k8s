@@ -229,6 +229,7 @@ fn test_sql_connection() {
 }
 
 #[test]
+#[ignore]
 fn run_sql_query() {
     let mut rt = Runtime::new().unwrap();
 
