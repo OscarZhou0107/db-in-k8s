@@ -19,9 +19,9 @@ Cristiana Amza, Alan L. Cox and Willy Zwaenepoel
 
 ### To build and run
 ```sh
-cargo run --bin dbproxy
-cargo run --bin scheduler
-cargo run --bin sequencer
+cargo run --bin dbproxy_exe
+cargo run --bin scheduler_exe
+cargo run --bin sequencer_exe
 ```
 
 ### To build and test
@@ -43,14 +43,16 @@ cargo check
 
 ### Project layout
 ```
-src  
-├── bin        # Executables
-├── core       # communication-related
-├── core       # core data structure and algorithm
-├── dbproxy    # dbproxy library
-├── scheduler  # scheduler library
-├── sequencer  # sequencer library
-└── lib.rs     # Declaration of the mods above
+o2versioner
+├── src  
+│  ├── bin        # executables
+│  ├── comm       # communication-related
+│  ├── core       # core data structure and algorithm
+│  ├── dbproxy    # dbproxy library
+│  ├── scheduler  # scheduler library
+│  ├── sequencer  # sequencer library
+│  └── lib.rs     # declaration of the mods above
+└── tests         # system level testing
 ```
 
 ## Notes for Tokio, `async` and `.await`
