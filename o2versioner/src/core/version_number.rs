@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub type VN = u64;
 
 /// Version number of a table
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub struct TableVN {
     pub table: String,
     pub vn: VN,
