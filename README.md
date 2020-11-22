@@ -51,7 +51,23 @@ src
 └── lib.rs     # Declaration of the mods above
 ```
 
-### References
+## Notes for Tokio and async
+1. Everything is around `future` or `stream` (like `Vec<future>`).
+2. `future` and `stream` must be run to complete; otherwise their enclosed closures won't be executed.
+3. `.await` is used to execute the `future`.
+4. Functions or closures with `.await` inside must be declared with `async`.
+5. `.await` means nonblockingly executing the future. The program is still executed from top to bottom as usual.
+`.await` only means the current thread won't be blocked or spinning to wait for the `future` to return.
+After `.await` is returned, the next line is executed.
+6. Multithreading: OS maps N threads onto K CPU cores.  
+Asynchronous: Tokio maps N spawned async functions (`tokio::spawn()`) onto K worker threads.
+7. `.await` (or nonblocking) means yielding the current spawned async function, so that the current worker thread can
+execute other spanwed async functions. Blocking means the current spawned async function will fully occupy the current
+worker thread to spin and do nothing, basically wasting the worker thread pool resources.
+8. `tokio::spawn()` returns a `future`, and this `future` must also be properly `.await` for it to execute to complete.
+Similar to a thread join.
+
+## References
 1. [The book](https://doc.rust-lang.org/book/title-page.html)  
 2. [Package Layout](https://doc.rust-lang.org/cargo/guide/project-layout.html)  
 3. [Actix Web](https://actix.rs/docs/getting-started/)
