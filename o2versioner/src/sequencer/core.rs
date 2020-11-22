@@ -202,8 +202,8 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
-    use crate::common::sql::{Operation, TableOp, TxTable};
-    use crate::common::version_number::{TableVN, TxVN};
+    use crate::core::sql::{Operation, TableOp, TxTable};
+    use crate::core::version_number::{TableVN, TxVN};
 
     fn new_tx_table(table_ops: Vec<TableOp>) -> TxTable {
         TxTable {
