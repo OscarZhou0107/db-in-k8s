@@ -17,13 +17,13 @@ pub enum Operation {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SqlRawString(pub String);
 
-impl SqlRawString {
-    /// Convenience constructor to build `SqlRawString` from `&str`
-    #[allow(dead_code)]
-    pub fn from(raw_str: &str) -> SqlRawString {
-        SqlRawString(raw_str.to_owned())
+impl<'a> From<&'a str> for SqlRawString {
+    fn from(s: &'a str) -> Self {
+        SqlRawString(s.to_owned())
     }
+}
 
+impl SqlRawString {
     /// Parse the transaction name and mark if valid
     ///
     /// Return `Some((transaction_name, mark))` or None
