@@ -9,19 +9,15 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
     let mut listener = TcpListener::bind(addr).await.unwrap();
 
     let mut cur_num_connection = 0;
+    let mut spawned_tasks = Vec::new();
     loop {
         let (tcp_stream, peer_addr) = listener.accept().await.unwrap();
 
-        info!(
-            "Connection established with [{}] {}",
-            cur_num_connection, peer_addr
-        );
+        info!("Connection established with [{}] {}", cur_num_connection, peer_addr);
         cur_num_connection += 1;
 
         // Spawn a new thread for each tcp connection
-        tokio::spawn(async move {
-            process_connection(tcp_stream).await;
-        });
+        spawned_tasks.push(tokio::spawn(process_connection(tcp_stream)));
 
         // An optional max number of connections allowed
         if let Some(nmax) = max_connection {
@@ -30,6 +26,9 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
             }
         }
     }
+
+    // Wait on all spawned tasks to finish
+    futures::future::join_all(spawned_tasks).await;
 }
 
 async fn process_connection(tcp_stream: TcpStream) {
@@ -45,10 +44,9 @@ async fn process_connection(tcp_stream: TcpStream) {
 
     // Process a stream of incomming messages from a single tcp connection
     serded
-        .try_for_each(|msg| {
+        .for_each(|msg| {
             info!("GOT: {:?}", msg);
-            future::ok(())
+            future::ready(())
         })
-        .await
-        .unwrap();
+        .await;
 }

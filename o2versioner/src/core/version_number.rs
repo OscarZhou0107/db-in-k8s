@@ -13,7 +13,7 @@ pub struct TableVN {
 }
 
 /// Version numbers of tables declared by a transaction
-#[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
     pub tx_name: String,
     // A single vec storing all W and R `TableVN` for now

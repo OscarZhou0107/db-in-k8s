@@ -20,7 +20,7 @@ pub struct SqlRawString(pub String);
 impl SqlRawString {
     /// Convenience constructor to build `SqlRawString` from `&str`
     #[allow(dead_code)]
-    fn from(raw_str: &str) -> SqlRawString {
+    pub fn from(raw_str: &str) -> SqlRawString {
         SqlRawString(raw_str.to_owned())
     }
 
@@ -67,7 +67,7 @@ pub struct TableOp {
 /// # Notes
 /// 1. `table_ops` should have no duplications in terms of `TableOp::table`
 /// 2. Such duplication should only keep the one that `TableOp::op == Operation::W`
-#[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxTable {
     pub tx_name: String,
     pub table_ops: Vec<TableOp>,

@@ -1,8 +1,8 @@
 use env_logger;
 use futures::prelude::*;
 use o2versioner::comm::scheduler_sequencer;
+use o2versioner::core::sql::*;
 use o2versioner::sequencer::handler;
-use std::net::Shutdown;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use tokio_util::codec::LengthDelimitedCodec;
@@ -35,17 +35,26 @@ fn mock_sequencer_connection() {
                     tokio_serde::formats::SymmetricalJson::default(),
                 );
 
-            // Send the value
+            // Send a message
             serded
-                .send(scheduler_sequencer::Message::Invalid)
+                .send(scheduler_sequencer::Message::TxVNRequest(
+                    SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
+                        .to_tx_table(false)
+                        .unwrap(),
+                ))
                 .await
                 .unwrap();
 
-            // Shutdown the connection
+            // Send a message
             serded
-                .into_inner()
-                .into_inner()
-                .shutdown(Shutdown::Both)
+                .send(scheduler_sequencer::Message::TxVNRequest(
+                    SqlRawString::from(
+                        "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
+                    )
+                    .to_tx_table(false)
+                    .unwrap(),
+                ))
+                .await
                 .unwrap();
         });
 
