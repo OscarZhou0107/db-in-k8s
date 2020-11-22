@@ -19,7 +19,7 @@ fn mock_sequencer_connection() {
     init_logger();
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let sequencer_handler = tokio::spawn(handler::main("127.0.0.1:6379", Some(1)));
+        let sequencer_handle = tokio::spawn(handler::main("127.0.0.1:6379", Some(1)));
 
         tokio::spawn(async {
             // Connect to a socket
@@ -56,9 +56,11 @@ fn mock_sequencer_connection() {
                 ))
                 .await
                 .unwrap();
-        });
+        })
+        .await
+        .unwrap();
 
         // Must run the sequencer_handler, otherwise it won't do the work
-        sequencer_handler.await.unwrap();
+        sequencer_handle.await.unwrap();
     })
 }
