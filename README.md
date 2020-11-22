@@ -53,7 +53,7 @@ src
 └── lib.rs     # Declaration of the mods above
 ```
 
-## Notes for Tokio and async
+## Notes for Tokio, `async` and `.await`
 1. Everything is around `future` or `stream` (like `Vec<future>`).
 2. `future` and `stream` must be run to complete; otherwise their enclosed closures won't be executed.
 3. `.await` is used to execute the `future`.
