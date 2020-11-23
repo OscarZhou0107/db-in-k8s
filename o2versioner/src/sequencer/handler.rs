@@ -65,7 +65,7 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
         SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
 
-    // Process a stream of incomming messages from a single tcp connection
+    // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(|msg| match msg {
             scheduler_sequencer::Message::TxVNRequest(tx_table) => {

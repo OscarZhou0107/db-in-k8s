@@ -80,7 +80,7 @@ After `.await` is returned, the next line is executed.
 6. Multithreading: OS maps N threads onto K CPU cores.  
 Asynchronous: Tokio maps N spawned async functions (`tokio::spawn()`) onto K worker threads.
 7. `.await` (or nonblocking) means yielding the current spawned async function, so that the current worker thread can
-execute other spanwed async functions. Blocking means the current spawned async function will fully occupy the current
+execute other spawned async functions. Blocking means the current spawned async function will fully occupy the current
 worker thread to spin and do nothing, basically wasting the worker thread pool resources.
 8. `tokio::spawn()` returns a `future`, and this `future` must also be properly `.await` for it to execute to complete,
 similar to a thread join.
