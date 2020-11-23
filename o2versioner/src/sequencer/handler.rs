@@ -7,7 +7,7 @@ use tokio::net::ToSocketAddrs;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 type ArcState = Arc<Mutex<State>>;
 
@@ -48,31 +48,39 @@ pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
 async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
+    let peer_addr = tcp_stream.peer_addr().unwrap();
+    let (tcp_read, tcp_write) = tcp_stream.into_split();
+
     // Delimit frames from bytes using a length header
-    let length_delimited = Framed::new(tcp_stream, LengthDelimitedCodec::new());
+    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
+    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
-        length_delimited,
+    let serded_read: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+        length_delimited_read,
+        SymmetricalJson::<scheduler_sequencer::Message>::default(),
+    );
+    let serded_write: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+        length_delimited_write,
         SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
 
     // Process a stream of incomming messages from a single tcp connection
-    serded
-        .for_each(|msg| {
-            match msg {
-                Ok(msg) => match msg {
-                    scheduler_sequencer::Message::TxVNRequest(tx_table) => {
-                        info!("Ready to process TxVNRequest on {:?}", tx_table);
-                        let mut state = state.lock().unwrap();
-                        let tx_vn = state.assign_vn(tx_table);
-                        info!("    {:?}", tx_vn);
-                    }
-                    other => warn!("Unsupported message {:?}", other),
-                },
-                Err(e) => warn!("Encoutered {} when decoding incoming TCP message", e),
+    serded_read
+        .and_then(|msg| match msg {
+            scheduler_sequencer::Message::TxVNRequest(tx_table) => {
+                info!("Received [{:?}] TxVNRequest on {:?}", peer_addr, tx_table);
+                let mut state = state.lock().unwrap();
+                let tx_vn = state.assign_vn(tx_table);
+                info!("    Reply [{:?}] {:?}", peer_addr, tx_vn);
+                future::ok(scheduler_sequencer::Message::TxVNResponse(tx_vn))
             }
-            future::ready(())
+            other => {
+                warn!("Unsupported message [{:?}] {:?}", peer_addr, other);
+                future::ok(scheduler_sequencer::Message::Invalid)
+            }
         })
+        .forward(serded_write)
+        .map(|_| ())
         .await;
 }
