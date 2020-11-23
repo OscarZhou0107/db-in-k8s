@@ -17,16 +17,15 @@ fn init_logger() {
     builder.init();
 }
 
-#[test]
-fn test_sequencer() {
+#[tokio::test]
+async fn test_sequencer() {
     init_logger();
     let port = "127.0.0.1:6389";
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async move {
-        let sequencer_handle = tokio::spawn(handler::main(port, Some(2)));
+    let sequencer_handle = tokio::spawn(handler::main(port, Some(2)));
 
-        let tester_handle_0 = tokio::spawn(async move {
+    let tester_handle_0 =
+        tokio::spawn(async move {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
                 SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
@@ -58,7 +57,8 @@ fn test_sequencer() {
             mock_connection(port, msgs).await
         });
 
-        let tester_handle_1 = tokio::spawn(async move {
+    let tester_handle_1 =
+        tokio::spawn(async move {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
                 SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
@@ -90,11 +90,10 @@ fn test_sequencer() {
             mock_connection(port, msgs).await
         });
 
-        // Must run the sequencer_handler, otherwise it won't do the work
-        tester_handle_0.await.unwrap();
-        tester_handle_1.await.unwrap();
-        sequencer_handle.await.unwrap();
-    })
+    // Must run the sequencer_handler, otherwise it won't do the work
+    tester_handle_0.await.unwrap();
+    tester_handle_1.await.unwrap();
+    sequencer_handle.await.unwrap();
 }
 
 async fn mock_connection(sequencer_port: &str, msgs: Vec<scheduler_sequencer::Message>) {
