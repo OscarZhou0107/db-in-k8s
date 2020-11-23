@@ -56,6 +56,17 @@ o2versioner
 └── tests         # system level testing
 ```
 
+## Architecture
+
+### Sequencer
+- `sequenecer::handler::main()` - main entrance
+- for every incomming tcp connection - `tokio::spawn(process_connection)`
+- `process_connection`
+  - Run until the connection is closed
+  - Process all requests through this connection
+  - Reply response after a request `future` is received and processed
+
+
 ## Notes for Tokio, `async` and `.await`
 1. Everything is around `future` or `stream` (like `Vec<future>`).
 2. `future` and `stream` must be run to complete; otherwise their enclosed closures won't be executed.
