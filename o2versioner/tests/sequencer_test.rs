@@ -91,9 +91,7 @@ async fn test_sequencer() {
         });
 
     // Must run the sequencer_handler, otherwise it won't do the work
-    tester_handle_0.await.unwrap();
-    tester_handle_1.await.unwrap();
-    sequencer_handle.await.unwrap();
+    tokio::try_join!(tester_handle_0, tester_handle_1, sequencer_handle).unwrap();
 }
 
 async fn mock_connection(sequencer_port: &str, msgs: Vec<scheduler_sequencer::Message>) {
