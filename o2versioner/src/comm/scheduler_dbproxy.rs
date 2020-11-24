@@ -1,5 +1,5 @@
-#![allow(dead_code, unused_imports)]
-use crate::core::sql::TxTable;
+use super::mysql::Packet;
+//use crate::core::sql::TxTable;
 use crate::core::version_number::TxVN;
 use crate::dbproxy::core::{Operation, QueryResult};
 use serde::{Deserialize, Serialize};
@@ -11,15 +11,6 @@ pub enum Message {
     SqlRequest(Operation),
     SqlResponse(QueryResult),
 }
-
-/// Represents a MySQL client/server protocol packet
-///
-/// https://dev.mysql.com/doc/dev/mysql-server/8.0.12/PAGE_PROTOCOL.html
-///
-/// Supports:
-/// 1. Connection Phase, SSL off, compression off. Bypassed
-/// 2. Command Phase, Text Protocol. Deserialized and handled
-pub struct Packet();
 
 pub enum EndTx {
     Commit,
