@@ -1,4 +1,16 @@
+#![allow(dead_code, unused_imports)]
+use crate::core::sql::TxTable;
 use crate::core::version_number::TxVN;
+use crate::dbproxy::core::{Operation, QueryResult};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+/// TODO: this should be replaced by the implementation below
+pub enum Message {
+    Invalid,
+    SqlRequest(Operation),
+    SqlResponse(QueryResult),
+}
 
 /// Represents a MySQL client/server protocol packet
 ///
@@ -20,7 +32,7 @@ pub enum Error {
     Invalid,
 }
 
-pub enum Message {
+pub enum RealMessage {
     Invalid,
     // Request from Scheduler to Dbproxy
     RequestBypass(Packet),
