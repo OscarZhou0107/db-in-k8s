@@ -67,26 +67,45 @@ o2versioner
   - Reply response after a request `future` is received and processed
 
 
-## Notes for Tokio, `async` and `.await`
-1. Everything is around `future` or `stream` (like `Vec<future>`).
-2. `future` and `stream` must be run to complete; otherwise their enclosed closures won't be executed.
-3. `future` needs to be executed eventually by `.await`. If a `inner: future` lives inside another `outer: future`,
-`outer.await` does not automatically imply `inner` will be executed nor `inner.await` is applied. In such case, `inner.await`
-needs to be applied manually inside `outer`.
-4. Functions or closures with `.await` inside must be declared with `async`, and they will return a `future`.
-5. `.await` means nonblockingly executing the future. The program is still executed from top to bottom as usual.
-`.await` only means the current thread won't be blocked or spinning to wait for the `future` to return.
-After `.await` is returned, the next line is executed.
-6. Multithreading: OS maps N threads onto K CPU cores.  
-Asynchronous: Tokio maps N spawned async functions (`tokio::spawn()`) onto K worker threads.
-7. `.await` (or nonblocking) means yielding the current spawned async function, so that the current worker thread can
-execute other spawned async functions. Blocking means the current spawned async function will fully occupy the current
+## Notes for asynchronous
+1. Everything is around objects that are implemented with `trait Future<Output=T>` or `trait Stream<Item=T>`.
+2. `Future<Output=T>` is an asynchronous version of `T`; `Stream<Item=T>` is an asynchonous version of `Iterator<Item=T>`.
+`Stream<Item=T>` is essentially an iterator of `Future<Output=T>` that resolves into `T` when being handled.
+3. `Future` and `Stream` must be run to complete; otherwise their enclosed closures won't be executed.
+
+
+### Notes for `trait Future<Output=T>`, `tokio::spawn()`, `.await` and `async`
+1. An object implementing `trait Future<Output=T>` can only be transformed into another object implementing `trait Future<Output=Y>`
+with side affects once being resolved. This can be done via provided methods from `trait FutureExt` (and/or `trait TryFutureExt`) which is provided for
+every object that implements `trait Future`. Or, by using keyword `.await` to nonblockingly yield `T` from `Future<Output=T>`.
+2. However, `.await` must resides within `async` functions or closures, which returns an anonymous object that implements `trait Future`.
+The only way for a `Future` to fully resolve is via an executor, such as `tokio::spawn`.
+3. Functions or closures with `.await` inside must be declared with `async`, and they will return an anonymous object that implements `trait Future`.
+4. `.await` means nonblockingly executing the future. The program is still executed from top to bottom as usual.
+`.await` only means the current task won't block the current thread that runs the current task. After `.await` is returned, the next line is executed.
+5. Multithreading: OS maps N threads onto K CPU cores.  
+Asynchronous: Tokio maps N spawned tasks (via `tokio::spawn()`) onto K worker threads.
+6. `.await` (or nonblocking) means yielding the current task, so that the current worker thread can
+execute other spawned async tasks. Blocking means the current async task will fully occupy the current
 worker thread to spin and do nothing, basically wasting the worker thread pool resources.
-8. `tokio::spawn()` spawns the argument `future` as a separate task, which may run on the current thread or
-another thread depending on the `tokio::runtime`, but in both cases, the spawned task is "decoupled" from the
+7. By default, all `Future` are executed one after one, as they are treated as a single task.
+On the other hand, `tokio::spawn()` spawns the argument `Future` as a separate task, which may run on the current thread or
+another thread depending on the `tokio::runtime`, but in any cases, the spawned task is "decoupled" from the
 parent task, so they can run concurrently (not necessarily in parallel).
-9. `tokio::spawn()` returns a handle of `trait future`, and this `future` must also be properly `.await` for it to execute to complete,
+8. `tokio::spawn()` returns a handle of `Future`, and this `Future` must also be properly `.await` or `tokio::try_join!()` for it to execute to complete,
 similar to a thread join.
+
+
+### Notes for `trait Stream<Item=T>`
+1. `trait Stream` does not imply `trait Future`, they are different.
+2. Object implementing `trait Stream` can be drained to completion. This draining process is however a `Future`.
+3. `Stream<Item=T>` is essentially `Iterator<Item: Future<Output=T>>`, and operations on `Stream` is similar to those on `Iterator` objects.
+These provided methods are inside `trait StreamExt` (and/or `trait TryStreamExt`), which are free for objects implementing `trait Stream`.
+All of these methods are essentially applying a closure on `T` that is yielded by `Stream<Item=T>`.
+4. `trait Stream::map()`: synchronously converts `Stream<Item=T>` to `Stream<Item=Y>` by mapping yielded `T` directly to `Y` via the closure. The closure is synchronous.
+5. `trait Stream::then()`: asynchronously converts `Stream<Item=T>` to `Stream<Item=Y>` by mapping yielded `T` to `Future<Output=Y>` via the closure. The closure is asynchronous. Then this `Future<Output=Y>` is yielded (like calling `.await` on it) to `Y` implicitly and automatically by the method.
+6. `trait Stream::for_each`: asynchronously converts `Stream<Item=T>` to `Future<Output=()>` by mapping yielded `T` to `Future<Output=()>` via the closure. The closure is asynchronous. As all items inside the `Stream<Item=T>` are asynchronously converted to `Future<Output=()>`, this essentially means the `Stream` is drained to complete. The returned `Future<Output=()>` can then be `.await` or `tokio::spawn()` to faciliate side affect of the closure to be executed. Note, all `Future<Output=()>` returned by the closure are then being yielded back to back as one serial task, using `trait Stream::for_each_concurrent` can spawn them as concurrent tasks once `T` is yielded and `Future<Output=()>` is returned by the closure.
+
 
 ## References
 1. [The book](https://doc.rust-lang.org/book/title-page.html)  
