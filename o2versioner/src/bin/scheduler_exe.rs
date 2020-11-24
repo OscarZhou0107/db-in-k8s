@@ -1,8 +1,5 @@
-use actix_session::CookieSession;
-use actix_web::{App, HttpServer};
 use env_logger;
-use log::info;
-use o2versioner::scheduler::*;
+use o2versioner::scheduler::appserver_handler;
 
 fn init_logger() {
     let mut builder = env_logger::Builder::from_default_env();
@@ -11,18 +8,9 @@ fn init_logger() {
     builder.init();
 }
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
+#[tokio::main]
+async fn main() {
     init_logger();
-    info!("Hello from scheduler exe");
 
-    HttpServer::new(|| {
-        App::new()
-            .wrap(CookieSession::private(&[0; 32]).secure(false))
-            .service(appserver_handler::greet)
-            .service(appserver_handler::sql_handler)
-    })
-    .bind("127.0.0.1:8080")?
-    .run()
-    .await
+    appserver_handler::main("127.0.0.1:6379", None).await
 }

@@ -1,45 +1,19 @@
-use crate::core::sql::SqlRawString;
-use actix_session::Session;
-use actix_web::{get, post, web, HttpMessage, HttpRequest, Responder};
-use log::info;
+// use super::core::State;
+use crate::comm::scheduler_sequencer;
+use futures::prelude::*;
+use log::{info, warn};
+//use std::sync::{Arc, Mutex};
+use tokio::net::ToSocketAddrs;
+use tokio::net::{TcpListener, TcpStream};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-/// Handler for /
-///
-/// This GET request is for toy/experiment purposes
-///
-/// Test this handler on curl:
-/// curl 127.0.0.1:8080
-///
-#[get("/")]
-pub async fn greet(req: HttpRequest, session: Session) -> impl Responder {
-    // access session data
-    if let Some(count) = session.get::<i32>("counter").unwrap() {
-        session.set("counter", count + 1).unwrap();
-    } else {
-        session.set("counter", 1).unwrap();
-    }
+// type ArcState = Arc<Mutex<State>>;
 
-    info!(
-        "Received request from {} on {}. cookies is {:?}. count is {:?}. req is {:?}",
-        req.peer_addr().unwrap(),
-        req.uri(),
-        req.cookies(),
-        session.get::<i32>("counter").unwrap(),
-        req
-    );
-
-    format!(
-        "Received request from {} on {}. cookies is {:?}. count is {:?}. req is {:?}",
-        req.peer_addr().unwrap(),
-        req.uri(),
-        req.cookies(),
-        session.get::<i32>("counter").unwrap(),
-        req
-    )
-}
-
-/// Handler for /sql
+/// Main entrance for the scheduler from appserver
 ///
+/// The incoming packet is checked
 /// This POST request accepts one of the following SQL syntaxes encoded via json in the format as `struct SqlData`.
 /// 1. BEGIN {TRAN | TRANSACTION} [transaction_name] WITH MARK 'READ table_0 table_1 WRITE table_2' [;]
 /// 2. UPDATE or SELECT
@@ -49,30 +23,69 @@ pub async fn greet(req: HttpRequest, session: Session) -> impl Responder {
 /// |  - Or
 /// [] - Optional
 ///
-/// Test this handler on curl:
-/// curl -X POST -H "Content-Type: application/json" -d '"select * from students;"' 127.0.0.1:8080/sql
+pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
+    // let state = Arc::new(Mutex::new(State::new()));
+
+    let mut listener = TcpListener::bind(addr).await.unwrap();
+
+    let mut cur_num_connection = 0;
+    let mut spawned_tasks = Vec::new();
+    loop {
+        let (tcp_stream, peer_addr) = listener.accept().await.unwrap();
+
+        info!("Connection established with [{}] {}", cur_num_connection, peer_addr);
+        cur_num_connection += 1;
+
+        // Spawn a new thread for each tcp connection
+        spawned_tasks.push(tokio::spawn(process_connection(tcp_stream)));
+
+        // An optional max number of connections allowed
+        if let Some(nmax) = max_connection {
+            if cur_num_connection >= nmax {
+                break;
+            }
+        }
+    }
+
+    // Wait on all spawned tasks to finish
+    futures::future::join_all(spawned_tasks).await;
+}
+
+/// Process the `tcp_stream` for a single connection
 ///
-#[post("/sql")]
-pub async fn sql_handler(
-    req: HttpRequest,
-    sql_raw_string: web::Json<SqlRawString>,
-    _session: Session,
-) -> impl Responder {
-    info!(
-        "From '{}' on '{}' with '{:?}'. cookies is '{:?}'. req is {:?}.",
-        req.peer_addr().unwrap(),
-        req.uri(),
-        sql_raw_string,
-        req.cookies(),
-        req
+/// Will process all messages sent via this `tcp_stream` on this tcp connection.
+/// Once this tcp connection is closed, this function will return
+async fn process_connection(tcp_stream: TcpStream) {
+    let peer_addr = tcp_stream.peer_addr().unwrap();
+    let (tcp_read, tcp_write) = tcp_stream.into_split();
+
+    // Delimit frames from bytes using a length header
+    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
+    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
+
+    // Deserialize/Serialize frames using JSON codec
+    let serded_read: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+        length_delimited_read,
+        SymmetricalJson::<scheduler_sequencer::Message>::default(),
+    );
+    let serded_write: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+        length_delimited_write,
+        SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
 
-    format!(
-        "From '{}' on '{}' with '{:?}'. cookies is '{:?}'. req is {:?}.",
-        req.peer_addr().unwrap(),
-        req.uri(),
-        sql_raw_string,
-        req.cookies(),
-        req
-    )
+    // Process a stream of incoming messages from a single tcp connection
+    serded_read
+        .and_then(|msg| match msg {
+            scheduler_sequencer::Message::TxVNRequest(tx_table) => {
+                info!("Received [{:?}] TxVNRequest on {:?}", peer_addr, tx_table);
+                future::ok(scheduler_sequencer::Message::Invalid)
+            }
+            other => {
+                warn!("Unsupported message [{:?}] {:?}", peer_addr, other);
+                future::ok(scheduler_sequencer::Message::Invalid)
+            }
+        })
+        .forward(serded_write)
+        .map(|_| ())
+        .await;
 }
