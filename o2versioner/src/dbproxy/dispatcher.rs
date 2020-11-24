@@ -1,10 +1,8 @@
-#![allow(warnings)]
 use super::core::{DbVersion, Operation, QueryResult, Repository, Task};
 use std::sync::Arc;
 use std::{collections::HashMap, sync::Mutex};
 use tokio::sync::mpsc;
 use tokio::sync::Notify;
-use tokio::sync::Semaphore;
 
 pub struct Dispatcher {}
 
@@ -28,16 +26,16 @@ impl Dispatcher {
                     let op = op.clone();
                     let mut lock = transactions.lock().unwrap();
                     if !lock.contains_key(&op.transaction_id) {
-                        let (mut ts, mut tr): (mpsc::Sender<Operation>, mpsc::Receiver<Operation>) = mpsc::channel(1);
+                        let (ts, mut tr): (mpsc::Sender<Operation>, mpsc::Receiver<Operation>) = mpsc::channel(1);
 
                         lock.insert(op.transaction_id.clone(), ts);
                         let pool_clone = pool.clone();
                         let mut sender_clone = sender.clone();
 
                         tokio::spawn(async move {
+                            #[allow(unused_assignments)]
                             let mut result: QueryResult = Default::default();
                             {
-
                                 let mut repo = Repository::new(pool_clone).await;
                                 repo.start_transaction().await;
 
@@ -50,15 +48,18 @@ impl Dispatcher {
                                             result = repo.execute_write().await;
                                         }
                                         Task::COMMIT => {
-                                            result = repo.commit().await;
+                                            repo.commit().await;
                                             break;
                                         }
                                         Task::ABORT => {
-                                            result = repo.abort().await;
+                                            repo.abort().await;
                                             break;
                                         }
                                     }
-                                    sender_clone.send(result).await;
+                                    #[allow(unused_must_use)]
+                                    {
+                                        sender_clone.send(result).await;
+                                    }
                                 }
                             }
                             //sender_clone.send(result).await;
@@ -73,7 +74,10 @@ impl Dispatcher {
                         sender = transactions.lock().unwrap().get(&op.transaction_id).unwrap().clone();
                     }
                     tokio::spawn(async move {
-                        sender.send(op).await;
+                        #[allow(unused_must_use)]
+                        {
+                            sender.send(op).await;
+                        }
                     });
                 });
             }
@@ -94,7 +98,7 @@ async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>,
 fn get_all_version_ready_task(
     pending_queue: &mut Arc<Mutex<Vec<Operation>>>,
     version: &mut Arc<Mutex<DbVersion>>,
-    ) -> Vec<Operation> {
+) -> Vec<Operation> {
     let mut lock = pending_queue.lock().unwrap();
 
     //Unstable feature

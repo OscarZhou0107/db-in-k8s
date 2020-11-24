@@ -1,11 +1,8 @@
-#![allow(warnings)]
 use crate::core::sql::Operation as OperationType;
-use crate::core::version_number::{TableVN, TxVN, VN};
-//use std::future::Future;
+use crate::core::version_number::{TableVN, TxVN};
 use mysql_async::prelude::*;
-use std::collections::HashMap;
-use tokio::runtime::Runtime;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub struct DbVersion {
     table_versions: HashMap<String, u64>,
@@ -110,7 +107,7 @@ pub enum Task {
     ABORT,
     COMMIT,
 }
-//================================Test================================//
+
 fn test_helper_get_query_result_version_release() -> QueryResult {
     let mock_table_vs = vec![
         TableVN {
@@ -150,93 +147,97 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
         contained_newer_versions: mock_table_vs,
     }
 }
+//================================Test================================//
 
-#[test]
-fn voilate_dbversion_should_return_true() {
-    //Prepare
-    let mut table_versions = HashMap::new();
-    table_versions.insert("table1".to_string(), 0);
-    table_versions.insert("table2".to_string(), 0);
-    let db_version = DbVersion {
-        table_versions: table_versions,
-    };
-    let versions = vec![
-        TableVN {
-            table: "table1".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-        TableVN {
-            table: "table2".to_string(),
-            vn: 1,
-            op: OperationType::R,
-        },
-    ];
-    let operation = Operation {
-        table_vns: versions,
-        transaction_id: "t1".to_string(),
-        task: Task::READ,
-    };
-    //Action
-    //Assert
-    assert!(db_version.violate_version(operation));
-}
+#[cfg(test)]
+mod tests_dbproxy_core {
+    use super::DbVersion;
+    use super::Operation;
+    use super::TableVN;
+    use super::Task;
+    use crate::core::sql::Operation as OperationType;
+    use mysql_async::prelude::Queryable;
+    use std::collections::HashMap;
 
-#[test]
-fn obey_dbversion_should_return_false() {
-    //Prepare
-    let mut table_versions = HashMap::new();
-    table_versions.insert("table1".to_string(), 0);
-    table_versions.insert("table2".to_string(), 0);
-    let db_version = DbVersion {
-        table_versions: table_versions,
-    };
-    let versions = vec![
-        TableVN {
-            table: "table1".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-        TableVN {
-            table: "table2".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-    ];
-    let operation = Operation {
-        table_vns: versions,
-        transaction_id: "t1".to_string(),
-        task: Task::READ,
-    };
-    //Action
-    //Assert
-    assert!(!db_version.violate_version(operation));
-}
+    #[test]
+    fn voilate_dbversion_should_return_true() {
+        //Prepare
+        let mut table_versions = HashMap::new();
+        table_versions.insert("table1".to_string(), 0);
+        table_versions.insert("table2".to_string(), 0);
+        let db_version = DbVersion {
+            table_versions: table_versions,
+        };
+        let versions = vec![
+            TableVN {
+                table: "table1".to_string(),
+                vn: 0,
+                op: OperationType::R,
+            },
+            TableVN {
+                table: "table2".to_string(),
+                vn: 1,
+                op: OperationType::R,
+            },
+        ];
+        let operation = Operation {
+            table_vns: versions,
+            transaction_id: "t1".to_string(),
+            task: Task::READ,
+        };
+        //Action
+        //Assert
+        assert!(db_version.violate_version(operation));
+    }
 
-#[test]
-fn test_sql_connection() {
-    let mut rt = Runtime::new().unwrap();
+    #[test]
+    fn obey_dbversion_should_return_false() {
+        //Prepare
+        let mut table_versions = HashMap::new();
+        table_versions.insert("table1".to_string(), 0);
+        table_versions.insert("table2".to_string(), 0);
+        let db_version = DbVersion {
+            table_versions: table_versions,
+        };
+        let versions = vec![
+            TableVN {
+                table: "table1".to_string(),
+                vn: 0,
+                op: OperationType::R,
+            },
+            TableVN {
+                table: "table2".to_string(),
+                vn: 0,
+                op: OperationType::R,
+            },
+        ];
+        let operation = Operation {
+            table_vns: versions,
+            transaction_id: "t1".to_string(),
+            task: Task::READ,
+        };
+        //Action
+        //Assert
+        assert!(!db_version.violate_version(operation));
+    }
 
-    rt.block_on(async {
+    #[tokio::test]
+    async fn test_sql_connection() {
         let url = "mysql://root:Rayh8768@localhost:3306/test";
         let pool = mysql_async::Pool::new(url);
         match pool.get_conn().await {
             Ok(_) => {
-                println! {"OK"}
+                println!("OK");
             }
             Err(e) => {
-                println!("error is =============================== : {}", e)
+                println!("error is =============================== : {}", e);
             }
-        };
-    })
-}
+        }
+    }
 
-#[test]
-#[ignore]
-fn run_sql_query() {
-    let mut rt = Runtime::new().unwrap();
-
-    rt.block_on(async {
+    #[ignore]
+    #[tokio::test]
+    async fn run_sql_query() {
         let url = "mysql://root:Rayh8768@localhost:3306/test";
         let pool = mysql_async::Pool::new(url);
         //let mut wtr = csv::Writer::from_writer(io::stdout());
@@ -252,8 +253,8 @@ fn run_sql_query() {
             // .iter()
             // .for_each(|v|{}
             // );
-        })
+        });
         //let se = tokio_serde::Serializer<Vec<mysql_async::Row>> serialize(results);
         //let de : tokio_serde::Deserializer<Vec<mysql_async::Row>> = tokio_serde::Deserializer();
-    });
+    }
 }

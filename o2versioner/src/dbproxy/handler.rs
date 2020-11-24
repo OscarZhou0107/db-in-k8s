@@ -1,25 +1,12 @@
-#![allow(warnings)]
-use super::core::{DbVersion, Operation, QueryResult, Repository, Task};
+use super::core::{DbVersion, Operation, QueryResult};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
-use crate::comm::scheduler_dbproxy::Message;
-use crate::core::sql::Operation as OperationType;
-use crate::core::version_number::{TableVN, TxVN, VN};
-use futures::prelude::*;
-use mysql_async::prelude::*;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 use std::{collections::HashMap, sync::Mutex};
-use std::{thread, time};
 use tokio::net::TcpListener;
-use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::sync::Notify;
-use tokio::sync::Semaphore;
-use tokio::{io, net::TcpStream};
-use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
-use tokio_util::codec::{Framed, FramedRead, FramedWrite, LengthDelimitedCodec};
 
 pub async fn main() {
     //=====================================Continue an ongoing transaction=======================================//
@@ -34,18 +21,18 @@ pub async fn main() {
     let version_2 = Arc::clone(&version);
 
     //PendingQueue
-    let mut pending_queue: Arc<Mutex<Vec<Operation>>> = Arc::new(Mutex::new(Vec::new()));
-    let mut pending_queue_2: Arc<Mutex<Vec<Operation>>> = Arc::clone(&pending_queue);
+    let pending_queue: Arc<Mutex<Vec<Operation>>> = Arc::new(Mutex::new(Vec::new()));
+    let pending_queue_2: Arc<Mutex<Vec<Operation>>> = Arc::clone(&pending_queue);
 
     //Dispatcher & Responder
-    let mut version_notify = Arc::new(Notify::new());
+    let version_notify = Arc::new(Notify::new());
     let version_notify_2 = version_notify.clone();
     //Dispatcher & Main Loop
-    let mut new_task_notify = Arc::new(Notify::new());
+    let new_task_notify = Arc::new(Notify::new());
     let new_task_notify_2 = new_task_notify.clone();
 
     //Responder sender and receiver
-    let (mut responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
+    let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
 
     let url = "mysql://root:Rayh8768@localhost:3306/test";
