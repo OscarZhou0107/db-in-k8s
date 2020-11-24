@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
 pub struct Config {
+    pub scheduler: SchedulerConfig,
     pub sequencer: SequencerConfig,
     pub dbproxy: Vec<DbProxyConfig>,
 }
@@ -14,6 +15,11 @@ impl Config {
         source.merge(config::File::with_name(path)).unwrap();
         source.try_into().expect("Invalid Configuration format!")
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
+pub struct SchedulerConfig {
+    pub addr: String,
 }
 
 #[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
@@ -29,7 +35,7 @@ pub struct DbProxyConfig {
 /// Unit test for `Config`
 #[cfg(test)]
 mod tests_config {
-    use super::{Config, DbProxyConfig, SequencerConfig};
+    use super::{Config, DbProxyConfig, SchedulerConfig, SequencerConfig};
 
     #[test]
     fn test_from_file() {
@@ -38,6 +44,9 @@ mod tests_config {
         assert_eq!(
             conf,
             Config {
+                scheduler: SchedulerConfig {
+                    addr: String::from("127.0.0.1:1077")
+                },
                 sequencer: SequencerConfig {
                     addr: String::from("127.0.0.1:9876")
                 },

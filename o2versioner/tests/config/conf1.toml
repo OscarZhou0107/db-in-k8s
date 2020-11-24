@@ -1,3 +1,6 @@
+[scheduler]
+addr = "127.0.0.1:1077"
+
 [sequencer]
 addr = "127.0.0.1:9876"
 
