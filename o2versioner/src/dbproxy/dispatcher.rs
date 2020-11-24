@@ -14,7 +14,6 @@ impl Dispatcher {
         sender: mpsc::Sender<QueryResult>,
         sql_url: String,
         mut version: Arc<Mutex<DbVersion>>,
-        semaphor: Arc<Semaphore>,
         mut task_notify: Arc<Notify>,
         mut version_notify: Arc<Notify>,
         transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>>,
@@ -33,13 +32,11 @@ impl Dispatcher {
 
                         lock.insert(op.transaction_id.clone(), ts);
                         let pool_clone = pool.clone();
-                        let semaphor_clone = semaphor.clone();
                         let mut sender_clone = sender.clone();
 
                         tokio::spawn(async move {
                             let mut result: QueryResult = Default::default();
                             {
-                                semaphor_clone.acquire().await;
 
                                 let mut repo = Repository::new(pool_clone).await;
                                 repo.start_transaction().await;
@@ -97,7 +94,7 @@ async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>,
 fn get_all_version_ready_task(
     pending_queue: &mut Arc<Mutex<Vec<Operation>>>,
     version: &mut Arc<Mutex<DbVersion>>,
-) -> Vec<Operation> {
+    ) -> Vec<Operation> {
     let mut lock = pending_queue.lock().unwrap();
 
     //Unstable feature

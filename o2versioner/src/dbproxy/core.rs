@@ -1,9 +1,12 @@
 #![allow(warnings)]
 use crate::core::sql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN, VN};
+//use std::future::Future;
 use mysql_async::prelude::*;
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
+use serde::{Deserialize, Serialize};
+
 pub struct DbVersion {
     table_versions: HashMap<String, u64>,
 }
@@ -86,21 +89,21 @@ impl Repository {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct QueryResult {
     pub result: String,
     pub version_release: bool,
     pub contained_newer_versions: Vec<TableVN>,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Operation {
     pub transaction_id: String,
     pub task: Task,
     pub table_vns: Vec<TableVN>,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Task {
     READ,
     WRITE,
