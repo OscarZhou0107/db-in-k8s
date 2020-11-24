@@ -1,7 +1,7 @@
 use crate::core::version_number::TxVN;
 
 /// Represents a MySQL client/server protocol packet
-/// 
+///
 /// https://dev.mysql.com/doc/dev/mysql-server/8.0.12/PAGE_PROTOCOL.html
 ///
 /// Supports:
