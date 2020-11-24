@@ -45,14 +45,14 @@ cargo check
 ```
 o2versioner
 ├── src  
-│  ├── bin        # executables
 │  ├── comm       # communication-related
 │  ├── core       # core data structure and algorithm
 │  ├── dbproxy    # dbproxy library
 │  ├── scheduler  # scheduler library
 │  ├── sequencer  # sequencer library
 │  ├── util       # utility library
-│  └── lib.rs     # declaration of the mods above
+│  ├── lib.rs     # declaration of the mods above
+│  └── main.rs    # main executable
 └── tests         # system level testing
 ```
 

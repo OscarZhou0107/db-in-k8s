@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use config;
 use serde::Deserialize;
 
@@ -12,7 +11,7 @@ pub struct Config {
 impl Config {
     pub fn from_file(path: &str) -> Config {
         let mut source = config::Config::default();
-        source.merge(config::File::with_name(path)).unwrap();
+        source.merge(config::File::with_name(path)).expect("Error");
         source.try_into().expect("Invalid Configuration format!")
     }
 }

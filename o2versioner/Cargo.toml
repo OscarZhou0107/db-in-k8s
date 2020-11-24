@@ -8,6 +8,7 @@ edition = "2018"
 
 
 [dependencies]
+clap = "2.33"
 config = "0.10"
 env_logger = "0.8"
 futures = "0.3"
