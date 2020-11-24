@@ -1,5 +1,5 @@
 use env_logger;
-use o2versioner::sequencer::handler;
+use o2versioner::sequencer;
 
 fn init_logger() {
     let mut builder = env_logger::Builder::from_default_env();
@@ -12,5 +12,5 @@ fn init_logger() {
 async fn main() {
     init_logger();
 
-    handler::main("127.0.0.1:6379", None).await
+    sequencer::handler::main("127.0.0.1:6379", None).await
 }
