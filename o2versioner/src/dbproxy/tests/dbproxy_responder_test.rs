@@ -13,6 +13,7 @@ use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 use super::Responder;
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn test_send_items_to_from_multiple_channel() {
     //Prepare - Network
     let notify = Arc::new(Notify::new());

@@ -11,6 +11,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn test_dbproxy_end_to_end() {
 
     tokio::spawn(async {

@@ -9,6 +9,7 @@ use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 use super::Receiver;
 
 #[tokio::test]
+#[ignore]
 async fn test_send_single_item_to_receiver() {
     //Prepare - Network
     let pending_queue: Arc<Mutex<Vec<Operation>>> = Arc::new(Mutex::new(Vec::new()));

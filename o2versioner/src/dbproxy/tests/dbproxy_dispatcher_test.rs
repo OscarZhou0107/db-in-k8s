@@ -8,6 +8,7 @@ use tokio::sync::Notify;
 use super::Dispatcher;
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn test_receive_response_from_new_transactions() {
     //Prepare - Network
     let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -74,6 +75,7 @@ async fn test_receive_response_from_new_transactions() {
 
 
 #[tokio::test(threaded_scheduler)]
+#[ignore]
 async fn test_receive_response_from_same_transactions() {
     //Prepare - Network
     let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>> = Arc::new(Mutex::new(HashMap::new()));
