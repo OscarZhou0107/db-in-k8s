@@ -146,8 +146,8 @@ impl TxTable {
     ///
     /// # Note
     /// Refer to `TxTable::process_tx_name` and `TxTable::process_table_ops` for processing details
-    fn from_str(tx_name: &str, mark: &str, add_uuid: bool) -> TxTable {
-        TxTable {
+    fn from_str(tx_name: &str, mark: &str, add_uuid: bool) -> Self {
+        Self {
             tx_name: TxTable::process_tx_name(tx_name, add_uuid),
             table_ops: TxTable::process_table_ops(mark),
         }

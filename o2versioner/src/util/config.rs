@@ -10,7 +10,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_file(path: &str) -> Config {
+    pub fn from_file(path: &str) -> Self {
         let mut source = config::Config::default();
         source.merge(config::File::with_name(path)).expect("Error");
         source.try_into().expect("Invalid Configuration format!")

@@ -41,8 +41,8 @@ pub struct State {
 }
 
 impl State {
-    pub fn new() -> State {
-        State {
+    pub fn new() -> Self {
+        Self {
             vn_record: HashMap::new(),
         }
     }

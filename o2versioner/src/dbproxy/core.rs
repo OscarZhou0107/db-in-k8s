@@ -9,8 +9,8 @@ pub struct DbVersion {
 }
 
 impl DbVersion {
-    pub fn new(table_versions: HashMap<String, u64>) -> DbVersion {
-        DbVersion {
+    pub fn new(table_versions: HashMap<String, u64>) -> Self {
+        Self {
             table_versions: table_versions,
         }
     }
@@ -48,9 +48,9 @@ pub struct Repository {
 }
 
 impl Repository {
-    pub async fn new(pool: mysql_async::Pool) -> Repository {
+    pub async fn new(pool: mysql_async::Pool) -> Self {
         let conn = pool.get_conn().await.unwrap();
-        Repository { conn: conn }
+        Self { conn: conn }
     }
 
     pub async fn start_transaction(&mut self) {

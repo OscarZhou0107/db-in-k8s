@@ -64,8 +64,8 @@ impl<A> TcpStreamConnectionManager<A>
 where
     A: ToSocketAddrs,
 {
-    pub fn new(addr: A) -> TcpStreamConnectionManager<A> {
-        TcpStreamConnectionManager { addr }
+    pub fn new(addr: A) -> Self {
+        Self { addr }
     }
 }
 
