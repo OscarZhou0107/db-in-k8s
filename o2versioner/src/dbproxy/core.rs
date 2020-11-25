@@ -2,7 +2,7 @@ use crate::core::sql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, pin::Pin, sync::{Arc, Mutex}, task::Context, task::Poll, sync::mpsc};
+use std::collections::HashMap;
 
 pub struct DbVersion {
     table_versions: HashMap<String, u64>,
