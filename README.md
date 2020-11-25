@@ -94,12 +94,12 @@ another thread depending on the `tokio::runtime`, but in any cases, the spawned 
 parent task, so they can run concurrently (not necessarily in parallel).
 8. `tokio::spawn()` returns a handle of `Future`, and this `Future` must also be properly `.await` or `tokio::try_join!()` for it to execute to complete,
 similar to a thread join.
-9. `async` closure is not yet supported, but can be achieved by having a closure returning a `Future`. This can be done by
+9. `async` closure is not yet supported, but can be achieved by having a closure returning a `Future`. This can be done by:
 ```rust
 |item| {
     // clone the data that needs to go into the async block
     let x_cloned = x.clone();
-    // This block basically returns a `Future<Output=Result<(), _>>` that encaptures the actions
+    // This block basically returns a `Future<Output=Result<(), _>>` that captures the actions enclosed
     async move {
         some_async_fn(x_cloned).await;
         Ok(())
