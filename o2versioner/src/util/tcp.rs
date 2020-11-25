@@ -10,8 +10,9 @@ use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 ///
 /// Note:
 /// 1. `addr` is the tcp port to bind to
-/// 2. `max_connection` can be specified to limit the max number of connections allowed.
-/// Server will shutdown immediately once `max_connection` connections are all dropped.
+/// 2. `connection_handler` is a `FnMut` closure takes in `TcpStream` and returns `Future<Output=()>`
+/// 3. `max_connection` can be specified to limit the max number of connections allowed. Server will shutdown immediately once `max_connection` connections are all dropped.
+/// 4. `server_name` is an optional name to be used for output
 pub async fn start_tcplistener<A, C, Fut, S>(
     addr: A,
     mut connection_handler: C,
