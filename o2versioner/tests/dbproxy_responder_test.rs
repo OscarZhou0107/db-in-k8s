@@ -26,7 +26,7 @@ async fn test_send_items_to_from_multiple_channel() {
     let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
 
     //Prepare - Responder
-    let r = tokio::spawn(async move {
+    let _r = tokio::spawn(async move {
         println!("a-1");
         let addr = "127.0.0.1:2345";
         let mut listener = TcpListener::bind(addr).await.unwrap();
@@ -39,7 +39,7 @@ async fn test_send_items_to_from_multiple_channel() {
     let result = Arc::new(Mutex::new(Vec::new()));
     let result_2 = Arc::clone(&result);
     //Action
-    let a = tokio::spawn(async move {
+    let _a = tokio::spawn(async move {
         let addr = "127.0.0.1:2345";
         let socket = TcpStream::connect(addr).await.unwrap();
         let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
@@ -75,7 +75,7 @@ async fn test_send_items_to_from_multiple_channel() {
     let worker_num:i32 = 5;
 
     //Action - Spwan worker thread to send response
-    let w = tokio::spawn( async move
+    let _w = tokio::spawn( async move
         {
             for _ in 0..worker_num {
                 let mut s = responder_sender.clone();
