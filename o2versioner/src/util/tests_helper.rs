@@ -37,30 +37,14 @@ where
     .await;
 }
 
-/// Mock a json client with argument `TcpStream` using symmetrical serialization and deserialization
-///
-/// Notes:
-/// `msgs` must be owned type, such as `Vec<String>`. `&[String]', `&[&str]`, `Vec<&str>`, `&Vec<String>`
-/// are not accepted. Since the deserializer can not deserialize into a non-owned type.
-pub async fn mock_json_client_symm<Msgs>(tcp_stream: &mut TcpStream, msgs: Msgs)
-where
-    Msgs: IntoIterator,
-    for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
-{
-    return mock_json_client::<_, Msgs::Item>(tcp_stream, msgs).await;
-}
-
 /// Mock a json client with argument `TcpStream` using customized deserialization
-///
-/// Notes:
-/// 1. Call the function like `mock_json_client::<_, String>(&mut tcp_stream, msgs)`.
-/// 2. `MsgIn` type must be an owned type.
-/// 3. If `Msgs` are owned types, can simply call `mock_json_client_symm(&mut tcp_stream, msgs)`.
-pub async fn mock_json_client<Msgs, MsgIn>(tcp_stream: &mut TcpStream, msgs: Msgs)
+/// 
+/// Note:
+/// `msgs` must be an owned collection that contains owned data types.
+pub async fn mock_json_client<Msgs, Msg>(tcp_stream: &mut TcpStream, msgs: Msgs)
 where
-    Msgs: IntoIterator,
-    Msgs::Item: Serialize + Unpin + Send + Sync + UnwindSafe + RefUnwindSafe,
-    for<'a> MsgIn: Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
+    Msgs: IntoIterator<Item=Msg>,
+    for<'a> Msg: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
     let (tcp_read, tcp_write) = tcp_stream.split();
@@ -70,10 +54,10 @@ where
     let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read: SymmetricallyFramed<_, MsgIn, _> =
-        SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<MsgIn>::default());
-    let serded_write: SymmetricallyFramed<_, Msgs::Item, _> =
-        SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msgs::Item>::default());
+    let serded_read: SymmetricallyFramed<_, Msg, _> =
+        SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Msg>::default());
+    let serded_write: SymmetricallyFramed<_, Msg, _> =
+        SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msg>::default());
 
     stream::iter(msgs)
         .fold(

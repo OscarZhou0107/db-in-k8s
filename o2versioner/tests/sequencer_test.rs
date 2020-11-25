@@ -51,7 +51,7 @@ async fn test_sequencer() {
             }), scheduler_sequencer::Message::Invalid];
 
             let mut tcp_stream = TcpStream::connect(port).await.unwrap();
-            tests_helper::mock_json_client_symm(&mut tcp_stream, msgs).await
+            tests_helper::mock_json_client(&mut tcp_stream, msgs).await
         });
 
     let tester_handle_1 =
@@ -85,7 +85,7 @@ async fn test_sequencer() {
             }), scheduler_sequencer::Message::Invalid];
 
             let mut tcp_stream = TcpStream::connect(port).await.unwrap();
-            tests_helper::mock_json_client_symm(&mut tcp_stream, msgs).await
+            tests_helper::mock_json_client(&mut tcp_stream, msgs).await
         });
 
     // Must run the sequencer_handler, otherwise it won't do the work

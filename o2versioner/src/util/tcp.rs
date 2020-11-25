@@ -137,20 +137,15 @@ mod tests_tcppool {
         let pool_cloned = pool.clone();
         let client0_handle = tokio::spawn(async move {
             let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-            tests_helper::mock_json_client::<_, String>(
-                &mut tcp_stream,
-                vec![String::from("hello0"), String::from("hello00")],
-            )
-            .await;
+            tests_helper::mock_json_client(&mut tcp_stream, vec![String::from("hello0"), String::from("hello00")])
+                .await;
         });
 
         let pool_cloned = pool.clone();
-        {
-            let client1_handle = tokio::spawn(async move {
-                let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-                tests_helper::mock_json_client::<_, String>(&mut tcp_stream, &["hello0", "hello00"]).await;
-            });
-            tokio::try_join!(server_handle, client0_handle, client1_handle).unwrap();
-        }
+        let client1_handle = tokio::spawn(async move {
+            let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+            tests_helper::mock_json_client(&mut tcp_stream, ["hello1".to_owned(), "hello11".to_owned()].to_vec()).await;
+        });
+        tokio::try_join!(server_handle, client0_handle, client1_handle).unwrap();
     }
 }
