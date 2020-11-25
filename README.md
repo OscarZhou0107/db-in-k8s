@@ -78,7 +78,7 @@ o2versioner
 1. An object implementing `trait Future<Output=T>` can only be transformed into another object implementing `trait Future<Output=Y>`
 with side affects once being resolved. This can be done via provided methods from `trait FutureExt` (and/or `trait TryFutureExt`) which is provided for
 every object that implements `trait Future`. Or, by using keyword `.await` to nonblockingly yield `T` from `Future<Output=T>`.
-2. However, `.await` must resides within `async` functions or closures, which returns an anonymous object that implements `trait Future`.
+2. However, `.await` must resides within `async` functions or blocks, which returns an anonymous object that implements `trait Future`.
 The only way for a `Future` to fully resolve is via an executor, such as `tokio::spawn`.
 3. Functions or closures with `.await` inside must be declared with `async`, and they will return an anonymous object that implements `trait Future`.
 4. `.await` means nonblockingly executing the future. The program is still executed from top to bottom as usual.
@@ -94,7 +94,18 @@ another thread depending on the `tokio::runtime`, but in any cases, the spawned 
 parent task, so they can run concurrently (not necessarily in parallel).
 8. `tokio::spawn()` returns a handle of `Future`, and this `Future` must also be properly `.await` or `tokio::try_join!()` for it to execute to complete,
 similar to a thread join.
-
+9. `async` closure is not yet supported, but can be achieved by having a closure returning a `Future`. This can be done by
+```rust
+|item| {
+    // clone the data that needs to go into the async block
+    let x_cloned = x.clone();
+    // This block basically returns a `Future<Output=Result<(), _>>` that encaptures the actions
+    async move {
+        some_async_fn(x_cloned).await;
+        Ok(())
+    }
+})
+```
 
 ### Notes for `trait Stream<Item=T>`
 1. `trait Stream` does not imply `trait Future`, they are different.
