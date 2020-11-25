@@ -110,13 +110,8 @@ mod tests_tcppool {
     use super::super::tests_helper;
     use super::TcpStreamConnectionManager;
     use bb8::Pool;
-    use futures::prelude::*;
     use std::convert::TryInto;
     use std::time::Duration;
-    use tokio::net::ToSocketAddrs;
-    use tokio_serde::formats::SymmetricalJson;
-    use tokio_serde::SymmetricallyFramed;
-    use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
     /// cargo test -- --nocapture
     #[tokio::test]
@@ -129,76 +124,30 @@ mod tests_tcppool {
             .max_lifetime(Some(Duration::from_millis(300)))
             .connection_timeout(Duration::from_millis(300))
             .reaper_rate(Duration::from_millis(300))
-            .build(TcpStreamConnectionManager::new(port))
+            .build(TcpStreamConnectionManager::new(port.to_owned()))
             .await
             .unwrap();
 
         let server_handle = tokio::spawn(tests_helper::mock_echo_server(
-            port,
+            port.clone(),
             Some(pool_size.try_into().unwrap()),
             Some("tests_tcppool_server"),
         ));
-        let client0_handle = tokio::spawn(mock_connection(pool.clone(), &["hello0", "hello00"], false));
-        let client1_handle = tokio::spawn(mock_connection(pool.clone(), &["hello1", "hello11"], false));
+
+        let pool_cloned = pool.clone();
+        let client0_handle = tokio::spawn(async move {
+            let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+            tests_helper::mock_json_client(&mut tcp_stream, vec![String::from("hello0"), String::from("hello00")])
+                .await;
+        });
+
+        let pool_cloned = pool.clone();
+        let client1_handle = tokio::spawn(async move {
+            let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+            tests_helper::mock_json_client(&mut tcp_stream, vec![String::from("hello0"), String::from("hello00")])
+                .await;
+        });
 
         tokio::try_join!(server_handle, client0_handle, client1_handle).unwrap();
-    }
-
-    async fn mock_connection<A: ToSocketAddrs + Clone + Send + Sync + 'static>(
-        connection_pool: Pool<TcpStreamConnectionManager<A>>,
-        msgs: &[&str],
-        expect_timeout: bool,
-    ) {
-        // Connect to a socket
-        let mut socket = connection_pool.get().await.expect("Can't grab socket from pool");
-        let local_addr = socket.local_addr().unwrap();
-        let (reader, writer) = socket.split();
-
-        // If expect_timeout, then the socket should have been closed at here
-
-        // Delimit frames from bytes using a length header
-        let length_delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
-        let length_delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
-
-        // Deserialize/Serialize frames using JSON codec
-        let mut serded_read: SymmetricallyFramed<_, String, _> =
-            SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<String>::default());
-        let mut serded_write: SymmetricallyFramed<_, String, _> =
-            SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<String>::default());
-
-        for msg in msgs {
-            serded_write
-                .send((*msg).to_owned())
-                .await
-                .or_else(|e| {
-                    if expect_timeout
-                        && (e.kind() == std::io::ErrorKind::ConnectionReset
-                            || e.kind() == std::io::ErrorKind::BrokenPipe)
-                    {
-                        Ok(())
-                    } else {
-                        Err(e)
-                    }
-                })
-                .expect("Unexpected error when sending message");
-
-            if let Some(msg) = serded_read
-                .try_next()
-                .await
-                .or_else(|e| {
-                    if expect_timeout
-                        && (e.kind() == std::io::ErrorKind::ConnectionReset
-                            || e.kind() == std::io::ErrorKind::BrokenPipe)
-                    {
-                        Ok(None)
-                    } else {
-                        Err(e)
-                    }
-                })
-                .expect("Unexpected error when receiving message")
-            {
-                println!("[{:?}] GOT RESPONSE: {:?}", local_addr, msg);
-            }
-        }
     }
 }

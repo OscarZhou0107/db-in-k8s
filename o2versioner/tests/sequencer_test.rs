@@ -1,14 +1,10 @@
 use env_logger;
-use futures::prelude::*;
-use log::info;
 use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::sql::*;
 use o2versioner::core::version_number::*;
 use o2versioner::sequencer::handler;
+use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
-use tokio_serde::formats::SymmetricalJson;
-use tokio_serde::SymmetricallyFramed;
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 fn init_logger() {
     let mut builder = env_logger::Builder::from_default_env();
@@ -54,7 +50,8 @@ async fn test_sequencer() {
                 ],
             }), scheduler_sequencer::Message::Invalid];
 
-            mock_connection(port, msgs).await
+            let mut tcp_stream = TcpStream::connect(port).await.unwrap();
+            tests_helper::mock_json_client(&mut tcp_stream, msgs).await
         });
 
     let tester_handle_1 =
@@ -87,37 +84,10 @@ async fn test_sequencer() {
                 ],
             }), scheduler_sequencer::Message::Invalid];
 
-            mock_connection(port, msgs).await
+            let mut tcp_stream = TcpStream::connect(port).await.unwrap();
+            tests_helper::mock_json_client(&mut tcp_stream, msgs).await
         });
 
     // Must run the sequencer_handler, otherwise it won't do the work
     tokio::try_join!(tester_handle_0, tester_handle_1, sequencer_handle).unwrap();
-}
-
-async fn mock_connection(sequencer_port: &str, msgs: Vec<scheduler_sequencer::Message>) {
-    // Connect to a socket
-    let socket = TcpStream::connect(sequencer_port).await.unwrap();
-    let local_addr = socket.local_addr().unwrap();
-    let (tcp_read, tcp_write) = socket.into_split();
-
-    // Delimit frames from bytes using a length header
-    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
-    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
-
-    // Deserialize/Serialize frames using JSON codec
-    let mut serded_read: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
-        length_delimited_read,
-        SymmetricalJson::<scheduler_sequencer::Message>::default(),
-    );
-    let mut serded_write: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
-        length_delimited_write,
-        SymmetricalJson::<scheduler_sequencer::Message>::default(),
-    );
-
-    for msg in msgs {
-        serded_write.send(msg).await.unwrap();
-        if let Some(msg) = serded_read.try_next().await.unwrap() {
-            info!("[{:?}] GOT RESPONSE: {:?}", local_addr, msg);
-        }
-    }
 }
