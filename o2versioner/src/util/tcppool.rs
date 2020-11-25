@@ -60,12 +60,12 @@ where
 /// Unit test for `Config`
 #[cfg(test)]
 mod tests_tcppool {
+    use super::super::tests_helper;
     use super::TcpStreamConnectionManager;
     use bb8::Pool;
     use futures::prelude::*;
     use std::convert::TryInto;
     use std::time::Duration;
-    use tokio::net::TcpListener;
     use tokio::net::ToSocketAddrs;
     use tokio::time::delay_for;
     use tokio_serde::formats::SymmetricalJson;
@@ -87,7 +87,10 @@ mod tests_tcppool {
             .await
             .unwrap();
 
-        let server_handle = tokio::spawn(mock_echo_server(port, Some(pool_size.try_into().unwrap())));
+        let server_handle = tokio::spawn(tests_helper::mock_echo_server(
+            port,
+            Some(pool_size.try_into().unwrap()),
+        ));
         let client0_handle = tokio::spawn(mock_connection(pool.clone(), &["hello0", "hello00"], false));
         let client1_handle = tokio::spawn(mock_connection(pool.clone(), &["hello1", "hello11"], false));
 
@@ -97,41 +100,6 @@ mod tests_tcppool {
         // Send another Pool::get to trigger Pool's timeout procedure
         let client2_handle = tokio::spawn(mock_connection(pool.clone(), &["hello2", "hello22"], true));
         tokio::try_join!(server_handle, client0_handle, client1_handle, client2_handle).unwrap();
-    }
-
-    async fn mock_echo_server<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
-        TcpListener::bind(addr)
-            .await
-            .unwrap()
-            .incoming()
-            .enumerate()
-            .take_while(move |(idx, _)| {
-                future::ready(
-                    max_connection
-                        .map(|max_connection| *idx < max_connection)
-                        .or(Some(true))
-                        .unwrap(),
-                )
-            })
-            .map(|(_, r)| r)
-            .try_for_each_concurrent(None, |mut socket| async move {
-                let addr = socket.peer_addr().unwrap();
-                println!("Connection established with {}", addr);
-                let (mut reader, mut writer) = socket.split();
-
-                tokio::io::copy(&mut reader, &mut writer)
-                    .then(move |result| {
-                        match result {
-                            Ok(amt) => println!("Echoed {} bytes to {}", amt, addr),
-                            Err(e) => println!("error on echoing to {}: {}", addr, e),
-                        };
-                        future::ready(())
-                    })
-                    .await;
-                Ok(())
-            })
-            .await
-            .unwrap();
     }
 
     async fn mock_connection<A: ToSocketAddrs + Clone + Send + Sync + 'static>(
