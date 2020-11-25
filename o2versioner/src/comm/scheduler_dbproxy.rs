@@ -4,7 +4,7 @@ use crate::core::version_number::TxVN;
 use crate::dbproxy::core::{Operation, QueryResult};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 /// TODO: this should be replaced by the implementation below
 pub enum Message {
     Invalid,

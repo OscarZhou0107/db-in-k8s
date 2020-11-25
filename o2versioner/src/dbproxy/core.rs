@@ -2,7 +2,7 @@ use crate::core::sql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin, sync::{Arc, Mutex}, task::Context, task::Poll, sync::mpsc};
 
 pub struct DbVersion {
     table_versions: HashMap<String, u64>,
@@ -86,7 +86,7 @@ impl Repository {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct QueryResult {
     pub result: String,
     pub version_release: bool,
@@ -248,13 +248,6 @@ mod tests_dbproxy_core {
         let results: Vec<mysql_async::Row> = raw.collect().await.unwrap();
         results.iter().for_each(|r| {
             println!("len {}", r.len());
-            // r
-            // .unwrap()
-            // .iter()
-            // .for_each(|v|{}
-            // );
         });
-        //let se = tokio_serde::Serializer<Vec<mysql_async::Row>> serialize(results);
-        //let de : tokio_serde::Deserializer<Vec<mysql_async::Row>> = tokio_serde::Deserializer();
     }
 }

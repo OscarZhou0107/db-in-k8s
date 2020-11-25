@@ -23,7 +23,8 @@ async fn main() {
     info!("{:?}", conf);
 
     if matches.is_present("dbproxy") {
-        dbproxy::handler::main().await
+        
+        dbproxy::handler::main("127.0.0.1:2345","mysql://root:Rayh8768@localhost:3306/test").await
     } else if matches.is_present("scheduler") {
         scheduler::handler::main("127.0.0.1:6379", None).await
     } else if matches.is_present("sequencer") {

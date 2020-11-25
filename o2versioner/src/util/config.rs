@@ -6,6 +6,7 @@ pub struct Config {
     pub scheduler: SchedulerConfig,
     pub sequencer: SequencerConfig,
     pub dbproxy: Vec<DbProxyConfig>,
+    pub dbschemas : Vec<DbSchemaConfig>,
 }
 
 impl Config {
@@ -29,12 +30,19 @@ pub struct SequencerConfig {
 #[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
 pub struct DbProxyConfig {
     pub addr: String,
+    pub sql_url: String,
+}
+
+
+#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
+pub struct DbSchemaConfig {
+    pub table_name: String,
 }
 
 /// Unit test for `Config`
 #[cfg(test)]
 mod tests_config {
-    use super::{Config, DbProxyConfig, SchedulerConfig, SequencerConfig};
+    use super::{Config, DbProxyConfig, DbSchemaConfig, SchedulerConfig, SequencerConfig};
 
     #[test]
     fn test_from_file() {
@@ -51,10 +59,20 @@ mod tests_config {
                 },
                 dbproxy: vec![
                     DbProxyConfig {
-                        addr: String::from("127.0.0.1:8876")
+                        addr: String::from("127.0.0.1:8876"),
+                        sql_url: String::from("mysql://root:Rayh8768@localhost:3306/test")
                     },
                     DbProxyConfig {
-                        addr: String::from("127.0.0.1:8877")
+                        addr: String::from("127.0.0.1:8877"),
+                        sql_url: String::from("mysql://root:Rayh8768@localhost:3306/test")
+                    }
+                ],
+                dbschemas: vec![
+                    DbSchemaConfig {
+                        table_name: String::from("table1")
+                    },
+                    DbSchemaConfig {
+                        table_name: String::from("table2")
                     }
                 ]
             }
