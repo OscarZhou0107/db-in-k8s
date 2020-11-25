@@ -3,8 +3,9 @@ use bb8;
 use futures::future::poll_fn;
 use log::info;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::string::ToString;
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -53,32 +54,29 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     info!("{} at {:?} says goodbye world", server_name, addr);
 }
 
-pub struct TcpStreamConnectionManager<A>
-where
-    A: ToSocketAddrs,
-{
-    addr: A,
+#[derive(Debug)]
+pub struct TcpStreamConnectionManager {
+    addrs: Vec<SocketAddr>,
 }
 
-impl<A> TcpStreamConnectionManager<A>
-where
-    A: ToSocketAddrs,
-{
-    pub fn new(addr: A) -> Self {
-        Self { addr }
+impl TcpStreamConnectionManager {
+    pub async fn new<A>(addrs: A) -> Self
+    where
+        A: ToSocketAddrs,
+    {
+        Self {
+            addrs: lookup_host(addrs).await.expect("Unexpected socket addresses").collect(),
+        }
     }
 }
 
 #[async_trait]
-impl<A> bb8::ManageConnection for TcpStreamConnectionManager<A>
-where
-    A: ToSocketAddrs + Clone + Send + Sync + 'static,
-{
+impl bb8::ManageConnection for TcpStreamConnectionManager {
     type Connection = TcpStream;
     type Error = std::io::Error;
 
     async fn connect(&self) -> Result<Self::Connection, Self::Error> {
-        let stream = TcpStream::connect(self.addr.clone()).await?;
+        let stream = TcpStream::connect(&self.addrs[..]).await?;
         Ok(stream)
     }
 
@@ -90,17 +88,6 @@ where
 
     fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
         false
-    }
-}
-
-impl<A> std::fmt::Debug for TcpStreamConnectionManager<A>
-where
-    A: ToSocketAddrs + std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.debug_struct("TcpStreamConnectionManager")
-            .field("addr", &self.addr)
-            .finish()
     }
 }
 
@@ -124,7 +111,7 @@ mod tests_tcppool {
             .max_lifetime(Some(Duration::from_millis(300)))
             .connection_timeout(Duration::from_millis(300))
             .reaper_rate(Duration::from_millis(300))
-            .build(TcpStreamConnectionManager::new(port.to_owned()))
+            .build(TcpStreamConnectionManager::new(port).await)
             .await
             .unwrap();
 
