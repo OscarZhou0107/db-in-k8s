@@ -1,9 +1,8 @@
 use futures::prelude::*;
-use o2versioner::{comm::scheduler_dbproxy::Message, dbproxy::core::{DbVersion, QueryResult}};
+use crate::{comm::scheduler_dbproxy::Message, dbproxy::core::{DbVersion, QueryResult}};
 use tokio::sync::mpsc;
-use o2versioner::core::sql::Operation as OperationType;
-use o2versioner::core::version_number::TableVN;
-use o2versioner::dbproxy::responder::Responder;
+use crate::core::sql::Operation as OperationType;
+use crate::core::version_number::TableVN;
 use std::{collections::HashMap, sync::Arc};
 use std::sync::Mutex;
 use tokio::net::TcpListener;
@@ -11,7 +10,7 @@ use tokio::net::TcpStream;
 use tokio::sync::Notify;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
-
+use super::Responder;
 
 #[tokio::test(threaded_scheduler)]
 async fn test_send_items_to_from_multiple_channel() {

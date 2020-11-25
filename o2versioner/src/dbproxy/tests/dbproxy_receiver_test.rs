@@ -1,16 +1,12 @@
 use futures::prelude::*;
-use o2versioner::comm::scheduler_dbproxy::Message;
-use o2versioner::core::sql::Operation as OperationType;
-use o2versioner::core::version_number::TableVN;
-use o2versioner::dbproxy::core::{Operation, Task};
-use o2versioner::dbproxy::receiver::Receiver;
-use std::sync::Arc;
-use std::sync::Mutex;
-use tokio::net::TcpListener;
-use tokio::net::TcpStream;
+use crate::{comm::scheduler_dbproxy::Message, dbproxy::core::{Operation, Task}};
+use crate::core::{sql::Operation as OperationType, version_number::TableVN};
+use std::sync::{Arc, Mutex};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Notify;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
+use super::Receiver;
 
 #[tokio::test]
 async fn test_send_single_item_to_receiver() {

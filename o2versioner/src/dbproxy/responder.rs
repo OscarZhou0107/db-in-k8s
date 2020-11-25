@@ -25,7 +25,6 @@ impl Responder {
             );
 
             while let Some(result) = receiver.recv().await {
-                println!("rrrrrrr");
                 let version_release = result.version_release;
                 if version_release {
                     version
@@ -35,8 +34,12 @@ impl Responder {
                     notify.notify();
                 }
 
-                serializer.send(Message::SqlResponse(result)).await.unwrap()
+                serializer.send(Message::SqlResponse(result)).await.unwrap();
             }
         });
     }
 }
+
+#[cfg(test)]
+#[path = "tests/dbproxy_responder_test.rs"]
+mod responder_test;

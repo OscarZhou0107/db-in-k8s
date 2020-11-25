@@ -33,3 +33,7 @@ impl Receiver {
         });
     }
 }
+
+#[cfg(test)]
+#[path = "tests/dbproxy_receiver_test.rs"]
+mod receiver_test;

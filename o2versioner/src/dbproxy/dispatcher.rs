@@ -20,49 +20,55 @@ impl Dispatcher {
             let pool = mysql_async::Pool::new(sql_url);
             loop {
                 wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
-                let operations = get_all_version_ready_task(&mut pending_queue, &mut version);
 
+                let operations = get_all_version_ready_task(&mut pending_queue, &mut version);
                 operations.iter().for_each(|op| {
-                    let op = op.clone();
+                let op = op.clone();
+
                     let mut lock = transactions.lock().unwrap();
                     if !lock.contains_key(&op.transaction_id) {
                         let (ts, mut tr): (mpsc::Sender<Operation>, mpsc::Receiver<Operation>) = mpsc::channel(1);
-
                         lock.insert(op.transaction_id.clone(), ts);
+
                         let pool_clone = pool.clone();
                         let mut sender_clone = sender.clone();
 
                         tokio::spawn(async move {
                             #[allow(unused_assignments)]
                             let mut result: QueryResult = Default::default();
+                            let r_ref = &mut result;
                             {
                                 let mut repo = Repository::new(pool_clone).await;
                                 repo.start_transaction().await;
 
                                 while let Some(operation) = tr.recv().await {
+                                    let inner_result;
                                     match operation.task {
                                         Task::READ => {
-                                            result = repo.execute_read().await;
+                                            inner_result = repo.execute_read().await;
                                         }
                                         Task::WRITE => {
-                                            result = repo.execute_write().await;
+                                            inner_result = repo.execute_write().await;
                                         }
                                         Task::COMMIT => {
-                                            repo.commit().await;
+                                            *r_ref = repo.commit().await;
                                             break;
                                         }
                                         Task::ABORT => {
-                                            repo.abort().await;
+                                            *r_ref = repo.abort().await;
                                             break;
                                         }
                                     }
                                     #[allow(unused_must_use)]
                                     {
-                                        sender_clone.send(result).await;
+                                        sender_clone.send(inner_result.clone()).await;
                                     }
                                 }
                             }
-                            //sender_clone.send(result).await;
+                            #[allow(unused_must_use)]
+                            {
+                                sender_clone.send(result).await;
+                            }
                         });
                     }
                 });
@@ -101,13 +107,6 @@ fn get_all_version_ready_task(
 ) -> Vec<Operation> {
     let mut lock = pending_queue.lock().unwrap();
 
-    //Unstable feature
-    // lock
-    // .drain_filter(|op| {
-    //         version.lock().unwrap().violate_version(op.clone())
-    //     })
-    // .collect()
-
     let ready_ops = lock
         .split(|op| version.lock().unwrap().violate_version(op.clone()))
         .fold(Vec::new(), |mut acc_ops, ops| {
@@ -120,3 +119,7 @@ fn get_all_version_ready_task(
     lock.retain(|op| version.lock().unwrap().violate_version(op.clone()));
     ready_ops
 }
+
+#[cfg(test)]
+#[path = "tests/dbproxy_dispatcher_test.rs"]
+mod dispatcher_test;
