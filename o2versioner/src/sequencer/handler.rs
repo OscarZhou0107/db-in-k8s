@@ -1,10 +1,10 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer;
+use crate::util::tcp;
 use futures::prelude::*;
 use log::{info, warn};
 use std::sync::{Arc, Mutex};
-use tokio::net::ToSocketAddrs;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
@@ -12,35 +12,22 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 type ArcState = Arc<Mutex<State>>;
 
 /// Main entrance for the sequencer
-///
-/// 1. `addr` is the tcp port to bind to
-/// 2. `max_connection` can be specified to limit the max number of connections allowed
-pub async fn main<A: ToSocketAddrs>(addr: A, max_connection: Option<usize>) {
+pub async fn main<A>(addr: A, max_connection: Option<usize>)
+where
+    A: ToSocketAddrs + std::fmt::Debug + Clone,
+{
     let state = Arc::new(Mutex::new(State::new()));
 
-    let mut listener = TcpListener::bind(addr).await.unwrap();
-
-    let mut cur_num_connection = 0;
-    let mut spawned_tasks = Vec::new();
-    loop {
-        let (tcp_stream, peer_addr) = listener.accept().await.unwrap();
-
-        info!("Connection established with [{}] {}", cur_num_connection, peer_addr);
-        cur_num_connection += 1;
-
-        // Spawn a new thread for each tcp connection
-        spawned_tasks.push(tokio::spawn(process_connection(tcp_stream, state.clone())));
-
-        // An optional max number of connections allowed
-        if let Some(nmax) = max_connection {
-            if cur_num_connection >= nmax {
-                break;
-            }
-        }
-    }
-
-    // Wait on all spawned tasks to finish
-    futures::future::join_all(spawned_tasks).await;
+    tcp::start_tcplistener(
+        addr,
+        |tcp_stream| {
+            let state_cloned = state.clone();
+            process_connection(tcp_stream, state_cloned)
+        },
+        max_connection,
+        Some("Sequencer"),
+    )
+    .await;
 }
 
 /// Process the `tcp_stream` for a single connection
@@ -72,7 +59,7 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
                 info!("Received [{:?}] TxVNRequest on {:?}", peer_addr, tx_table);
                 let mut state = state.lock().unwrap();
                 let tx_vn = state.assign_vn(tx_table);
-                info!("    Reply [{:?}] {:?}", peer_addr, tx_vn);
+                info!("Reply [{:?}] {:?}", peer_addr, tx_vn);
                 future::ok(scheduler_sequencer::Message::TxVNResponse(tx_vn))
             }
             other => {
