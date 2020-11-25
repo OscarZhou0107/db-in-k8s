@@ -64,7 +64,6 @@ mod tests_tcppool {
     use bb8::Pool;
     use futures::prelude::*;
     use std::convert::TryInto;
-    use std::io;
     use std::time::Duration;
     use tokio::net::TcpListener;
     use tokio::net::ToSocketAddrs;
@@ -89,14 +88,14 @@ mod tests_tcppool {
             .unwrap();
 
         let server_handle = tokio::spawn(mock_echo_server(port, Some(pool_size.try_into().unwrap())));
-        let client0_handle = tokio::spawn(mock_connection(pool.clone(), "hello0", false));
-        let client1_handle = tokio::spawn(mock_connection(pool.clone(), "hello1", false));
+        let client0_handle = tokio::spawn(mock_connection(pool.clone(), &["hello0", "hello00"], false));
+        let client1_handle = tokio::spawn(mock_connection(pool.clone(), &["hello1", "hello11"], false));
 
         // Wait for a time period that's greater than Pool's max lifetime
         delay_for(Duration::from_millis(700)).await;
 
         // Send another Pool::get to trigger Pool's timeout procedure
-        let client2_handle = tokio::spawn(mock_connection(pool.clone(), "hello2", true));
+        let client2_handle = tokio::spawn(mock_connection(pool.clone(), &["hello2", "hello22"], true));
         tokio::try_join!(server_handle, client0_handle, client1_handle, client2_handle).unwrap();
     }
 
@@ -115,28 +114,21 @@ mod tests_tcppool {
                 )
             })
             .map(|(_, r)| r)
-            .try_for_each_concurrent(None, |socket| {
+            .try_for_each_concurrent(None, |mut socket| async move {
                 let addr = socket.peer_addr().unwrap();
                 println!("Connection established with {}", addr);
-                let (reader, writer) = socket.into_split();
+                let (mut reader, mut writer) = socket.split();
 
-                // Delimit frames from bytes using a length header
-                let length_delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
-                let length_delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
-
-                // Deserialize/Serialize frames using JSON codec
-                let serded_read: SymmetricallyFramed<_, String, _> =
-                    SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<String>::default());
-                let serded_write: SymmetricallyFramed<_, String, _> =
-                    SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<String>::default());
-
-                serded_read
-                    .and_then(move |msg| {
-                        println!("Echo {} to [{}]", msg, addr);
-                        future::ok(msg)
+                tokio::io::copy(&mut reader, &mut writer)
+                    .then(move |result| {
+                        match result {
+                            Ok(amt) => println!("Echoed {} bytes to {}", amt, addr),
+                            Err(e) => println!("error on echoing to {}: {}", addr, e),
+                        };
+                        future::ready(())
                     })
-                    .forward(serded_write)
-                    .map(|_| Ok(()))
+                    .await;
+                Ok(())
             })
             .await
             .unwrap();
@@ -144,7 +136,7 @@ mod tests_tcppool {
 
     async fn mock_connection<A: ToSocketAddrs + Clone + Send + Sync + 'static>(
         connection_pool: Pool<TcpStreamConnectionManager<A>>,
-        msg: &str,
+        msgs: &[&str],
         expect_timeout: bool,
     ) {
         // Connect to a socket
@@ -164,31 +156,33 @@ mod tests_tcppool {
         let mut serded_write: SymmetricallyFramed<_, String, _> =
             SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<String>::default());
 
-        serded_write
-            .send(msg.to_owned())
-            .await
-            .or_else(|e| {
-                if expect_timeout && e.kind() == io::ErrorKind::ConnectionReset {
-                    Ok(())
-                } else {
-                    Err(e)
-                }
-            })
-            .expect("Unexpected error when sending message");
+        for msg in msgs {
+            serded_write
+                .send((*msg).to_owned())
+                .await
+                .or_else(|e| {
+                    if expect_timeout && e.kind() == std::io::ErrorKind::ConnectionReset {
+                        Ok(())
+                    } else {
+                        Err(e)
+                    }
+                })
+                .expect("Unexpected error when sending message");
 
-        if let Some(msg) = serded_read
-            .try_next()
-            .await
-            .or_else(|e| {
-                if expect_timeout && e.kind() == io::ErrorKind::ConnectionReset {
-                    Ok(None)
-                } else {
-                    Err(e)
-                }
-            })
-            .expect("Unexpected error when receiving message")
-        {
-            println!("[{:?}] GOT RESPONSE: {:?}", local_addr, msg);
+            if let Some(msg) = serded_read
+                .try_next()
+                .await
+                .or_else(|e| {
+                    if expect_timeout && e.kind() == std::io::ErrorKind::ConnectionReset {
+                        Ok(None)
+                    } else {
+                        Err(e)
+                    }
+                })
+                .expect("Unexpected error when receiving message")
+            {
+                println!("[{:?}] GOT RESPONSE: {:?}", local_addr, msg);
+            }
         }
     }
 }
