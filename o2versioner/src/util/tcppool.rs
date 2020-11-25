@@ -129,7 +129,10 @@ mod tests_tcppool {
                 .send((*msg).to_owned())
                 .await
                 .or_else(|e| {
-                    if expect_timeout && e.kind() == std::io::ErrorKind::ConnectionReset {
+                    if expect_timeout
+                        && (e.kind() == std::io::ErrorKind::ConnectionReset
+                            || e.kind() == std::io::ErrorKind::BrokenPipe)
+                    {
                         Ok(())
                     } else {
                         Err(e)
@@ -141,7 +144,10 @@ mod tests_tcppool {
                 .try_next()
                 .await
                 .or_else(|e| {
-                    if expect_timeout && e.kind() == std::io::ErrorKind::ConnectionReset {
+                    if expect_timeout
+                        && (e.kind() == std::io::ErrorKind::ConnectionReset
+                            || e.kind() == std::io::ErrorKind::BrokenPipe)
+                    {
                         Ok(None)
                     } else {
                         Err(e)
