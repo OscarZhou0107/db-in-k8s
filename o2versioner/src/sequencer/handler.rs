@@ -2,7 +2,7 @@ use super::core::State;
 use crate::comm::scheduler_sequencer;
 use crate::util::tcp;
 use futures::prelude::*;
-use log::{info, warn};
+use log::{debug, warn};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
@@ -56,10 +56,10 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
     serded_read
         .and_then(|msg| match msg {
             scheduler_sequencer::Message::TxVNRequest(txtable) => {
-                info!("<- [{}] TxVNRequest on {:?}", peer_addr, txtable);
+                debug!("<- [{}] TxVNRequest on {:?}", peer_addr, txtable);
                 let mut state = state.lock().unwrap();
                 let txvn = state.assign_vn(txtable);
-                info!("-> [{}] Reply {:?}", peer_addr, txvn);
+                debug!("-> [{}] Reply {:?}", peer_addr, txvn);
                 future::ok(scheduler_sequencer::Message::TxVNResponse(txvn))
             }
             other => {

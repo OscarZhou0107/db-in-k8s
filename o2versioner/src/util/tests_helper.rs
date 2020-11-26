@@ -1,7 +1,7 @@
 use super::tcp;
 use env_logger;
 use futures::prelude::*;
-use log::{error, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::panic::{RefUnwindSafe, UnwindSafe};
@@ -33,7 +33,7 @@ where
             tokio::io::copy(&mut reader, &mut writer)
                 .then(move |result| {
                     match result {
-                        Ok(amt) => info!("-> [{}] ECHOED {} BYTES", peer_addr, amt),
+                        Ok(amt) => debug!("-> [{}] ECHOED {} BYTES", peer_addr, amt),
                         Err(e) => error!("-> [{}] ERROR ON ECHOING: {}", peer_addr, e),
                     };
                     future::ready(())
@@ -75,14 +75,14 @@ where
         .fold(
             (serded_read, serded_write, &mut responses),
             |(mut serded_read, mut serded_write, responses), send_msg| async move {
-                info!("[{}] -> SEND REQUEST: {:?}", local_addr, send_msg);
+                debug!("[{}] -> SEND REQUEST: {:?}", local_addr, send_msg);
                 responses.push(
                     serded_write
                         .send(send_msg)
                         .and_then(|_| serded_read.try_next())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap();
-                            info!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
+                            debug!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
                             received_msg
                         })
                         .await

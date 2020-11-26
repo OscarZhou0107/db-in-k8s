@@ -4,7 +4,7 @@ use crate::core::version_number::TxVN;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;
-use log::info;
+use log::debug;
 use std::net::SocketAddr;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
@@ -76,7 +76,7 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<T
     // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(|msg| {
-            info!("<- [{}] Received {:?}", peer_addr, msg);
+            debug!("<- [{}] Received {:?}", peer_addr, msg);
             process_request(msg, peer_addr, sequencer_socket_pool.clone())
         })
         .forward(serded_write)
@@ -99,7 +99,7 @@ async fn process_request(
     } else {
         SqlRawString("[".to_owned() + &request.0 + "] not recognized")
     };
-    info!("-> [{}] Reply {:?}", peer_addr, response);
+    debug!("-> [{}] Reply {:?}", peer_addr, response);
     Ok(response)
 }
 
@@ -123,13 +123,13 @@ async fn request_txvn(txtable: TxTable, sequencer_socket: &mut TcpStream) -> Res
     );
 
     let msg = scheduler_sequencer::Message::TxVNRequest(txtable);
-    info!("[{}] -> Request to Sequencer: {:?}", local_addr, msg);
+    debug!("[{}] -> Request to Sequencer: {:?}", local_addr, msg);
     let sequencer_response = serded_write
         .send(msg)
         .and_then(|_| serded_read.try_next())
         .map_ok(|received_msg| {
             let received_msg = received_msg.unwrap();
-            info!("[{}] <- Reply from Sequencer: {:?}", local_addr, received_msg);
+            debug!("[{}] <- Reply from Sequencer: {:?}", local_addr, received_msg);
             received_msg
         })
         .await;

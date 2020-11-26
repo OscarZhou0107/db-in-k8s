@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bb8;
 use futures::future::poll_fn;
-use log::info;
+use log::{info};
 use std::future::Future;
 use std::net::SocketAddr;
 use std::string::ToString;
@@ -111,7 +111,7 @@ mod tests_tcppool {
     use super::TcpStreamConnectionManager;
     use bb8::Pool;
     use futures::future;
-    use log::info;
+    use log::debug;
     use std::time::Duration;
 
     /// cargo test -- --show-output
@@ -130,7 +130,7 @@ mod tests_tcppool {
 
         let server_handle = tokio::spawn(async move {
             tests_helper::mock_echo_server(port, Some(pool_size), "tests_tcppool_server").await;
-            info!("server_handle finished");
+            debug!("server_handle finished");
         });
 
         let client_handles = tokio::spawn(async move {
@@ -153,7 +153,7 @@ mod tests_tcppool {
                     "Pooled client 0",
                 )
                 .await;
-                info!("client0_handle finished");
+                debug!("client0_handle finished");
             });
 
             let pool_cloned = pool.clone();
@@ -165,15 +165,15 @@ mod tests_tcppool {
                     "Pooled client 1",
                 )
                 .await;
-                info!("client1_handle finished");
+                debug!("client1_handle finished");
             });
 
             tokio::try_join!(client0_handle, client1_handle).unwrap();
-            info!("pool dropped automatically")
+            debug!("pool dropped automatically")
         });
 
         tokio::try_join!(server_handle, client_handles).unwrap();
-        info!("test_pool_lifetime finished!")
+        debug!("test_pool_lifetime finished!")
     }
 
     /// cargo test -- --show-output
@@ -199,7 +199,7 @@ mod tests_tcppool {
         // and then server_handle can properly terminate.
         let server_handle = tokio::spawn(async move {
             tests_helper::mock_echo_server(port, Some(pool_size), "tests_tcppool_server").await;
-            info!("server_handle finished");
+            debug!("server_handle finished");
         });
 
         let pool_cloned = pool.clone();
@@ -211,7 +211,7 @@ mod tests_tcppool {
                 "Pooled client 0",
             )
             .await;
-            info!("client0_handle finished");
+            debug!("client0_handle finished");
         });
 
         let pool_cloned = pool.clone();
@@ -223,7 +223,7 @@ mod tests_tcppool {
                 "Pooled client 1",
             )
             .await;
-            info!("client1_handle finished");
+            debug!("client1_handle finished");
         });
 
         // pool connections must have already been dropped
@@ -235,6 +235,6 @@ mod tests_tcppool {
         )
         .await
         .is_ok());
-        info!("test_pool_lifetime finished!")
+        debug!("test_pool_lifetime finished!")
     }
 }
