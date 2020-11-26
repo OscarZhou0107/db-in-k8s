@@ -19,7 +19,7 @@ pub fn init_logger() {
 }
 
 /// A mock echo server for testing
-pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: Option<S>)
+pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: S)
 where
     A: ToSocketAddrs + std::fmt::Debug + Clone,
     S: ToString,
@@ -53,10 +53,11 @@ where
 /// 2. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
 ///
 /// TODO: Consider split the type being sent and the type expected to receive
-pub async fn mock_json_client<Msgs>(tcp_stream: &mut TcpStream, msgs: Msgs) -> Vec<Msgs::Item>
+pub async fn mock_json_client<Msgs, S>(tcp_stream: &mut TcpStream, msgs: Msgs, client_name: S) -> Vec<Msgs::Item>
 where
     Msgs: IntoIterator,
     for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
+    S: ToString,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
     let (tcp_read, tcp_write) = tcp_stream.split();
@@ -66,10 +67,8 @@ where
     let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read: SymmetricallyFramed<_, Msgs::Item, _> =
-        SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Msgs::Item>::default());
-    let serded_write: SymmetricallyFramed<_, Msgs::Item, _> =
-        SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msgs::Item>::default());
+    let serded_read = SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Msgs::Item>::default());
+    let serded_write = SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msgs::Item>::default());
 
     let mut responses = Vec::new();
     stream::iter(msgs)
@@ -95,9 +94,10 @@ where
         )
         .await;
 
+    let client_name = client_name.to_string();
     info!(
-        "[{}] {} says service terminated, have a good night",
-        local_addr, "mock_json_client"
+        "[{}] {} TcpStream says service terminated, have a good night",
+        local_addr, client_name
     );
 
     responses

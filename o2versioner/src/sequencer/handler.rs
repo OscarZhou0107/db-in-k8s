@@ -11,7 +11,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 type ArcState = Arc<Mutex<State>>;
 
-/// Main entrance for the sequencer
+/// Main entrance for Sequencer
 pub async fn main<A>(addr: A, max_connection: Option<u32>)
 where
     A: ToSocketAddrs + std::fmt::Debug + Clone,
@@ -25,7 +25,7 @@ where
             process_connection(tcp_stream, state_cloned)
         },
         max_connection,
-        Some("Sequencer"),
+        "Sequencer",
     )
     .await;
 }
@@ -43,11 +43,11 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
     let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+    let serded_read = SymmetricallyFramed::new(
         length_delimited_read,
         SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
-    let serded_write: SymmetricallyFramed<_, scheduler_sequencer::Message, _> = SymmetricallyFramed::new(
+    let serded_write = SymmetricallyFramed::new(
         length_delimited_write,
         SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
@@ -55,12 +55,12 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
     // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(|msg| match msg {
-            scheduler_sequencer::Message::TxVNRequest(tx_table) => {
-                info!("<- [{}] TxVNRequest on {:?}", peer_addr, tx_table);
+            scheduler_sequencer::Message::TxVNRequest(txtable) => {
+                info!("<- [{}] TxVNRequest on {:?}", peer_addr, txtable);
                 let mut state = state.lock().unwrap();
-                let tx_vn = state.assign_vn(tx_table);
-                info!("-> [{}] Reply {:?}", peer_addr, tx_vn);
-                future::ok(scheduler_sequencer::Message::TxVNResponse(tx_vn))
+                let txvn = state.assign_vn(txtable);
+                info!("-> [{}] Reply {:?}", peer_addr, txvn);
+                future::ok(scheduler_sequencer::Message::TxVNResponse(txvn))
             }
             other => {
                 warn!("<- [{}] Unsupported message {:?}", peer_addr, other);

@@ -18,7 +18,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     addr: A,
     mut connection_handler: C,
     max_connection: Option<u32>,
-    server_name: Option<S>,
+    server_name: S,
 ) where
     A: ToSocketAddrs + Clone,
     C: FnMut(TcpStream) -> Fut,
@@ -28,7 +28,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     let mut listener = TcpListener::bind(addr.clone()).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
-    let server_name = server_name.map_or(String::from("Server"), |s| s.to_string());
+    let server_name = server_name.to_string();
     info!("[{}] {} successfully binded ", local_addr, server_name);
 
     let mut cur_num_connection = 0;
@@ -56,7 +56,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     // Wait on all spawned tasks to finish
     futures::future::join_all(spawned_tasks).await;
     info!(
-        "[{}] {} says service terminated, have a good night",
+        "[{}] {} TcpListener says service terminated, have a good night",
         local_addr, server_name
     );
 }
@@ -125,20 +125,29 @@ mod tests_tcppool {
         let server_handle = tokio::spawn(tests_helper::mock_echo_server(
             port.clone(),
             Some(pool_size),
-            Some("tests_tcppool_server"),
+            "tests_tcppool_server",
         ));
 
         let pool_cloned = pool.clone();
         let client0_handle = tokio::spawn(async move {
             let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-            tests_helper::mock_json_client(&mut tcp_stream, vec![String::from("hello0"), String::from("hello00")])
-                .await;
+            tests_helper::mock_json_client(
+                &mut tcp_stream,
+                vec![String::from("hello0"), String::from("hello00")],
+                "Pooled client 0",
+            )
+            .await;
         });
 
         let pool_cloned = pool.clone();
         let client1_handle = tokio::spawn(async move {
             let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-            tests_helper::mock_json_client(&mut tcp_stream, ["hello1".to_owned(), "hello11".to_owned()].to_vec()).await;
+            tests_helper::mock_json_client(
+                &mut tcp_stream,
+                vec!["hello1".to_owned(), "hello11".to_owned()],
+                "Pooled client 1",
+            )
+            .await;
         });
         tokio::try_join!(server_handle, client0_handle, client1_handle).unwrap();
     }

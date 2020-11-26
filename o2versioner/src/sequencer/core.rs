@@ -47,8 +47,8 @@ impl State {
         }
     }
 
-    pub fn assign_vn(&mut self, tx_table: TxTable) -> TxVN {
-        let TxTable { tx_name, table_ops } = tx_table;
+    pub fn assign_vn(&mut self, txtable: TxTable) -> TxVN {
+        let TxTable { tx_name, table_ops } = txtable;
 
         TxVN {
             tx_name,
@@ -204,7 +204,7 @@ mod tests_state {
     use crate::core::sql::{Operation, TableOp, TxTable};
     use crate::core::version_number::{TableVN, TxVN};
 
-    fn new_tx_table(table_ops: Vec<TableOp>) -> TxTable {
+    fn new_txtable(table_ops: Vec<TableOp>) -> TxTable {
         TxTable {
             tx_name: String::from("tx007"),
             table_ops,
@@ -219,7 +219,7 @@ mod tests_state {
         // next_for_read     0     0     0
         // next_for_write    0     0     0
         assert_eq!(
-            state.assign_vn(new_tx_table(vec![
+            state.assign_vn(new_txtable(vec![
                 TableOp {
                     table: String::from("a"),
                     op: Operation::W,
@@ -259,7 +259,7 @@ mod tests_state {
         // next_for_read     1     1     0
         // next_for_write    1     1     1
         assert_eq!(
-            state.assign_vn(new_tx_table(vec![
+            state.assign_vn(new_txtable(vec![
                 TableOp {
                     table: String::from("b"),
                     op: Operation::W,
@@ -290,7 +290,7 @@ mod tests_state {
         // next_for_read     1     2     0
         // next_for_write    1     2     2
         assert_eq!(
-            state.assign_vn(new_tx_table(vec![
+            state.assign_vn(new_txtable(vec![
                 TableOp {
                     table: String::from("b"),
                     op: Operation::R,
@@ -321,7 +321,7 @@ mod tests_state {
         // next_for_read     1     2     3
         // next_for_write    1     3     3
         assert_eq!(
-            state.assign_vn(new_tx_table(vec![
+            state.assign_vn(new_txtable(vec![
                 TableOp {
                     table: String::from("a"),
                     op: Operation::R,

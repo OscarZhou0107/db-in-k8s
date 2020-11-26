@@ -17,13 +17,13 @@ async fn test_sequencer() {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
                 SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
-                    .to_tx_table(false)
+                    .to_txtable(false)
                     .unwrap(),
             ),scheduler_sequencer::Message::TxVNRequest(
                 SqlRawString::from(
                     "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
                 )
-                .to_tx_table(false)
+                .to_txtable(false)
                 .unwrap(),
             ), scheduler_sequencer::Message::TxVNResponse(TxVN {
                 tx_name: String::from("tx2"),
@@ -43,7 +43,7 @@ async fn test_sequencer() {
             }), scheduler_sequencer::Message::Invalid];
 
             let mut tcp_stream = TcpStream::connect(port).await.unwrap();
-            tests_helper::mock_json_client(&mut tcp_stream, msgs).await
+            tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 0").await
         });
 
     let tester_handle_1 =
@@ -51,13 +51,13 @@ async fn test_sequencer() {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
                 SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
-                    .to_tx_table(false)
+                    .to_txtable(false)
                     .unwrap(),
             ),scheduler_sequencer::Message::TxVNRequest(
                 SqlRawString::from(
                     "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
                 )
-                .to_tx_table(false)
+                .to_txtable(false)
                 .unwrap(),
             ), scheduler_sequencer::Message::TxVNResponse(TxVN {
                 tx_name: String::from("tx2"),
@@ -77,7 +77,7 @@ async fn test_sequencer() {
             }), scheduler_sequencer::Message::Invalid];
 
             let mut tcp_stream = TcpStream::connect(port).await.unwrap();
-            tests_helper::mock_json_client(&mut tcp_stream, msgs).await
+            tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await
         });
 
     // Must run the sequencer_handler, otherwise it won't do the work

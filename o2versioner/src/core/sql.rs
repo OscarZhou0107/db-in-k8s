@@ -48,7 +48,7 @@ impl SqlRawString {
     /// # Note
     /// 1. If `add_uuid == True`, will append uuid to the end of `TxTable::tx_name`
     /// 2. `add_uuid == False` should only be used for unit testing
-    pub fn to_tx_table(&self, add_uuid: bool) -> Option<TxTable> {
+    pub fn to_txtable(&self, add_uuid: bool) -> Option<TxTable> {
         self.get_tx_data()
             .map(|(tx_name, mark)| TxTable::from_str(&tx_name, &mark, add_uuid))
     }
@@ -210,10 +210,10 @@ mod tests_sql_raw_string {
     }
 
     #[test]
-    fn test_to_tx_table() {
+    fn test_to_txtable() {
         assert_eq!(
             SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
-                .to_tx_table(false),
+                .to_txtable(false),
             Some(TxTable {
                 tx_name: String::from("tx0"),
                 table_ops: vec![
@@ -235,7 +235,7 @@ mod tests_sql_raw_string {
 
         assert_eq!(
             SqlRawString::from("BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';")
-                .to_tx_table(false),
+                .to_txtable(false),
             Some(TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![
@@ -257,7 +257,7 @@ mod tests_sql_raw_string {
 
         assert_eq!(
             SqlRawString::from("BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'")
-                .to_tx_table(false),
+                .to_txtable(false),
             Some(TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![
@@ -278,7 +278,7 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNsaction with MarK ''").to_tx_table(false),
+            SqlRawString::from("BeGin TraNsaction with MarK ''").to_txtable(false),
             Some(TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![]
@@ -286,26 +286,26 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'").to_tx_table(false),
+            SqlRawString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'").to_txtable(false),
             None
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNsaction with MarK").to_tx_table(false),
+            SqlRawString::from("BeGin TraNsaction with MarK").to_txtable(false),
             None
         );
 
-        assert_eq!(SqlRawString::from("select * from table0;").to_tx_table(false), None);
+        assert_eq!(SqlRawString::from("select * from table0;").to_txtable(false), None);
 
-        assert_eq!(SqlRawString::from("begin").to_tx_table(false), None);
+        assert_eq!(SqlRawString::from("begin").to_txtable(false), None);
 
-        assert_eq!(SqlRawString::from("").to_tx_table(false), None);
+        assert_eq!(SqlRawString::from("").to_txtable(false), None);
     }
 }
 
 /// Unit test for `TxTable`
 #[cfg(test)]
-mod tests_tx_table {
+mod tests_txtable {
     use super::Operation;
     use super::TableOp;
     use super::TxTable;
