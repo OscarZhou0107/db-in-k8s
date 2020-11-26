@@ -122,12 +122,14 @@ async fn request_txvn(txtable: TxTable, sequencer_socket: &mut TcpStream) -> Res
         SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
 
+    let msg = scheduler_sequencer::Message::TxVNRequest(txtable);
+    info!("[{}] -> Request to Sequencer: {:?}", local_addr, msg);
     let sequencer_response = serded_write
-        .send(scheduler_sequencer::Message::TxVNRequest(txtable))
+        .send(msg)
         .and_then(|_| serded_read.try_next())
         .map_ok(|received_msg| {
             let received_msg = received_msg.unwrap();
-            info!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
+            info!("[{}] <- Reply from Sequencer: {:?}", local_addr, received_msg);
             received_msg
         })
         .await;

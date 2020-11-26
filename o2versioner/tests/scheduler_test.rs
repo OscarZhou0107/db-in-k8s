@@ -10,7 +10,7 @@ async fn test_scheduler() {
     let sequencer_addr = "127.0.0.1:6379";
     let scheduler_addr = "127.0.0.1:16379";
     let scheduler_max_connection = 2;
-    let sequencer_max_connection = 1;
+    let sequencer_max_connection = 2;
 
     let scheduler_handle = tokio::spawn(handler::main(
         scheduler_addr,
@@ -26,7 +26,11 @@ async fn test_scheduler() {
     ));
 
     let tester_handle_0 = tokio::spawn(async move {
-        let msgs = vec![SqlRawString::from("0-hello"), SqlRawString::from("0-world")];
+        let msgs = vec![
+            SqlRawString::from("0-hello"),
+            SqlRawString::from("0-world"),
+            SqlRawString::from(" BeGin TraNsaction tx0 with MarK 'table4 read table4 read write table4 table3 read'"),
+        ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2").await
