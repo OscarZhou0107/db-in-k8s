@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bb8;
 use futures::future::poll_fn;
-use log::{info};
+use log::info;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::string::ToString;
@@ -20,12 +20,12 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     max_connection: Option<u32>,
     server_name: S,
 ) where
-    A: ToSocketAddrs + Clone,
+    A: ToSocketAddrs,
     C: FnMut(TcpStream) -> Fut,
     Fut: Future<Output = ()> + Send + 'static,
     S: ToString,
 {
-    let mut listener = TcpListener::bind(addr.clone()).await.unwrap();
+    let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.to_string();
@@ -79,7 +79,10 @@ impl TcpStreamConnectionManager {
 
 impl Drop for TcpStreamConnectionManager {
     fn drop(&mut self) {
-        info!("TcpStreamConnectionManager with connections to {:?} terminated", self.addrs);
+        info!(
+            "TcpStreamConnectionManager with connections to {:?} terminated",
+            self.addrs
+        );
     }
 }
 

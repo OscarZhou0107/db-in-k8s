@@ -33,7 +33,7 @@ pub async fn main<A>(
     sequencer_addr: A,
     sequencer_max_connection: u32,
 ) where
-    A: ToSocketAddrs + std::fmt::Debug + Clone,
+    A: ToSocketAddrs,
 {
     // The current task completes as soon as start_tcplistener finishes,
     // which happens when it reaches the sceduler_max_connection if not None,
@@ -91,13 +91,14 @@ async fn process_request(
     sequencer_socket_pool: Pool<TcpStreamConnectionManager>,
 ) -> std::io::Result<SqlRawString> {
     let response = if let Some(txtable) = request.to_txtable(true) {
-        let txvn = request_txvn(txtable, &mut sequencer_socket_pool.get().await.unwrap()).await;
-        txvn.map_or_else(
-            |e| SqlRawString("[".to_owned() + &request.0 + "] failed due to: " + &e),
-            |_txvn| SqlRawString("[".to_owned() + &request.0 + "] successful"),
-        )
+        request_txvn(txtable, &mut sequencer_socket_pool.get().await.unwrap())
+            .await
+            .map_or_else(
+                |e| SqlRawString(format!("[{}] failed due to: {}", request.0, e)),
+                |_txvn| SqlRawString(format!("[{}] successful", request.0)),
+            )
     } else {
-        SqlRawString("[".to_owned() + &request.0 + "] not recognized")
+        SqlRawString(format!("[{}] not recognized", request.0))
     };
     debug!("-> [{}] Reply {:?}", peer_addr, response);
     Ok(response)

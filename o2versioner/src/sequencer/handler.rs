@@ -14,7 +14,7 @@ type ArcState = Arc<Mutex<State>>;
 /// Main entrance for Sequencer
 pub async fn main<A>(addr: A, max_connection: Option<u32>)
 where
-    A: ToSocketAddrs + std::fmt::Debug + Clone,
+    A: ToSocketAddrs,
 {
     let state = Arc::new(Mutex::new(State::new()));
 

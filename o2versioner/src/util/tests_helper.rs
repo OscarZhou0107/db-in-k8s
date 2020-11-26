@@ -21,7 +21,7 @@ pub fn init_logger() {
 /// A mock echo server for testing
 pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: S)
 where
-    A: ToSocketAddrs + std::fmt::Debug + Clone,
+    A: ToSocketAddrs,
     S: ToString,
 {
     tcp::start_tcplistener(
