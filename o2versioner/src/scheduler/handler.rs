@@ -2,6 +2,7 @@
 use crate::core::sql::{SqlRawString, TxTable};
 use crate::core::version_number::TxVN;
 use crate::util::tcp;
+use bb8::Pool;
 use futures::prelude::*;
 use log::info;
 use std::net::SocketAddr;
@@ -27,14 +28,26 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 /// `|`  - Or;
 /// `[]` - Optional
 ///
-pub async fn main<A>(addr: A, max_connection: Option<usize>)
-where
+pub async fn main<A>(
+    scheduler_addr: A,
+    sceduler_max_connection: Option<u32>,
+    // sequencer_addr: A,
+    // sequencer_max_connection: u32,
+) where
     A: ToSocketAddrs + std::fmt::Debug + Clone,
 {
+    // let pool = Pool::builder()
+    //     .max_size(pool_size)
+    //     .max_lifetime(Some(Duration::from_millis(300)))
+    //     .connection_timeout(Duration::from_millis(300))
+    //     .reaper_rate(Duration::from_millis(300))
+    //     .build(TcpStreamConnectionManager::new(port).await)
+    //     .await
+    //     .unwrap();
     tcp::start_tcplistener(
-        addr,
+        scheduler_addr,
         |tcp_stream| process_connection(tcp_stream),
-        max_connection,
+        sceduler_max_connection,
         Some("Scheduler"),
     )
     .await;

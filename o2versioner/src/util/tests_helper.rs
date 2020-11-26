@@ -10,7 +10,7 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 /// A mock echo server for testing
-pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<usize>, server_name: Option<S>)
+pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: Option<S>)
 where
     A: ToSocketAddrs + std::fmt::Debug + Clone,
     S: ToString,

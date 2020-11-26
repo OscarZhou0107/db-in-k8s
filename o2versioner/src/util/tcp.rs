@@ -17,7 +17,7 @@ use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
 pub async fn start_tcplistener<A, C, Fut, S>(
     addr: A,
     mut connection_handler: C,
-    max_connection: Option<usize>,
+    max_connection: Option<u32>,
     server_name: Option<S>,
 ) where
     A: ToSocketAddrs + std::fmt::Debug + Clone,
@@ -97,7 +97,6 @@ mod tests_tcppool {
     use super::super::tests_helper;
     use super::TcpStreamConnectionManager;
     use bb8::Pool;
-    use std::convert::TryInto;
     use std::time::Duration;
 
     /// cargo test -- --nocapture
@@ -117,7 +116,7 @@ mod tests_tcppool {
 
         let server_handle = tokio::spawn(tests_helper::mock_echo_server(
             port.clone(),
-            Some(pool_size.try_into().unwrap()),
+            Some(pool_size),
             Some("tests_tcppool_server"),
         ));
 
