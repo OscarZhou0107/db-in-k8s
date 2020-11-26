@@ -22,13 +22,14 @@ async fn main() {
     let conf = Config::from_file(matches.value_of("config").unwrap());
     info!("{:?}", conf);
 
+    let sequencer_addr = "127.0.0.1:6379";
+    let scheduler_addr = "127.0.0.1:16379";
     if matches.is_present("dbproxy") {
-        
-        dbproxy::handler::main("127.0.0.1:2345","mysql://root:Rayh8768@localhost:3306/test").await
+        dbproxy::handler::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await
     } else if matches.is_present("scheduler") {
-        scheduler::handler::main("127.0.0.1:6379", None).await
+        scheduler::handler::main(scheduler_addr, None, sequencer_addr, 5, None).await
     } else if matches.is_present("sequencer") {
-        sequencer::handler::main("127.0.0.1:6379", None).await
+        sequencer::handler::main(sequencer_addr, None).await
     } else {
         panic!("Unknown error!")
     }

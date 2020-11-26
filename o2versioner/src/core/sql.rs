@@ -20,7 +20,7 @@ pub struct SqlRawString(pub String);
 
 impl<'a> From<&'a str> for SqlRawString {
     fn from(s: &'a str) -> Self {
-        SqlRawString(s.to_owned())
+        Self(s.to_owned())
     }
 }
 
