@@ -38,13 +38,14 @@ where
 }
 
 /// Mock a json client with argument `TcpStream` using customized deserialization
-/// 
+///
 /// Note:
-/// `msgs` must be an owned collection that contains owned data types.
-pub async fn mock_json_client<Msgs, Msg>(tcp_stream: &mut TcpStream, msgs: Msgs)
+/// 1. `msgs: Msgs` must be an owned collection that contains owned data types.
+/// 2. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
+pub async fn mock_json_client<Msgs>(tcp_stream: &mut TcpStream, msgs: Msgs) -> Vec<Msgs::Item>
 where
-    Msgs: IntoIterator<Item=Msg>,
-    for<'a> Msg: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
+    Msgs: IntoIterator,
+    for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
     let (tcp_read, tcp_write) = tcp_stream.split();
@@ -54,27 +55,33 @@ where
     let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read: SymmetricallyFramed<_, Msg, _> =
-        SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Msg>::default());
-    let serded_write: SymmetricallyFramed<_, Msg, _> =
-        SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msg>::default());
+    let serded_read: SymmetricallyFramed<_, Msgs::Item, _> =
+        SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Msgs::Item>::default());
+    let serded_write: SymmetricallyFramed<_, Msgs::Item, _> =
+        SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msgs::Item>::default());
 
+    let mut responses = Vec::new();
     stream::iter(msgs)
         .fold(
-            (serded_read, serded_write),
-            |(mut serded_read, mut serded_write), send_msg| async move {
-                serded_write
-                    .send(send_msg)
-                    .and_then(|_| serded_read.try_next())
-                    .and_then(|received_msg| {
-                        println!("[{:?}] GOT RESPONSE: {:?}", local_addr, received_msg);
-                        future::ok(())
-                    })
-                    .await
-                    .unwrap();
+            (serded_read, serded_write, &mut responses),
+            |(mut serded_read, mut serded_write, responses), send_msg| async move {
+                println!("[{:?}] SEND REQUEST: {:?}", local_addr, send_msg);
+                responses.push(
+                    serded_write
+                        .send(send_msg)
+                        .and_then(|_| serded_read.try_next())
+                        .map_ok(|received_msg| {
+                            println!("[{:?}] GOT RESPONSE: {:?}", local_addr, received_msg);
+                            received_msg.unwrap()
+                        })
+                        .await
+                        .unwrap(),
+                );
 
-                (serded_read, serded_write)
+                (serded_read, serded_write, responses)
             },
         )
         .await;
+
+    responses
 }
