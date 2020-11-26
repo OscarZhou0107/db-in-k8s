@@ -55,7 +55,10 @@ pub async fn start_tcplistener<A, C, Fut, S>(
 
     // Wait on all spawned tasks to finish
     futures::future::join_all(spawned_tasks).await;
-    info!("[{}] {} says goodbye world", local_addr, server_name);
+    info!(
+        "[{}] {} says service terminated, have a good night",
+        local_addr, server_name
+    );
 }
 
 #[derive(Debug)]

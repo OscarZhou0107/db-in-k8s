@@ -95,7 +95,10 @@ where
         )
         .await;
 
-    info!("[{}] {} says goodbye world", local_addr, "mock_json_client");
+    info!(
+        "[{}] {} says service terminated, have a good night",
+        local_addr, "mock_json_client"
+    );
 
     responses
 }
