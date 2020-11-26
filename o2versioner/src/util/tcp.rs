@@ -20,15 +20,16 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     max_connection: Option<u32>,
     server_name: Option<S>,
 ) where
-    A: ToSocketAddrs + std::fmt::Debug + Clone,
+    A: ToSocketAddrs + Clone,
     C: FnMut(TcpStream) -> Fut,
     Fut: Future<Output = ()> + Send + 'static,
     S: ToString,
 {
     let mut listener = TcpListener::bind(addr.clone()).await.unwrap();
+    let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.map_or(String::from("Server"), |s| s.to_string());
-    info!("{} successfully binded to {:?}", server_name, addr);
+    info!("{} successfully binded to {:?}", server_name, local_addr);
 
     let mut cur_num_connection = 0;
     let mut spawned_tasks = Vec::new();
@@ -51,7 +52,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
 
     // Wait on all spawned tasks to finish
     futures::future::join_all(spawned_tasks).await;
-    info!("{} at {:?} says goodbye world", server_name, addr);
+    info!("{} at {:?} says goodbye world", server_name, local_addr);
 }
 
 #[derive(Debug)]
@@ -102,6 +103,7 @@ mod tests_tcppool {
     /// cargo test -- --nocapture
     #[tokio::test]
     async fn test_pool() {
+        tests_helper::init_logger();
         let port = "127.0.0.1:14523";
 
         let pool_size = 2;

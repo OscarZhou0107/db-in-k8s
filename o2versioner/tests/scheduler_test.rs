@@ -1,20 +1,12 @@
-use env_logger;
 use o2versioner::core::sql::*;
 use o2versioner::scheduler::handler;
 use o2versioner::util::tests_helper;
 use std::time::Duration;
 use tokio::net::TcpStream;
 
-fn init_logger() {
-    let mut builder = env_logger::Builder::from_default_env();
-    builder.target(env_logger::Target::Stdout);
-    builder.filter_level(log::LevelFilter::Debug);
-    builder.init();
-}
-
 #[tokio::test]
 async fn test_sequencer() {
-    init_logger();
+    tests_helper::init_logger();
 
     let sequencer_addr = "127.0.0.1:6379";
     let scheduler_addr = "127.0.0.1:16379";

@@ -7,10 +7,10 @@ use o2versioner::sequencer;
 use o2versioner::util::config::Config;
 
 fn init_logger() {
-    let mut builder = env_logger::Builder::from_default_env();
-    builder.target(env_logger::Target::Stdout);
-    builder.filter_level(log::LevelFilter::Debug);
-    builder.init();
+    env_logger::Builder::from_default_env()
+        .target(env_logger::Target::Stdout)
+        .filter_level(log::LevelFilter::Debug)
+        .init();
 }
 
 /// cargo run -- <args>

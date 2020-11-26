@@ -1,5 +1,7 @@
 use super::tcp;
+use env_logger;
 use futures::prelude::*;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::panic::{RefUnwindSafe, UnwindSafe};
@@ -8,6 +10,13 @@ use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+
+pub fn init_logger() {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Debug)
+        .is_test(true)
+        .init();
+}
 
 /// A mock echo server for testing
 pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: Option<S>)
@@ -24,8 +33,8 @@ where
             tokio::io::copy(&mut reader, &mut writer)
                 .then(move |result| {
                     match result {
-                        Ok(amt) => println!("Echoed {} bytes to [{}]", amt, peer_addr),
-                        Err(e) => println!("Error on echoing to [{}]: {}", peer_addr, e),
+                        Ok(amt) => info!("Echoed {} bytes to [{}]", amt, peer_addr),
+                        Err(e) => error!("Error on echoing to [{}]: {}", peer_addr, e),
                     };
                     future::ready(())
                 })
@@ -67,14 +76,15 @@ where
         .fold(
             (serded_read, serded_write, &mut responses),
             |(mut serded_read, mut serded_write, responses), send_msg| async move {
-                println!("[{:?}] SEND REQUEST: {:?}", local_addr, send_msg);
+                info!("[{:?}] SEND REQUEST: {:?}", local_addr, send_msg);
                 responses.push(
                     serded_write
                         .send(send_msg)
                         .and_then(|_| serded_read.try_next())
                         .map_ok(|received_msg| {
-                            println!("[{:?}] GOT RESPONSE: {:?}", local_addr, received_msg);
-                            received_msg.unwrap()
+                            let received_msg = received_msg.unwrap();
+                            info!("[{:?}] GOT RESPONSE: {:?}", local_addr, received_msg);
+                            received_msg
                         })
                         .await
                         .unwrap(),
@@ -84,6 +94,8 @@ where
             },
         )
         .await;
+
+    info!("{} at {:?} says goodbye world", "mock_json_client", local_addr);
 
     responses
 }
