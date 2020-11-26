@@ -35,6 +35,11 @@ pub async fn main<A>(
 ) where
     A: ToSocketAddrs + std::fmt::Debug + Clone,
 {
+    // The current task completes as soon as start_tcplistener finishes,
+    // which happens when it reaches the sceduler_max_connection if not None,
+    // which is really depending on the incoming connections into Scheduler.
+    // So the sequencer_socket_pool here does not require an explicit
+    // max_lifetime being set.
     let sequencer_socket_pool = Pool::builder()
         .max_size(sequencer_max_connection)
         .build(TcpStreamConnectionManager::new(sequencer_addr).await)

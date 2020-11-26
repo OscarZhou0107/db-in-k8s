@@ -104,11 +104,75 @@ mod tests_tcppool {
     use super::super::tests_helper;
     use super::TcpStreamConnectionManager;
     use bb8::Pool;
+    use futures::future;
+    use log::info;
     use std::time::Duration;
 
-    /// cargo test -- --nocapture
+    /// cargo test -- --show-output
     #[tokio::test]
     async fn test_pool() {
+        tests_helper::init_logger();
+        let port = "127.0.0.1:24523";
+
+        let pool_size = 2;
+
+        // pool has a lifetime shorter within client_handles,
+        // as soon as the two client handles within client_handles
+        // are finished, all connections of pool will be dropped.
+        // As the result, the server_handle will join after client_handles
+        // are joined.
+
+        let server_handle = tokio::spawn(async move {
+            tests_helper::mock_echo_server(port, Some(pool_size), "tests_tcppool_server").await;
+            info!("server_handle finished");
+        });
+
+        let client_handles = tokio::spawn(async move {
+            // As soon as the two client handles finish their tasks,
+            // the end of scope of the current task will be reached,
+            // and pool will be dropped automatically without any
+            // max_lifetime being set.
+            let pool = Pool::builder()
+                .max_size(pool_size)
+                .build(TcpStreamConnectionManager::new(port).await)
+                .await
+                .unwrap();
+
+            let pool_cloned = pool.clone();
+            let client0_handle = tokio::spawn(async move {
+                let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+                tests_helper::mock_json_client(
+                    &mut tcp_stream,
+                    vec![String::from("hello0"), String::from("hello00")],
+                    "Pooled client 0",
+                )
+                .await;
+                info!("client0_handle finished");
+            });
+
+            let pool_cloned = pool.clone();
+            let client1_handle = tokio::spawn(async move {
+                let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+                tests_helper::mock_json_client(
+                    &mut tcp_stream,
+                    vec!["hello1".to_owned(), "hello11".to_owned()],
+                    "Pooled client 1",
+                )
+                .await;
+                info!("client1_handle finished");
+            });
+
+            tokio::try_join!(client0_handle, client1_handle).unwrap();
+            info!("pool dropped automatically")
+        });
+
+        tokio::try_join!(server_handle, client_handles).unwrap();
+        info!("test_pool_lifetime finished!")
+    }
+
+    /// cargo test -- --show-output
+    #[tokio::test]
+    async fn test_pool_lifetime() {
         tests_helper::init_logger();
         let port = "127.0.0.1:14523";
 
@@ -116,17 +180,21 @@ mod tests_tcppool {
         let pool = Pool::builder()
             .max_size(pool_size)
             .max_lifetime(Some(Duration::from_millis(300)))
-            .connection_timeout(Duration::from_millis(300))
-            .reaper_rate(Duration::from_millis(300))
+            .reaper_rate(Duration::from_millis(100))
             .build(TcpStreamConnectionManager::new(port).await)
             .await
             .unwrap();
 
-        let server_handle = tokio::spawn(tests_helper::mock_echo_server(
-            port.clone(),
-            Some(pool_size),
-            "tests_tcppool_server",
-        ));
+        // Since pool has a lifetime longer than server_handle,
+        // pool will always hold the connection, and since the connections
+        // are still alive, server_handle won't join.
+        // In this scenerio, pool must actively timeout,
+        // so that all connections are dropped,
+        // and then server_handle can properly terminate.
+        let server_handle = tokio::spawn(async move {
+            tests_helper::mock_echo_server(port, Some(pool_size), "tests_tcppool_server").await;
+            info!("server_handle finished");
+        });
 
         let pool_cloned = pool.clone();
         let client0_handle = tokio::spawn(async move {
@@ -137,6 +205,7 @@ mod tests_tcppool {
                 "Pooled client 0",
             )
             .await;
+            info!("client0_handle finished");
         });
 
         let pool_cloned = pool.clone();
@@ -148,7 +217,18 @@ mod tests_tcppool {
                 "Pooled client 1",
             )
             .await;
+            info!("client1_handle finished");
         });
-        tokio::try_join!(server_handle, client0_handle, client1_handle).unwrap();
+
+        // pool connections must have already been dropped
+        // due to its max_lifetime setting. Create a future
+        // that awaits the worker handles and returns Err when a timeout limit is reached.
+        assert!(tokio::time::timeout(
+            Duration::from_millis(600),
+            future::join3(server_handle, client0_handle, client1_handle)
+        )
+        .await
+        .is_ok());
+        info!("test_pool_lifetime finished!")
     }
 }

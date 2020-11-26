@@ -12,10 +12,10 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 pub fn init_logger() {
-    env_logger::builder()
+    let _ = env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .is_test(true)
-        .init();
+        .try_init();
 }
 
 /// A mock echo server for testing
