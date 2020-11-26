@@ -27,8 +27,10 @@ cargo run --bin sequencer_exe
 ### To build and test
 ```sh
 cargo test
-# To capture stdout
+# To show stdout at the end
 cargo test -- --show-output
+# To pipe into stdout
+cargo test -- --nocapture
 ```
 
 ### To build the entire library
