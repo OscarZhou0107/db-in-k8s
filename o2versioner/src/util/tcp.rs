@@ -37,8 +37,8 @@ pub async fn start_tcplistener<A, C, Fut, S>(
         let (tcp_stream, peer_addr) = listener.accept().await.unwrap();
 
         info!(
-            "[{}] <- [{}] Connection [{}] established",
-            local_addr, peer_addr, cur_num_connection
+            "<- [{}] Incomming connection [{}] established",
+            peer_addr, cur_num_connection
         );
         cur_num_connection += 1;
 

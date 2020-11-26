@@ -56,14 +56,14 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
     serded_read
         .and_then(|msg| match msg {
             scheduler_sequencer::Message::TxVNRequest(tx_table) => {
-                info!("Received [{:?}] TxVNRequest on {:?}", peer_addr, tx_table);
+                info!("<- [{}] TxVNRequest on {:?}", peer_addr, tx_table);
                 let mut state = state.lock().unwrap();
                 let tx_vn = state.assign_vn(tx_table);
-                info!("Reply [{:?}] {:?}", peer_addr, tx_vn);
+                info!("-> [{}] Reply {:?}", peer_addr, tx_vn);
                 future::ok(scheduler_sequencer::Message::TxVNResponse(tx_vn))
             }
             other => {
-                warn!("Unsupported message [{:?}] {:?}", peer_addr, other);
+                warn!("<- [{}] Unsupported message {:?}", peer_addr, other);
                 future::ok(scheduler_sequencer::Message::Invalid)
             }
         })

@@ -79,7 +79,7 @@ async fn process_connection(socket: TcpStream, sequencer_socket_pool: Pool<TcpSt
     // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(|msg| {
-            info!("Received [{:?}] {:?}", peer_addr, msg);
+            info!("<- [{}] Received {:?}", peer_addr, msg);
             process_request(peer_addr, msg, sequencer_socket_pool.clone())
         })
         .forward(serded_write)
@@ -93,7 +93,7 @@ async fn process_request(
     _sequencer_socket_pool: Pool<TcpStreamConnectionManager>,
 ) -> std::io::Result<SqlRawString> {
     let response = request;
-    info!("    Reply [{:?}] {:?}", peer_addr, response);
+    info!("-> [{}] Reply {:?}", peer_addr, response);
     Ok(response)
 }
 
