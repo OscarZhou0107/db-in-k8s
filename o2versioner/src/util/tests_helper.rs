@@ -42,6 +42,8 @@ where
 /// Note:
 /// 1. `msgs: Msgs` must be an owned collection that contains owned data types.
 /// 2. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
+///
+/// TODO: Consider split the type being sent and the type expected to receive
 pub async fn mock_json_client<Msgs>(tcp_stream: &mut TcpStream, msgs: Msgs) -> Vec<Msgs::Item>
 where
     Msgs: IntoIterator,
