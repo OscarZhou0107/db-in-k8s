@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::net::TcpStream;
 
 #[tokio::test]
-async fn test_sequencer() {
+async fn test_scheduler() {
     tests_helper::init_logger();
 
     let sequencer_addr = "127.0.0.1:6379";

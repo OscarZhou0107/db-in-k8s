@@ -28,13 +28,14 @@ where
         addr,
         |mut tcp_stream| async move {
             let peer_addr = tcp_stream.peer_addr().unwrap();
+            let local_addr = tcp_stream.local_addr().unwrap();
             let (mut reader, mut writer) = tcp_stream.split();
 
             tokio::io::copy(&mut reader, &mut writer)
                 .then(move |result| {
                     match result {
-                        Ok(amt) => info!("Echoed {} bytes to [{}]", amt, peer_addr),
-                        Err(e) => error!("Error on echoing to [{}]: {}", peer_addr, e),
+                        Ok(amt) => info!("[{}] -> [{}] ECHOED {} BYTES", local_addr, peer_addr, amt),
+                        Err(e) => error!("[{}] -> [{}] ERROR ON ECHOING: {}", local_addr, peer_addr, e),
                     };
                     future::ready(())
                 })
@@ -59,6 +60,7 @@ where
     for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
+    let peer_addr = tcp_stream.peer_addr().unwrap();
     let (tcp_read, tcp_write) = tcp_stream.split();
 
     // Delimit frames from bytes using a length header
@@ -76,14 +78,14 @@ where
         .fold(
             (serded_read, serded_write, &mut responses),
             |(mut serded_read, mut serded_write, responses), send_msg| async move {
-                info!("[{:?}] SEND REQUEST: {:?}", local_addr, send_msg);
+                info!("[{}] -> [{}] SEND REQUEST: {:?}", local_addr, peer_addr, send_msg);
                 responses.push(
                     serded_write
                         .send(send_msg)
                         .and_then(|_| serded_read.try_next())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap();
-                            info!("[{:?}] GOT RESPONSE: {:?}", local_addr, received_msg);
+                            info!("[{}] <- [{}] GOT RESPONSE: {:?}", local_addr, peer_addr, received_msg);
                             received_msg
                         })
                         .await
@@ -95,7 +97,7 @@ where
         )
         .await;
 
-    info!("{} at {:?} says goodbye world", "mock_json_client", local_addr);
+    info!("[{}] {} says goodbye world", "mock_json_client", local_addr);
 
     responses
 }

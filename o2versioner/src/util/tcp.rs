@@ -29,14 +29,17 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.map_or(String::from("Server"), |s| s.to_string());
-    info!("{} successfully binded to {:?}", server_name, local_addr);
+    info!("[{}] {} successfully binded ", local_addr, server_name);
 
     let mut cur_num_connection = 0;
     let mut spawned_tasks = Vec::new();
     loop {
         let (tcp_stream, peer_addr) = listener.accept().await.unwrap();
 
-        info!("Connection established with [{}] {}", cur_num_connection, peer_addr);
+        info!(
+            "[{}] <- [{}] Connection [{}] established",
+            local_addr, peer_addr, cur_num_connection
+        );
         cur_num_connection += 1;
 
         // Spawn a new thread for each tcp connection
@@ -52,7 +55,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
 
     // Wait on all spawned tasks to finish
     futures::future::join_all(spawned_tasks).await;
-    info!("{} at {:?} says goodbye world", server_name, local_addr);
+    info!("[{}] {} says goodbye world", local_addr, server_name);
 }
 
 #[derive(Debug)]
