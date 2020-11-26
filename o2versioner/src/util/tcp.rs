@@ -77,6 +77,12 @@ impl TcpStreamConnectionManager {
     }
 }
 
+impl Drop for TcpStreamConnectionManager {
+    fn drop(&mut self) {
+        info!("TcpStreamConnectionManager with connections to {:?} terminated", self.addrs);
+    }
+}
+
 #[async_trait]
 impl bb8::ManageConnection for TcpStreamConnectionManager {
     type Connection = TcpStream;
