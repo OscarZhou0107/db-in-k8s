@@ -19,6 +19,47 @@ pub struct TableOp {
     pub op: Operation,
 }
 
+trait IntoLegalTableOps {
+    fn into_legal_table_ops(self) -> Vec<TableOp>;
+}
+
+/// Automatically converts any `Iterator<Item=(String, Operation)>` to a well-formed `Vec<TableOp>`
+///
+/// # Note
+/// 1. It is expected `String` is already processed
+/// 2. `Vec<TableOp>` is sorted in ascending order by `String` and by `Operation`
+/// (`Operation`s with same `String` are ordered such that `Operation::W` comes before `Operation::R`)
+impl<T, S> IntoLegalTableOps for T
+where
+    T: IntoIterator<Item = (S, Operation)>,
+    S: ToString + Ord,
+{
+    fn into_legal_table_ops(self) -> Vec<TableOp> {
+        self.into_iter()
+            .sorted_by(|(left_token, left_op), (right_token, right_op)| {
+                if left_token != right_token {
+                    Ord::cmp(&left_token, &right_token)
+                } else {
+                    if left_op == right_op {
+                        Ordering::Equal
+                    } else {
+                        if *left_op == Operation::W {
+                            Ordering::Less
+                        } else {
+                            Ordering::Greater
+                        }
+                    }
+                }
+            })
+            .dedup_by(|(left_token, _), (right_token, _)| left_token == right_token)
+            .map(|(token, op)| TableOp {
+                table: token.to_string(),
+                op: op.into(),
+            })
+            .collect()
+    }
+}
+
 /// Represents a raw Sql string
 ///
 /// This string can be an invalid Sql statement.
@@ -105,27 +146,7 @@ impl SqlBeginTx {
                 }
             })
             .filter_map(|token_op| token_op)
-            .sorted_by(|(left_token, left_op), (right_token, right_op)| {
-                if left_token != right_token {
-                    Ord::cmp(&left_token, &right_token)
-                } else {
-                    if left_op == right_op {
-                        Ordering::Equal
-                    } else {
-                        if *left_op == Operation::W {
-                            Ordering::Less
-                        } else {
-                            Ordering::Greater
-                        }
-                    }
-                }
-            })
-            .dedup_by(|(left_token, _), (right_token, _)| left_token == right_token)
-            .map(|(token, op)| TableOp {
-                table: token.to_owned(),
-                op,
-            })
-            .collect()
+            .into_legal_table_ops()
     }
 
     pub fn add_uuid(mut self) -> Self {
@@ -150,6 +171,175 @@ impl TryFrom<SqlString> for SqlBeginTx {
             tx_name: Self::process_tx_name(&tx_name),
             table_ops: Self::process_table_ops(&mark),
         })
+    }
+}
+
+#[allow(warnings)]
+pub struct SqlQuery {
+    pub query: String,
+    pub table_ops: Vec<TableOp>,
+}
+
+#[cfg(test)]
+mod tests_into_legal_table_ops {
+    use super::*;
+
+    #[test]
+    fn test_into_legal_table_ops() {
+        assert_eq!(
+            vec![
+                ("table_r_0", Operation::R),
+                ("table_r_1", Operation::R),
+                ("table_w_0", Operation::W)
+            ]
+            .into_legal_table_ops(),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_w_0"),
+                    op: Operation::W,
+                },
+            ]
+        );
+
+        assert_eq!(
+            vec![("table_r_0", Operation::R), ("table_r_1", Operation::R)].into_legal_table_ops(),
+            vec![
+                TableOp {
+                    table: String::from("table_r_0"),
+                    op: Operation::R,
+                },
+                TableOp {
+                    table: String::from("table_r_1"),
+                    op: Operation::R,
+                },
+            ]
+        );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_r_0 write read"),
+        //     vec![TableOp {
+        //         table: String::from("table_r_0"),
+        //         op: Operation::R,
+        //     },]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_r_0 writeread"),
+        //     vec![
+        //         TableOp {
+        //             table: String::from("table_r_0"),
+        //             op: Operation::R,
+        //         },
+        //         TableOp {
+        //             table: String::from("writeread"),
+        //             op: Operation::R,
+        //         },
+        //     ]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_r_0 write table_w_0 read table_r_1 write table_w_1"),
+        //     vec![
+        //         TableOp {
+        //             table: String::from("table_r_0"),
+        //             op: Operation::R,
+        //         },
+        //         TableOp {
+        //             table: String::from("table_r_1"),
+        //             op: Operation::R,
+        //         },
+        //         TableOp {
+        //             table: String::from("table_w_0"),
+        //             op: Operation::W,
+        //         },
+        //         TableOp {
+        //             table: String::from("table_w_1"),
+        //             op: Operation::W,
+        //         },
+        //     ]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("table0 table1 table2 read table_r_0 table_r_1 write table_w_0"),
+        //     vec![
+        //         TableOp {
+        //             table: String::from("table_r_0"),
+        //             op: Operation::R,
+        //         },
+        //         TableOp {
+        //             table: String::from("table_r_1"),
+        //             op: Operation::R,
+        //         },
+        //         TableOp {
+        //             table: String::from("table_w_0"),
+        //             op: Operation::W,
+        //         },
+        //     ]
+        // );
+
+        // assert_eq!(SqlBeginTx::process_table_ops("table0 table1 table2"), vec![]);
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_0 table_0"),
+        //     vec![TableOp {
+        //         table: String::from("table_0"),
+        //         op: Operation::R,
+        //     },]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("write table_0 table_0"),
+        //     vec![TableOp {
+        //         table: String::from("table_0"),
+        //         op: Operation::W,
+        //     },]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_0 write table_0"),
+        //     vec![TableOp {
+        //         table: String::from("table_0"),
+        //         op: Operation::W,
+        //     },]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_0 table_0 write table_0"),
+        //     vec![TableOp {
+        //         table: String::from("table_0"),
+        //         op: Operation::W,
+        //     },]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_0 table_0 write table_0 table_0"),
+        //     vec![TableOp {
+        //         table: String::from("table_0"),
+        //         op: Operation::W,
+        //     },]
+        // );
+
+        // assert_eq!(
+        //     SqlBeginTx::process_table_ops("read table_0 table_1 write table_0"),
+        //     vec![
+        //         TableOp {
+        //             table: String::from("table_0"),
+        //             op: Operation::W,
+        //         },
+        //         TableOp {
+        //             table: String::from("table_1"),
+        //             op: Operation::R,
+        //         },
+        //     ]
+        // );
     }
 }
 
@@ -418,24 +608,6 @@ mod tests_sqlbegintx {
         assert_eq!(SqlBeginTx::process_table_ops(""), vec![]);
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 read table_r_1 write table_w_0"),
-            vec![
-                TableOp {
-                    table: String::from("table_r_0"),
-                    op: Operation::R,
-                },
-                TableOp {
-                    table: String::from("table_r_1"),
-                    op: Operation::R,
-                },
-                TableOp {
-                    table: String::from("table_w_0"),
-                    op: Operation::W,
-                },
-            ]
-        );
-
-        assert_eq!(
             SqlBeginTx::process_table_ops("read table_r_0 write table_w_0 read table_r_1 "),
             vec![
                 TableOp {
@@ -452,21 +624,7 @@ mod tests_sqlbegintx {
                 },
             ]
         );
-
-        assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 write read table_r_1 "),
-            vec![
-                TableOp {
-                    table: String::from("table_r_0"),
-                    op: Operation::R,
-                },
-                TableOp {
-                    table: String::from("table_r_1"),
-                    op: Operation::R,
-                },
-            ]
-        );
-
+        //////////
         assert_eq!(
             SqlBeginTx::process_table_ops("read table_r_0 write read"),
             vec![TableOp {
