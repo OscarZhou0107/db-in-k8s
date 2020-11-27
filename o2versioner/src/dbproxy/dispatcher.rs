@@ -8,7 +8,7 @@ pub struct Dispatcher {}
 
 impl Dispatcher {
     pub fn run(
-        mut pending_queue: Arc<Mutex<PendingQueue>>,
+        pending_queue: Arc<Mutex<PendingQueue>>,
         sender: mpsc::Sender<QueryResult>,
         sql_url: String,
         mut version: Arc<Mutex<DbVersion>>,
