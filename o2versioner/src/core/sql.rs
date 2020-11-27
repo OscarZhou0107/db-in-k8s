@@ -13,6 +13,12 @@ pub enum Operation {
     R,
 }
 
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TableOp {
+    pub table: String,
+    pub op: Operation,
+}
+
 /// Represents a raw Sql string
 ///
 /// This string can be an invalid Sql statement.
@@ -29,12 +35,6 @@ impl From<String> for SqlString {
     fn from(s: String) -> Self {
         Self(s)
     }
-}
-
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct TableOp {
-    pub table: String,
-    pub op: Operation,
 }
 
 /// Keeps a list of all tables accessed for a Sql transaction
