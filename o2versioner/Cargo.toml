@@ -23,4 +23,5 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "0.2.23", features = ["full"] }
 tokio-serde = { version = "0.6", features = ["json"] }
 tokio-util = { version = "0.3", features = ["codec"] }
+unicase = "2.6"
 uuid = { version = "0.8", features = ["v4"] }

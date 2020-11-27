@@ -4,6 +4,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use unicase::UniCase;
 use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)
@@ -62,7 +63,9 @@ where
 
 /// Represents a raw Sql string
 ///
-/// This string can be an invalid Sql statement.
+/// # Notes
+/// 1. This string can be an invalid Sql statement.
+/// 2. Sql keyword are case insensitive, other things are case sensitive.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SqlString(pub String);
 
@@ -92,26 +95,27 @@ pub struct SqlBeginTx {
 impl SqlBeginTx {
     /// Parse the transaction name and mark if valid
     ///
+    /// # Notes
+    /// 1. Assume Sql keywords are case insensitive.
+    /// 2. Others are case sensitive, including transaction name and table name
     /// Return `Result<(tx_name: String, mark: String), ())>`
-    fn try_from_sqlstring_helper(sqlstring: &SqlString) -> Result<(String, String), ()> {
-        let re = Regex::new(r"^\s*begin\s+(?:tran|transaction)\s+(\S*)\s*with\s+mark\s+'(.*)'\s*;?\s*$").unwrap();
+    fn try_from_sqlstring_helper(sqlstring: &SqlString) -> Result<(&str, &str), ()> {
+        let re = Regex::new(
+            r"^\s*(?i)begin(?-i)\s+(?i)(?:tran|transaction)(?-i)\s+(\S*)\s*(?i)with\s+mark(?-i)\s+'(.*)'\s*;?\s*$",
+        )
+        .unwrap();
 
-        re.captures(&sqlstring.0.to_ascii_lowercase())
-            .map(|caps| {
-                (
-                    caps.get(1).unwrap().as_str().to_owned(),
-                    caps.get(2).unwrap().as_str().to_owned(),
-                )
-            })
+        re.captures(&sqlstring.0)
+            .map(|caps| (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()))
             .ok_or(())
     }
 
     /// Process the argument `tx_name` for use as the `SqlBeginTx.tx_name` field
     ///
-    /// # Note
-    /// Will remove any whitespace from the argument `tx_name`
+    /// # Notes
+    /// 1. Will remove any whitespace from the argument `tx_name`
     fn process_tx_name(tx_name: &str) -> String {
-        let mut tx_name = tx_name.to_ascii_lowercase();
+        let mut tx_name = tx_name.to_owned();
         common::remove_whitespace(&mut tx_name);
         tx_name
     }
@@ -119,29 +123,32 @@ impl SqlBeginTx {
     /// Process the argument `mark` for use as the `SqlBeginTx.table_ops` field
     ///
     /// # Note
-    /// 1. It supports multiple occurance for read or write keyword
-    /// 2. Any space-separated identifier are associated with the previous keyword if existed; else, will be discarded
-    /// 3. If no identifier is followed after a keyword, the keyword will be ignored
-    /// 4. `Vec<TableOp>` is sorted in ascending order by `TableOp.name` and by `TableOp.op`
+    /// 1. Assume keywords, such as "read" and "write", are case insensitive.
+    /// 2. It supports multiple occurance for read or write keyword
+    /// 3. Any space-separated identifier are associated with the previous keyword if existed; else, will be discarded
+    /// 4. If no identifier is followed after a keyword, the keyword will be ignored
+    /// 5. `Vec<TableOp>` is sorted in ascending order by `TableOp.name` and by `TableOp.op`
     /// (`TableOp`s with same `TableOp.name` are ordered such that `Operation::W` comes before `Operation::R`)
     fn process_table_ops(mark: &str) -> Vec<TableOp> {
-        mark.to_ascii_lowercase()
-            .split_whitespace()
-            .skip_while(|token| *token != "read" && *token != "write")
-            .scan(None, |is_read_st, token| {
-                if token == "read" {
+        let read_ci = UniCase::new("read");
+        let write_ci = UniCase::new("write");
+        mark.split_whitespace()
+            .map(|token| UniCase::new(token))
+            .skip_while(|token_ci| *token_ci != read_ci && *token_ci != write_ci)
+            .scan(None, |is_read_st, token_ci| {
+                if token_ci == read_ci {
                     *is_read_st = Some(true);
                     return Some(None);
-                } else if token == "write" {
+                } else if token_ci == write_ci {
                     *is_read_st = Some(false);
                     return Some(None);
                 } else {
                     // is_read_st can't be None here because
                     // we should have met at least one key word
                     if is_read_st.unwrap() {
-                        return Some(Some((token, Operation::R)));
+                        return Some(Some((token_ci.into_inner(), Operation::R)));
                     } else {
-                        return Some(Some((token, Operation::W)));
+                        return Some(Some((token_ci.into_inner(), Operation::W)));
                     }
                 }
             })
@@ -169,8 +176,8 @@ impl TryFrom<SqlString> for SqlBeginTx {
     /// Refer to `SqlBeginTx::process_tx_name` and `SqlBeginTx::process_table_ops` for processing details
     fn try_from(sqlstring: SqlString) -> Result<Self, Self::Error> {
         Self::try_from_sqlstring_helper(&sqlstring).map(|(tx_name, mark)| Self {
-            tx_name: Self::process_tx_name(&tx_name),
-            table_ops: Self::process_table_ops(&mark),
+            tx_name: Self::process_tx_name(tx_name),
+            table_ops: Self::process_table_ops(mark),
         })
     }
 }
@@ -373,8 +380,7 @@ mod tests_sqlbegintx {
         tests.into_iter().for_each(|(sqlstring, res)| {
             assert_eq!(
                 SqlBeginTx::try_from_sqlstring_helper(&sqlstring),
-                res.map(|res_ref| (res_ref.0.to_ascii_lowercase(), res_ref.1.to_ascii_lowercase()))
-                    .ok_or(())
+                res.map(|res_ref| (res_ref.0, res_ref.1)).ok_or(())
             )
         });
     }
@@ -474,22 +480,23 @@ mod tests_sqlbegintx {
 
     #[test]
     fn test_process_tx_name() {
-        assert_eq!(SqlBeginTx::process_tx_name("  tx_name  "), *"tx_name");
+        assert_eq!(SqlBeginTx::process_tx_name("  tX_name  "), *"tX_name");
 
-        assert_eq!(SqlBeginTx::process_tx_name("  tx_name 1 2 3  "), *"tx_name123");
+        assert_eq!(SqlBeginTx::process_tx_name("  tx_nAMe 1 2 3  "), *"tx_nAMe123");
 
         assert_eq!(SqlBeginTx::process_tx_name("   "), *"");
 
-        assert_eq!(SqlBeginTx::process_tx_name("tx_name"), *"tx_name");
+        assert_ne!(SqlBeginTx::process_tx_name("tXX_name"), *"txx_name");
+        assert_eq!(SqlBeginTx::process_tx_name("tXX_name"), *"tXX_name");
     }
 
     #[test]
     fn test_process_table_ops() {
         assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 table_r_1 write table_w_0"),
+            SqlBeginTx::process_table_ops("read table_R_0 table_r_1 write table_w_0"),
             vec![
                 TableOp {
-                    table: String::from("table_r_0"),
+                    table: String::from("table_R_0"),
                     op: Operation::R,
                 },
                 TableOp {
@@ -522,8 +529,12 @@ mod tests_sqlbegintx {
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("write table_w_0 read table_r_0 table_r_1"),
+            SqlBeginTx::process_table_ops("WrItE Table_w_0 read table_r_0 table_r_1"),
             vec![
+                TableOp {
+                    table: String::from("Table_w_0"),
+                    op: Operation::W,
+                },
                 TableOp {
                     table: String::from("table_r_0"),
                     op: Operation::R,
@@ -532,105 +543,101 @@ mod tests_sqlbegintx {
                     table: String::from("table_r_1"),
                     op: Operation::R,
                 },
-                TableOp {
-                    table: String::from("table_w_0"),
-                    op: Operation::W,
-                },
             ]
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("write table_w_0write read table_r_0read writetable_r_1read"),
+            SqlBeginTx::process_table_ops("write table_w_0writE read table_r_0read writetable_r_1reAd"),
             vec![
                 TableOp {
                     table: String::from("table_r_0read"),
                     op: Operation::R,
                 },
                 TableOp {
-                    table: String::from("table_w_0write"),
+                    table: String::from("table_w_0writE"),
                     op: Operation::W,
                 },
                 TableOp {
-                    table: String::from("writetable_r_1read"),
+                    table: String::from("writetable_r_1reAd"),
                     op: Operation::R,
                 },
             ]
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("write read table_r_0 table_r_1"),
+            SqlBeginTx::process_table_ops("write read Table_r_0 Table_r_1"),
             vec![
                 TableOp {
-                    table: String::from("table_r_0"),
+                    table: String::from("Table_r_0"),
                     op: Operation::R,
                 },
                 TableOp {
-                    table: String::from("table_r_1"),
+                    table: String::from("Table_r_1"),
                     op: Operation::R,
                 },
             ]
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 table_r_1 write"),
+            SqlBeginTx::process_table_ops("read table_r_0 Table_r_1 write"),
             vec![
                 TableOp {
-                    table: String::from("table_r_0"),
+                    table: String::from("Table_r_1"),
                     op: Operation::R,
                 },
                 TableOp {
-                    table: String::from("table_r_1"),
+                    table: String::from("table_r_0"),
                     op: Operation::R,
                 },
             ]
         );
 
-        assert_eq!(SqlBeginTx::process_table_ops("read write"), vec![]);
+        assert_eq!(SqlBeginTx::process_table_ops("ReaD WriTE"), vec![]);
 
         assert_eq!(SqlBeginTx::process_table_ops(""), vec![]);
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 write table_w_0 read table_r_1 "),
+            SqlBeginTx::process_table_ops("ReAd table_R_0 WrItE table_W_0 rEad table_R_1 "),
             vec![
                 TableOp {
-                    table: String::from("table_r_0"),
+                    table: String::from("table_R_0"),
                     op: Operation::R,
                 },
                 TableOp {
-                    table: String::from("table_r_1"),
+                    table: String::from("table_R_1"),
                     op: Operation::R,
                 },
                 TableOp {
-                    table: String::from("table_w_0"),
+                    table: String::from("table_W_0"),
                     op: Operation::W,
                 },
             ]
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 write read"),
+            SqlBeginTx::process_table_ops("read Table_r_0 WRITE REAd"),
             vec![TableOp {
-                table: String::from("table_r_0"),
+                table: String::from("Table_r_0"),
                 op: Operation::R,
             },]
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("read table_r_0 writeread"),
+            SqlBeginTx::process_table_ops("Read table_r_0 writereAD"),
             vec![
                 TableOp {
                     table: String::from("table_r_0"),
                     op: Operation::R,
                 },
                 TableOp {
-                    table: String::from("writeread"),
+                    table: String::from("writereAD"),
                     op: Operation::R,
                 },
             ]
         );
 
         assert_eq!(
-            SqlBeginTx::process_table_ops("table0 table1 table2 read table_r_0 table_r_1 write table_w_0"),
+            SqlBeginTx::process_table_ops("table0 table1 table2 read table_r_0 table_r_1 Write table_w_0"),
             vec![
                 TableOp {
                     table: String::from("table_r_0"),
@@ -647,7 +654,7 @@ mod tests_sqlbegintx {
             ]
         );
 
-        assert_eq!(SqlBeginTx::process_table_ops("table0 table1 table2"), vec![]);
+        assert_eq!(SqlBeginTx::process_table_ops("tAble0 taBle1 tabLe2"), vec![]);
     }
 }
 
