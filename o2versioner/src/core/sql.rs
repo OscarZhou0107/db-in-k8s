@@ -27,16 +27,12 @@ impl<'a> From<&'a str> for SqlRawString {
 impl SqlRawString {
     /// Parse the transaction name and mark if valid
     ///
-    /// Return `Some((transaction_name, mark))` or None
-    fn get_tx_data(&self) -> Option<(String, String)> {
+    /// Return `Option<SqlBeginTx>`
+    fn get_sqlbegintx(&self) -> Option<SqlBeginTx> {
         let re = Regex::new(r"^\s*begin\s+(?:tran|transaction)\s+(\S*)\s*with\s+mark\s+'(.*)'\s*;?\s*$").unwrap();
 
-        re.captures(&self.0.to_ascii_lowercase()).map(|caps| {
-            (
-                caps.get(1).unwrap().as_str().to_owned(),
-                caps.get(2).unwrap().as_str().to_owned(),
-            )
-        })
+        re.captures(&self.0.to_ascii_lowercase())
+            .map(|caps| SqlBeginTx::new(caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str()))
     }
 
     /// Conversion to a `TxTable` if valid
@@ -49,8 +45,24 @@ impl SqlRawString {
     /// 1. If `add_uuid == True`, will append uuid to the end of `TxTable::tx_name`
     /// 2. `add_uuid == False` should only be used for unit testing
     pub fn to_txtable(&self, add_uuid: bool) -> Option<TxTable> {
-        self.get_tx_data()
-            .map(|(tx_name, mark)| TxTable::from_str(&tx_name, &mark, add_uuid))
+        self.get_sqlbegintx()
+            .map(|sqlbegintx| TxTable::new(&sqlbegintx, add_uuid))
+    }
+}
+
+/// Represents a raw Sql begin transaction
+#[derive(Debug, Eq, PartialEq)]
+pub struct SqlBeginTx {
+    pub tx_name: String,
+    pub mark: String,
+}
+
+impl SqlBeginTx {
+    fn new(tx_name: &str, mark: &str) -> Self {
+        Self {
+            tx_name: tx_name.to_owned(),
+            mark: mark.to_owned(),
+        }
     }
 }
 
@@ -72,6 +84,18 @@ pub struct TxTable {
 }
 
 impl TxTable {
+    /// Construct a `TxTable` with `SqlBeginTx`
+    /// which is then processed to form the `TxTable.tx_name` and `TxTable.table_ops` fields
+    ///
+    /// # Note
+    /// Refer to `TxTable::process_tx_name` and `TxTable::process_table_ops` for processing details
+    fn new(sqlbegintx: &SqlBeginTx, add_uuid: bool) -> Self {
+        Self {
+            tx_name: Self::process_tx_name(&sqlbegintx.tx_name, add_uuid),
+            table_ops: Self::process_table_ops(&sqlbegintx.mark),
+        }
+    }
+
     /// Process the argument `tx_name` for use as the `TxTable.tx_name` field
     ///
     /// # Note
@@ -140,30 +164,19 @@ impl TxTable {
             })
             .collect()
     }
-
-    /// Construct a `TxTable` with raw string arguments `tx_name` and `mark`
-    /// which are then processed to form the `TxTable.tx_name` and `TxTable.table_ops` fields
-    ///
-    /// # Note
-    /// Refer to `TxTable::process_tx_name` and `TxTable::process_table_ops` for processing details
-    fn from_str(tx_name: &str, mark: &str, add_uuid: bool) -> Self {
-        Self {
-            tx_name: TxTable::process_tx_name(tx_name, add_uuid),
-            table_ops: TxTable::process_table_ops(mark),
-        }
-    }
 }
 
 /// Unit test for `SqlRawString`
 #[cfg(test)]
 mod tests_sql_raw_string {
     use super::Operation;
+    use super::SqlBeginTx;
     use super::SqlRawString;
     use super::TableOp;
     use super::TxTable;
 
     #[test]
-    fn test_get_tx_data() {
+    fn test_get_sqlbegintx() {
         let tests = vec![
             (
                 SqlRawString::from("BEGIN TRAN trans1 WITH MARK 'READ table_0 table_1 WRITE table_2';"),
@@ -203,8 +216,8 @@ mod tests_sql_raw_string {
 
         tests.into_iter().for_each(|(sql_raw_string, res)| {
             assert_eq!(
-                sql_raw_string.get_tx_data(),
-                res.map(|res_ref| (res_ref.0.to_ascii_lowercase(), res_ref.1.to_ascii_lowercase()))
+                sql_raw_string.get_sqlbegintx(),
+                res.map(|res_ref| SqlBeginTx::new(&res_ref.0.to_ascii_lowercase(), &res_ref.1.to_ascii_lowercase()))
             )
         });
     }
@@ -307,6 +320,7 @@ mod tests_sql_raw_string {
 #[cfg(test)]
 mod tests_txtable {
     use super::Operation;
+    use super::SqlBeginTx;
     use super::TableOp;
     use super::TxTable;
 
@@ -597,9 +611,9 @@ mod tests_txtable {
     }
 
     #[test]
-    fn test_from_str() {
+    fn test_new() {
         assert_eq!(
-            TxTable::from_str("tx0", "read tr0 tr1 write tw0 tw1", false),
+            TxTable::new(&SqlBeginTx::new("tx0", "read tr0 tr1 write tw0 tw1"), false),
             TxTable {
                 tx_name: String::from("tx0"),
                 table_ops: vec![
@@ -624,7 +638,7 @@ mod tests_txtable {
         );
 
         assert_eq!(
-            TxTable::from_str("tx1", "read tr0 write tw0 read tr1 write", false),
+            TxTable::new(&SqlBeginTx::new("tx1", "read tr0 write tw0 read tr1 write"), false),
             TxTable {
                 tx_name: String::from("tx1"),
                 table_ops: vec![
@@ -645,7 +659,7 @@ mod tests_txtable {
         );
 
         assert_eq!(
-            TxTable::from_str("tx1", "read t0 write t0 read t1 write", false),
+            TxTable::new(&SqlBeginTx::new("tx1", "read t0 write t0 read t1 write"), false),
             TxTable {
                 tx_name: String::from("tx1"),
                 table_ops: vec![
@@ -662,7 +676,7 @@ mod tests_txtable {
         );
 
         assert_eq!(
-            TxTable::from_str("tx1", "read t1 write t0 write t1 write t0", false),
+            TxTable::new(&SqlBeginTx::new("tx1", "read t1 write t0 write t1 write t0"), false),
             TxTable {
                 tx_name: String::from("tx1"),
                 table_ops: vec![
@@ -679,7 +693,7 @@ mod tests_txtable {
         );
 
         assert_eq!(
-            TxTable::from_str("", "", false),
+            TxTable::new(&SqlBeginTx::new("", ""), false),
             TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![]
