@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::{collections::HashMap, sync::Mutex};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio::sync::mpsc;
-use tokio::sync::Notify;
 
 pub async fn main<A: ToSocketAddrs>(addr : A, sql_url : &str) {
     //=====================================Continue an ongoing transaction=======================================//

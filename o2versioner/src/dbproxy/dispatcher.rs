@@ -1,6 +1,7 @@
 use super::core::{DbVersion, Operation, QueryResult, Repository, Task, PendingQueue};
 use std::sync::Arc;
 use std::{collections::HashMap, sync::Mutex};
+use mysql_async::Pool;
 use tokio::sync::mpsc;
 use tokio::sync::Notify;
 
@@ -8,7 +9,7 @@ pub struct Dispatcher {}
 
 impl Dispatcher {
     pub fn run(
-        mut pending_queue: Arc<Mutex<PendingQueue>>,
+        pending_queue: Arc<Mutex<PendingQueue>>,
         sender: mpsc::Sender<QueryResult>,
         sql_url: String,
         mut version: Arc<Mutex<DbVersion>>,
@@ -29,66 +30,64 @@ impl Dispatcher {
                     let mut lock = transactions.lock().unwrap();
                     if !lock.contains_key(&op.transaction_id) {
                         
-                        let (ts, mut tr): (mpsc::Sender<Operation>, mpsc::Receiver<Operation>) = mpsc::channel(1);
+                        let (ts, tr): (mpsc::Sender<Operation>, mpsc::Receiver<Operation>) = mpsc::channel(1);
                         lock.insert(op.transaction_id.clone(), ts);
-
-                        let pool_clone = pool.clone();
-                        let mut sender_clone = sender.clone();
-
-                        tokio::spawn(async move {
-                            #[allow(unused_assignments)]
-                            let mut result: QueryResult = Default::default();
-                            let r_ref = &mut result;
-                            {
-                                let mut repo = Repository::new(pool_clone).await;
-                                repo.start_transaction().await;
-
-                                while let Some(operation) = tr.recv().await {
-                                    let inner_result;
-                                    match operation.task {
-                                        Task::READ => {
-                                            inner_result = repo.execute_read().await;
-                                        }
-                                        Task::WRITE => {
-                                            inner_result = repo.execute_write().await;
-                                        }
-                                        Task::COMMIT => {
-                                            *r_ref = repo.commit().await;
-                                            break;
-                                        }
-                                        Task::ABORT => {
-                                            *r_ref = repo.abort().await;
-                                            break;
-                                        }
-                                    }
-                                    #[allow(unused_must_use)]
-                                    {
-                                        sender_clone.send(inner_result.clone()).await;
-                                    }
-                                }
-                            }
-                            #[allow(unused_must_use)]
-                            {
-                                sender_clone.send(result).await;
-                            }
-                        });
+                        Self::spawn_transaction(pool.clone(), tr, sender.clone());
+                  
                     }
                 });
 
                 operations.iter().for_each(|op| {
                     let op = op.clone();
-                    let mut sender;
+                    let sender;
                     {
                         sender = transactions.lock().unwrap().get(&op.transaction_id).unwrap().clone();
                     }
-                    tokio::spawn(async move {
-                        #[allow(unused_must_use)]
-                        {
-                            sender.send(op).await;
-                        }
-                    });
+                    
+                    Self::spawn_unblock_send(sender, op);
                 });
             }
+        });
+    }
+
+    fn spawn_transaction(pool : Pool, mut rec : mpsc::Receiver<Operation>, mut sender : mpsc::Sender<QueryResult>){
+        
+        tokio::spawn(async move {
+
+            let mut result: QueryResult = Default::default();
+            let r_ref = &mut result;
+            {
+                let mut repo = Repository::new(pool).await;
+                repo.start_transaction().await;
+
+                while let Some(operation) = rec.recv().await {
+                    let inner_result;
+                    match operation.task {
+                        Task::READ => {
+                            inner_result = repo.execute_read().await;
+                        }
+                        Task::WRITE => {
+                            inner_result = repo.execute_write().await;
+                        }
+                        Task::COMMIT => {
+                            *r_ref = repo.commit().await;
+                            break;
+                        }
+                        Task::ABORT => {
+                            *r_ref = repo.abort().await;
+                            break;
+                        }
+                    }
+                    let _ = sender.send(inner_result.clone()).await;
+                }
+            }
+                let _ = sender.send(result).await;
+        });
+    }
+
+    fn spawn_unblock_send(mut sender : mpsc::Sender<Operation>, op : Operation){
+        tokio::spawn(async move {
+            let _ = sender.send(op).await;
         });
     }
 

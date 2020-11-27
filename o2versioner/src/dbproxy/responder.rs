@@ -3,7 +3,6 @@ use crate::comm::scheduler_dbproxy::Message;
 use futures::SinkExt;
 use std::sync::Arc;
 use std::sync::Mutex;
-use tokio::sync::Notify;
 use tokio::{net::tcp::OwnedWriteHalf, sync::mpsc};
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};

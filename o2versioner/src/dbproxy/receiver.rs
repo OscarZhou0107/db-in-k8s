@@ -1,4 +1,4 @@
-use super::core::{Operation, PendingQueue};
+use super::core::PendingQueue;
 use crate::comm::scheduler_dbproxy::Message;
 use std::sync::Arc;
 use std::sync::Mutex;

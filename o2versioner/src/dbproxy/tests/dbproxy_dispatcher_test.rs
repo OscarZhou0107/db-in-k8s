@@ -20,21 +20,14 @@ async fn test_receive_response_from_new_transactions() {
     mock_db.insert("table2".to_string(), 0);
     let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
 
-  
     //PendingQueue
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
     let pending_queue_2 = Arc::clone(&pending_queue);
-
-    //Dispatcher & Responder
-    let version_notify = Arc::new(Notify::new());
-
-    //Dispatcher & Main Loop
    
     //Responder sender and receiver
     let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
   
-    let new_task_notify = pending_queue.lock().unwrap().get_notify();
     Dispatcher::run(
         pending_queue,
         responder_sender,
@@ -65,7 +58,6 @@ async fn test_receive_response_from_new_transactions() {
         }
     }
     
-    assert!(true);
     assert!(transactions_2.lock().unwrap().len() == 4);
 }
 
@@ -122,6 +114,5 @@ async fn test_receive_response_from_same_transactions() {
         }
     }
     
-    assert!(true);
     assert!(transactions_2.lock().unwrap().len() == 3);
 }
