@@ -1,10 +1,11 @@
 use crate::comm::scheduler_sequencer;
-use crate::core::sql::{SqlString, TxTable};
+use crate::core::sql::{SqlBeginTx, SqlString};
 use crate::core::version_number::TxVN;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;
 use log::debug;
+use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
@@ -90,8 +91,8 @@ async fn process_request(
     peer_addr: SocketAddr,
     sequencer_socket_pool: Pool<TcpStreamConnectionManager>,
 ) -> std::io::Result<SqlString> {
-    let response = if let Some(txtable) = request.to_txtable(true) {
-        request_txvn(txtable, &mut sequencer_socket_pool.get().await.unwrap())
+    let response = if let Ok(sqlbegintx) = SqlBeginTx::try_from(request.clone()) {
+        request_txvn(sqlbegintx.add_uuid(), &mut sequencer_socket_pool.get().await.unwrap())
             .await
             .map_or_else(
                 |e| SqlString(format!("[{}] failed due to: {}", request.0, e)),
@@ -104,8 +105,8 @@ async fn process_request(
     Ok(response)
 }
 
-/// Attempt to request a `TxVN` from the Sequencer based on the argument `TxTable`
-async fn request_txvn(txtable: TxTable, sequencer_socket: &mut TcpStream) -> Result<TxVN, String> {
+/// Attempt to request a `TxVN` from the Sequencer based on the argument `SqlBeginTx`
+async fn request_txvn(sqlbegintx: SqlBeginTx, sequencer_socket: &mut TcpStream) -> Result<TxVN, String> {
     let local_addr = sequencer_socket.local_addr().unwrap();
     let (tcp_read, tcp_write) = sequencer_socket.split();
 
@@ -123,7 +124,7 @@ async fn request_txvn(txtable: TxTable, sequencer_socket: &mut TcpStream) -> Res
         SymmetricalJson::<scheduler_sequencer::Message>::default(),
     );
 
-    let msg = scheduler_sequencer::Message::TxVNRequest(txtable);
+    let msg = scheduler_sequencer::Message::TxVNRequest(sqlbegintx);
     debug!("[{}] -> Request to Sequencer: {:?}", local_addr, msg);
     let sequencer_response = serded_write
         .send(msg)

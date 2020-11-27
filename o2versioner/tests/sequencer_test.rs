@@ -3,6 +3,7 @@ use o2versioner::core::sql::*;
 use o2versioner::core::version_number::*;
 use o2versioner::sequencer::handler;
 use o2versioner::util::tests_helper;
+use std::convert::TryInto;
 use tokio::net::TcpStream;
 
 #[tokio::test]
@@ -17,13 +18,13 @@ async fn test_sequencer() {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
                 SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
-                    .to_txtable(false)
+                    .try_into()
                     .unwrap(),
             ),scheduler_sequencer::Message::TxVNRequest(
                 SqlString::from(
                     "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
                 )
-                .to_txtable(false)
+                .try_into()
                 .unwrap(),
             ), scheduler_sequencer::Message::TxVNResponse(TxVN {
                 tx_name: String::from("tx2"),
@@ -51,13 +52,13 @@ async fn test_sequencer() {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
                 SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
-                    .to_txtable(false)
+                    .try_into()
                     .unwrap(),
             ),scheduler_sequencer::Message::TxVNRequest(
                 SqlString::from(
                     "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
                 )
-                .to_txtable(false)
+                .try_into()
                 .unwrap(),
             ), scheduler_sequencer::Message::TxVNResponse(TxVN {
                 tx_name: String::from("tx2"),

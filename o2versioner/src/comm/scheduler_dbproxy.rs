@@ -1,5 +1,5 @@
 use super::mysql::Packet;
-//use crate::core::sql::TxTable;
+//use crate::core::sql::SqlBeginTx;
 use crate::core::version_number::TxVN;
 use crate::dbproxy::core::{Operation, QueryResult};
 use serde::{Deserialize, Serialize};
