@@ -11,11 +11,7 @@ pub struct Responder {}
 
 // Box<SymmetricallyFramed<FramedWrite<OwnedWriteHalf, LengthDelimitedCodec>,Message,SymmetricalJson<Message>>>
 impl Responder {
-    pub fn run(
-        mut receiver: mpsc::Receiver<QueryResult>,
-        version: Arc<Mutex<DbVersion>>,
-        tcp_write: OwnedWriteHalf,
-    ) {
+    pub fn run(mut receiver: mpsc::Receiver<QueryResult>, version: Arc<Mutex<DbVersion>>, tcp_write: OwnedWriteHalf) {
         tokio::spawn(async move {
             let mut serializer = SymmetricallyFramed::new(
                 FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),

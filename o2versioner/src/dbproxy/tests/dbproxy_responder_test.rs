@@ -1,23 +1,24 @@
-use futures::prelude::*;
-use crate::{comm::scheduler_dbproxy::Message, dbproxy::core::{DbVersion, QueryResult}};
-use tokio::sync::mpsc;
+use super::Responder;
+use crate::comm::scheduler_dbproxy::Message;
 use crate::core::sql::Operation as OperationType;
 use crate::core::version_number::TableVN;
-use std::{collections::HashMap, sync::Arc};
+use crate::dbproxy::core::{DbVersion, QueryResult};
+use futures::prelude::*;
 use std::sync::Mutex;
+use std::{collections::HashMap, sync::Arc};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
-use tokio::sync::Notify;
+use tokio::sync::mpsc;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
-use super::Responder;
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn test_send_items_to_from_multiple_channel() {
     //Prepare - Network
 
-    let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =  mpsc::channel(100);
+    let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
+        mpsc::channel(100);
 
     let mut mock_db = HashMap::new();
     mock_db.insert("table1".to_string(), 0);
@@ -70,27 +71,28 @@ async fn test_send_items_to_from_multiple_channel() {
             op: OperationType::R,
         },
     ];
-    let r = QueryResult{ result : "r".to_string(), version_release : false, contained_newer_versions : mock_table_vs.clone()};
-    let worker_num:i32 = 5;
+    let r = QueryResult {
+        result: "r".to_string(),
+        version_release: false,
+        contained_newer_versions: mock_table_vs.clone(),
+    };
+    let worker_num: i32 = 5;
 
     //Action - Spwan worker thread to send response
-    let _w = tokio::spawn( async move
-        {
-            for _ in 0..worker_num {
-                let mut s = responder_sender.clone();
-                let r_c = r.clone();
-                tokio::spawn( async move {
-                    let _a = s.send(r_c).await;
-                });
-            }
+    let _w = tokio::spawn(async move {
+        for _ in 0..worker_num {
+            let mut s = responder_sender.clone();
+            let r_c = r.clone();
+            tokio::spawn(async move {
+                let _a = s.send(r_c).await;
+            });
         }
-    );
+    });
 
     loop {
-       if result_2.lock().unwrap().len() == 5{
-           break;
-       }
+        if result_2.lock().unwrap().len() == 5 {
+            break;
+        }
     }
-    
     assert!(true);
 }

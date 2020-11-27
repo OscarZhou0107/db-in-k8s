@@ -1,12 +1,12 @@
-use futures::prelude::*;
-use crate::{comm::scheduler_dbproxy::Message, dbproxy::core::{Operation, PendingQueue, Task}};
+use super::Receiver;
+use crate::comm::scheduler_dbproxy::Message;
 use crate::core::{sql::Operation as OperationType, version_number::TableVN};
+use crate::dbproxy::core::{Operation, PendingQueue, Task};
+use futures::prelude::*;
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::Notify;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
-use super::Receiver;
 
 #[tokio::test(threaded_scheduler)]
 //#[ignore]
