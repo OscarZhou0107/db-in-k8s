@@ -50,7 +50,7 @@ cargo check
 - [x] Scheduler
 - [x] Sequencer
 - [x] DbProxy
-- [ ] MySQL protocol
+- [ ] ~~MySQL protocol~~ Aborted, use msql interface instead
 
 ### Features
 - [x] msql: simple sql
