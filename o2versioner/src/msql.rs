@@ -2,6 +2,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::iter::FromIterator;
+use uuid::Uuid;
 
 /// Enum representing either a W (write) or R (read) for a table
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
@@ -10,13 +11,22 @@ pub enum Operation {
     R,
 }
 
+/// Enum representing the access pattern of a `TableOps`
+#[derive(Debug, Eq, PartialEq)]
+pub enum AccessPattern {
+    WriteOnly,
+    ReadOnly,
+    Mixed,
+}
+
 /// Enum representing the end transaction mode, can be either `Abort` or `Commit`
+#[derive(Debug)]
 pub enum EndMode {
     Abort,
     Commit,
 }
 
-/// Representing the access mode for `self.table`, can be either `Operation::R` or `Operation::W`
+/// Representing the access mode for `Self::table`, can be either `Operation::R` or `Operation::W`
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
     pub table: String,
@@ -61,6 +71,17 @@ impl TableOps {
         self.0.push(tableop);
         Self::from_iter(self)
     }
+
+    /// The access pattern of this `TableOps`
+    pub fn access_pattern(&self) -> AccessPattern {
+        if self.0.iter().all(|tableop| tableop.op == Operation::R) {
+            AccessPattern::ReadOnly
+        } else if self.0.iter().all(|tableop| tableop.op == Operation::W) {
+            AccessPattern::WriteOnly
+        } else {
+            AccessPattern::Mixed
+        }
+    }
 }
 
 impl IntoIterator for TableOps {
@@ -97,6 +118,26 @@ impl FromIterator<TableOp> for TableOps {
     }
 }
 
+/// Representing the final form of all `M: IntoMsqlEndString`
+///
+/// The process of converting into `MsqlEndString` is not revertible.
+pub struct MsqlEndString(String);
+
+impl<M> From<M> for MsqlEndString
+where
+    M: IntoMsqlEndString,
+{
+    fn from(m: M) -> Self {
+        m.into_msqlendstring()
+    }
+}
+
+/// Traits for all Msql pieces to convert into `MsqlEndString`
+/// TODO
+pub trait IntoMsqlEndString {
+    fn into_msqlendstring(self) -> MsqlEndString;
+}
+
 /// Begin a Msql transaction
 pub struct MsqlBeginTx {
     tx: Option<String>,
@@ -116,6 +157,16 @@ impl MsqlBeginTx {
     /// Set an optional name for the transacstion, will overwrite previous value
     pub fn set_name<S: Into<String>>(mut self, name: Option<S>) -> Self {
         self.tx = name.map(|s| s.into());
+        self
+    }
+
+    /// Append a uuid to the end of the transaction name
+    pub fn add_uuid(mut self) -> Self {
+        self.tx = self.tx.map(|mut tx| {
+            tx.push_str("_");
+            tx.push_str(&Uuid::new_v4().to_string());
+            tx
+        });
         self
     }
 
@@ -149,10 +200,14 @@ pub struct MsqlQuery {
 
 impl MsqlQuery {
     /// Create a new query, `table_ops` must correctly annotate the `query`
-    pub fn new<S: Into<String>>(query: S, table_ops: TableOps) -> Self {
-        Self {
-            query: query.into(),
-            table_ops,
+    pub fn new<S: Into<String>>(query: S, table_ops: TableOps) -> Result<Self, &'static str> {
+        if let AccessPattern::Mixed = table_ops.access_pattern() {
+            Err("Only read-only or write-only Msql query is supported, but not the mixed!")
+        } else {
+            Ok(Self {
+                query: query.into(),
+                table_ops,
+            })
         }
     }
 
@@ -289,354 +344,115 @@ mod tests_tableops {
 
     #[test]
     fn test_add_tableop() {
+        let tableops = TableOps::default();
+
+        let tableops = tableops.add_tableop(TableOp::new("table_0", Operation::R));
+        assert_eq!(tableops.get(), vec![TableOp::new("table_0", Operation::R)].as_slice());
+
+        let tableops = tableops.add_tableop(TableOp::new("table_0", Operation::R));
+        assert_eq!(tableops.get(), vec![TableOp::new("table_0", Operation::R)].as_slice());
+
+        let tableops = tableops.add_tableop(TableOp::new("table_1", Operation::R));
         assert_eq!(
-            TableOps::default()
-                .add_tableop(TableOp::new("table_0", Operation::R))
-                .add_tableop(TableOp::new("table_0", Operation::R))
-                .add_tableop(TableOp::new("table_1", Operation::R))
-                .add_tableop(TableOp::new("table_0", Operation::W))
-                .into_vec(),
+            tableops.get(),
             vec![
-                TableOp::new("table_0".to_owned(), Operation::W),
-                TableOp::new("table_1".to_owned(), Operation::R)
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_1", Operation::R)
             ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("table_0", Operation::W));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", Operation::W),
+                TableOp::new("table_1", Operation::R)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("table_1", Operation::W));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", Operation::W),
+                TableOp::new("table_1", Operation::W)
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    fn test_access_pattern() {
+        assert_eq!(
+            TableOps::from_iter(vec![TableOp::new("table_r_0", Operation::R),]).access_pattern(),
+            AccessPattern::ReadOnly
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![TableOp::new("table_w_0", Operation::W),]).access_pattern(),
+            AccessPattern::WriteOnly
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R),
+                TableOp::new("table_w_0", Operation::W)
+            ])
+            .access_pattern(),
+            AccessPattern::Mixed
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R),
+                TableOp::new("table_r_2", Operation::R),
+            ])
+            .access_pattern(),
+            AccessPattern::ReadOnly
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_w_0", Operation::W),
+                TableOp::new("table_w_1", Operation::W),
+                TableOp::new("table_w_2", Operation::W),
+            ])
+            .access_pattern(),
+            AccessPattern::WriteOnly
         );
     }
 }
 
-// /// Unit test for `SqlBeginTx`
-// #[cfg(test)]
-// mod tests_sqlbegintx {
-//     use super::*;
-//     use std::convert::TryInto;
+/// Unit test for `MsqlQuery`
+#[cfg(test)]
+mod tests_msqlquery {
+    use super::*;
 
-//     #[test]
-//     fn test_try_from_sqlstring_helper() {
-//         let tests = vec![
-//             (
-//                 SqlString::from("BEGIN TRAN trans1 WITH MARK 'READ table_0 table_1 WRITE table_2';"),
-//                 Some(("trans1", "READ table_0 table_1 WRITE table_2")),
-//             ),
-//             (
-//                 SqlString::from("BEGIN TRAN WITH MARK 'READ table_0 table_1 WRITE table_2';"),
-//                 Some(("", "READ table_0 table_1 WRITE table_2")),
-//             ),
-//             (SqlString::from("BEGIN TRAN WITH MARK '';"), Some(("", ""))),
-//             (SqlString::from("BEGIN TRAN WITH MARK ''"), Some(("", ""))),
-//             (
-//                 SqlString::from("BEGIN TRANSACTION trans1 WITH MARK 'WRITE table_2 READ table_0 table_1';"),
-//                 Some(("trans1", "WRITE table_2 READ table_0 table_1")),
-//             ),
-//             (
-//                 SqlString::from("BEGIN TRANSACTION WITH MARK 'WRITE table_2 READ table_0 table_1';"),
-//                 Some(("", "WRITE table_2 READ table_0 table_1")),
-//             ),
-//             (SqlString::from("BEGIN TRANSACTION WITH MARK '';"), Some(("", ""))),
-//             (SqlString::from("BEGIN TRANSACTION WITH MARK ''"), Some(("", ""))),
-//             (
-//                 SqlString::from("     BEGIN  TRANSACTION   WITH MARK '   READ   table_0'   ;  "),
-//                 Some(("", "   READ   table_0")),
-//             ),
-//             (SqlString::from("SELECT * FROM table_0;"), None),
-//             (SqlString::from("BGIN TRANSACTION WITH MARK ''"), None),
-//             (SqlString::from("BEGIN TRENSACTION WITH MARK ''"), None),
-//             (SqlString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
-//             (SqlString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
-//             (SqlString::from("BEGIN TRANSACTION trans0 WITH MARK'';"), None),
-//             (
-//                 SqlString::from("BEGIN TRANSACTION trans0 WITH MARK 'read table_2 write    table_0';"),
-//                 Some(("trans0", "read table_2 write    table_0")),
-//             ),
-//         ];
+    #[test]
+    fn test_new() {
+        assert!(MsqlQuery::new(
+            "Select * from table0;",
+            TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+        )
+        .is_ok());
 
-//         tests.into_iter().for_each(|(sqlstring, res)| {
-//             assert_eq!(
-//                 SqlBeginTx::try_from_sqlstring_helper(&sqlstring),
-//                 res.map(|res_ref| (res_ref.0, res_ref.1)).ok_or(())
-//             )
-//         });
-//     }
+        assert!(MsqlQuery::new(
+            "Update table1 set name=\"ray\" where id = 20;",
+            TableOps::from_iter(vec![TableOp::new("table1", Operation::W)])
+        )
+        .is_ok());
 
-//     #[test]
-//     fn test_try_from_sqlstring() {
-//         assert_eq!(
-//             SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';").try_into(),
-//             Ok(SqlBeginTx {
-//                 tx_name: String::from("tx0"),
-//                 table_ops: vec![
-//                     TableOp {
-//                         table: String::from("table1"),
-//                         op: Operation::R
-//                     },
-//                     TableOp {
-//                         table: String::from("table2"),
-//                         op: Operation::W
-//                     },
-//                     TableOp {
-//                         table: String::from("table3"),
-//                         op: Operation::W
-//                     },
-//                 ]
-//             })
-//         );
-
-//         assert_eq!(
-//             SqlString::from("BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';").try_into(),
-//             Ok(SqlBeginTx {
-//                 tx_name: String::from(""),
-//                 table_ops: vec![
-//                     TableOp {
-//                         table: String::from("table1"),
-//                         op: Operation::R
-//                     },
-//                     TableOp {
-//                         table: String::from("table2"),
-//                         op: Operation::W
-//                     },
-//                     TableOp {
-//                         table: String::from("table3"),
-//                         op: Operation::W
-//                     },
-//                 ]
-//             })
-//         );
-
-//         assert_eq!(
-//             SqlString::from("BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'")
-//                 .try_into(),
-//             Ok(SqlBeginTx {
-//                 tx_name: String::from(""),
-//                 table_ops: vec![
-//                     TableOp {
-//                         table: String::from("table1"),
-//                         op: Operation::R
-//                     },
-//                     TableOp {
-//                         table: String::from("table2"),
-//                         op: Operation::W
-//                     },
-//                     TableOp {
-//                         table: String::from("table3"),
-//                         op: Operation::W
-//                     },
-//                 ]
-//             })
-//         );
-
-//         assert_eq!(
-//             SqlString::from("BeGin TraNsaction with MarK ''").try_into(),
-//             Ok(SqlBeginTx {
-//                 tx_name: String::from(""),
-//                 table_ops: vec![]
-//             })
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::try_from(SqlString::from(
-//                 "BeGin TraNssaction with MarK 'read table1 table2 table3'"
-//             )),
-//             Err(())
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::try_from(SqlString::from("BeGin TraNsaction with MarK")),
-//             Err(())
-//         );
-
-//         assert_eq!(SqlBeginTx::try_from(SqlString::from("select * from table0;")), Err(()));
-
-//         assert_eq!(SqlBeginTx::try_from(SqlString::from("begin")), Err(()));
-
-//         assert_eq!(SqlBeginTx::try_from(SqlString::from("")), Err(()));
-//     }
-
-//     #[test]
-//     fn test_process_tx_name() {
-//         assert_eq!(SqlBeginTx::process_tx_name("  tX_name  "), *"tX_name");
-
-//         assert_eq!(SqlBeginTx::process_tx_name("  tx_nAMe 1 2 3  "), *"tx_nAMe123");
-
-//         assert_eq!(SqlBeginTx::process_tx_name("   "), *"");
-
-//         assert_ne!(SqlBeginTx::process_tx_name("tXX_name"), *"txx_name");
-//         assert_eq!(SqlBeginTx::process_tx_name("tXX_name"), *"tXX_name");
-//     }
-
-//     #[test]
-//     fn test_process_table_ops() {
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("read table_R_0 table_r_1 write table_w_0"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("table_R_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_r_1"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_w_0"),
-//                     op: Operation::W,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops(" read     table_r_0   table_r_1    write  table_w_0 "),
-//             vec![
-//                 TableOp {
-//                     table: String::from("table_r_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_r_1"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_w_0"),
-//                     op: Operation::W,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("WrItE Table_w_0 read table_r_0 table_r_1"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("Table_w_0"),
-//                     op: Operation::W,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_r_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_r_1"),
-//                     op: Operation::R,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("write table_w_0writE read table_r_0read writetable_r_1reAd"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("table_r_0read"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_w_0writE"),
-//                     op: Operation::W,
-//                 },
-//                 TableOp {
-//                     table: String::from("writetable_r_1reAd"),
-//                     op: Operation::R,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("write read Table_r_0 Table_r_1"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("Table_r_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("Table_r_1"),
-//                     op: Operation::R,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("read table_r_0 Table_r_1 write"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("Table_r_1"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_r_0"),
-//                     op: Operation::R,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(SqlBeginTx::process_table_ops("ReaD WriTE"), vec![]);
-
-//         assert_eq!(SqlBeginTx::process_table_ops(""), vec![]);
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("ReAd table_R_0 WrItE table_W_0 rEad table_R_1 "),
-//             vec![
-//                 TableOp {
-//                     table: String::from("table_R_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_R_1"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_W_0"),
-//                     op: Operation::W,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("read Table_r_0 WRITE REAd"),
-//             vec![TableOp {
-//                 table: String::from("Table_r_0"),
-//                 op: Operation::R,
-//             },]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("Read table_r_0 writereAD"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("table_r_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("writereAD"),
-//                     op: Operation::R,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(
-//             SqlBeginTx::process_table_ops("table0 table1 table2 read table_r_0 table_r_1 Write table_w_0"),
-//             vec![
-//                 TableOp {
-//                     table: String::from("table_r_0"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_r_1"),
-//                     op: Operation::R,
-//                 },
-//                 TableOp {
-//                     table: String::from("table_w_0"),
-//                     op: Operation::W,
-//                 },
-//             ]
-//         );
-
-//         assert_eq!(SqlBeginTx::process_table_ops("tAble0 taBle1 tabLe2"), vec![]);
-//     }
-// }
-
-// /// Unit test for `SqlQuery`
-// #[cfg(test)]
-// mod tests_sqlquery {
-//     #![allow(warnings)]
-//     use super::*;
-//     use std::convert::TryInto;
-
-//     #[test]
-//     fn test_try_from_sqlstring_helper() {}
-// }
+        assert!(MsqlQuery::new(
+            "some_black_magic;",
+            TableOps::from_iter(vec![
+                TableOp::new("table0", Operation::W),
+                TableOp::new("table1", Operation::R)
+            ])
+        )
+        .is_err());
+    }
+}
