@@ -1,7 +1,6 @@
 use super::tcp;
-use env_logger;
 use futures::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, info, LevelFilter};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::panic::{RefUnwindSafe, UnwindSafe};
@@ -12,8 +11,9 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 pub fn init_logger() {
-    let _ = env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+    let _ = env_logger::Builder::from_default_env()
+        .filter_level(LevelFilter::Debug)
+        .format_timestamp(None)
         .is_test(true)
         .try_init();
 }

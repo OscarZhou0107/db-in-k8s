@@ -1,6 +1,5 @@
 use clap::{App, Arg, ArgGroup, ArgMatches};
-use env_logger;
-use log::info;
+use log::{info, LevelFilter};
 use o2versioner::dbproxy;
 use o2versioner::scheduler;
 use o2versioner::sequencer;
@@ -9,7 +8,8 @@ use o2versioner::util::config::Config;
 fn init_logger() {
     env_logger::Builder::from_default_env()
         .target(env_logger::Target::Stdout)
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(LevelFilter::Debug)
+        .format_timestamp(None)
         .init();
 }
 
