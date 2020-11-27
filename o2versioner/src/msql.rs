@@ -111,24 +111,24 @@ impl FromIterator<TableOp> for TableOps {
     }
 }
 
-/// Representing the final form of all `M: IntoMsqlEndString`
+/// Representing the final form of all `M: IntoMsqlFinalString`
 ///
-/// The process of converting into `MsqlEndString` is not reversible.
-pub struct MsqlEndString(String);
+/// The process of converting into `MsqlFinalString` is not reversible.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct MsqlFinalString(String);
 
-impl<M> From<M> for MsqlEndString
+impl<M> From<M> for MsqlFinalString
 where
-    M: IntoMsqlEndString,
+    M: IntoMsqlFinalString,
 {
     fn from(m: M) -> Self {
-        m.into_msqlendstring()
+        m.into_msqlfinalstring()
     }
 }
 
-/// Traits for all Msql pieces to convert into `MsqlEndString`
-/// TODO
-pub trait IntoMsqlEndString {
-    fn into_msqlendstring(self) -> MsqlEndString;
+/// Traits for all Msql pieces to convert into `MsqlFinalString`
+pub trait IntoMsqlFinalString {
+    fn into_msqlfinalstring(self) -> MsqlFinalString;
 }
 
 /// Begin a Msql transaction
@@ -144,6 +144,18 @@ impl Default for MsqlBeginTx {
             tx: None,
             table_ops: TableOps::default(),
         }
+    }
+}
+
+impl IntoMsqlFinalString for MsqlBeginTx {
+    fn into_msqlfinalstring(self) -> MsqlFinalString {
+        let mut sql = String::from("BEGIN TRAN");
+        if let Some(txname) = self.unwrap().0 {
+            sql.push_str(" ");
+            sql.push_str(&txname);
+        }
+        sql.push_str(";");
+        MsqlFinalString(sql)
     }
 }
 
@@ -193,6 +205,12 @@ pub struct MsqlQuery {
     table_ops: TableOps,
 }
 
+impl IntoMsqlFinalString for MsqlQuery {
+    fn into_msqlfinalstring(self) -> MsqlFinalString {
+        MsqlFinalString(self.unwrap().0)
+    }
+}
+
 impl MsqlQuery {
     /// Create a new query, `table_ops` must correctly annotate the `query`
     pub fn new<S: Into<String>>(query: S, table_ops: TableOps) -> Result<Self, &'static str> {
@@ -222,14 +240,80 @@ impl MsqlQuery {
     }
 }
 
-/// End a Msql transaction
-///
-/// Enum representing the end transaction mode, can be either `Abort` or `Commit`
-#[derive(Debug, Serialize, Deserialize)]
+/// Enum representing the end transaction mode, can be either `Rollback` or `Commit`
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum MsqlEndTx {
-    Abort,
+pub enum MsqlEndTxMode {
     Commit,
+    Rollback,
+}
+
+/// End a Msql transaction
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MsqlEndTx {
+    tx: Option<String>,
+    mode: MsqlEndTxMode,
+}
+
+impl IntoMsqlFinalString for MsqlEndTx {
+    fn into_msqlfinalstring(self) -> MsqlFinalString {
+        let mut sql = match self.mode() {
+            MsqlEndTxMode::Rollback => String::from("ROLLBACK TRAN"),
+            MsqlEndTxMode::Commit => String::from("COMMIT TRAN"),
+        };
+
+        if let Some(txname) = self.name() {
+            sql.push_str(" ");
+            sql.push_str(txname);
+        }
+        sql.push_str(";");
+        MsqlFinalString(sql)
+    }
+}
+
+impl MsqlEndTx {
+    /// Returns a `MsqlEndTx` that represents commit
+    pub fn commit() -> Self {
+        Self {
+            tx: None,
+            mode: MsqlEndTxMode::Commit,
+        }
+    }
+
+    /// Returns a `MsqlEndTx` that represents rollback
+    pub fn rollback() -> Self {
+        Self {
+            tx: None,
+            mode: MsqlEndTxMode::Rollback,
+        }
+    }
+
+    /// Set an optional name for transacstion, will overwrite previous value
+    pub fn set_name<S: Into<String>>(mut self, name: Option<S>) -> Self {
+        self.tx = name.map(|s| s.into());
+        self
+    }
+
+    /// Set the mode for ending the transaction, will overwrite previous value
+    pub fn set_mode(mut self, mode: MsqlEndTxMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// Get a ref to the optional transaction name
+    pub fn name(&self) -> Option<&str> {
+        self.tx.as_ref().map(|s| &s[..])
+    }
+
+    /// Get the ending transaction mode
+    pub fn mode(&self) -> MsqlEndTxMode {
+        self.mode
+    }
+
+    /// Unwrap into (name: Option<String>, mode: MsqlEndTxMode)
+    pub fn unwrap(self) -> (Option<String>, MsqlEndTxMode) {
+        (self.tx, self.mode)
+    }
 }
 
 /// Represents a Msql command variant.
@@ -259,7 +343,11 @@ pub enum MsqlText {
         query: String,
         table_ops: String,
     },
-    EndTx(MsqlEndTx),
+    EndTx {
+        #[serde(default)]
+        tx: Option<String>,
+        mode: MsqlEndTxMode,
+    },
 }
 
 /// Unit test for `TableOps`
@@ -457,6 +545,39 @@ mod tests_tableops {
             AccessPattern::WriteOnly
         );
     }
+}
+
+/// Unit test for `IntoMsqlFinalString`
+#[cfg(test)]
+mod tests_into_msqlfinalstring {
+    use super::*;
+    use std::convert::Into;
+
+    #[test]
+    fn test_from_msqlbegintx() {
+        assert_eq!(
+            MsqlFinalString::from(MsqlBeginTx::default().set_table_ops(TableOps::from_iter(vec![
+                TableOp::new("table0", Operation::R),
+                TableOp::new("table0", Operation::W),
+            ]))),
+            MsqlFinalString(String::from("BEGIN TRAN;"))
+        );
+
+        let mfs: MsqlFinalString = MsqlBeginTx::default()
+            .set_table_ops(TableOps::from_iter(vec![
+                TableOp::new("table0", Operation::R),
+                TableOp::new("table0", Operation::W),
+            ]))
+            .set_name(Some("tx0"))
+            .into();
+        assert_eq!(mfs, MsqlFinalString(String::from("BEGIN TRAN tx0;")));
+    }
+
+    #[test]
+    fn test_from_msqlquery() {}
+
+    #[test]
+    fn test_from_msqlendtx() {}
 }
 
 /// Unit test for `MsqlQuery`
