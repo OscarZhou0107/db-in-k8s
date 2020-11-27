@@ -10,6 +10,7 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1"
 bb8 = "0.5"
+bytes = "0.6"
 clap = "2.33"
 config = "0.10"
 env_logger = "0.8"

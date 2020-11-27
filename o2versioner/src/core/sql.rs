@@ -149,6 +149,7 @@ impl SqlBeginTx {
             .into_legal_table_ops()
     }
 
+    /// Append a uuid to the end of `SqlBeginTx::tx_name`
     pub fn add_uuid(mut self) -> Self {
         self.tx_name.push_str("_");
         self.tx_name.push_str(&Uuid::new_v4().to_string());
@@ -180,6 +181,7 @@ pub struct SqlQuery {
     pub table_ops: Vec<TableOp>,
 }
 
+/// Unit test for `IntoLegalTableOps`
 #[cfg(test)]
 mod tests_into_legal_table_ops {
     use super::*;
@@ -647,4 +649,15 @@ mod tests_sqlbegintx {
 
         assert_eq!(SqlBeginTx::process_table_ops("table0 table1 table2"), vec![]);
     }
+}
+
+/// Unit test for `SqlQuery`
+#[cfg(test)]
+mod tests_sqlquery {
+    #![allow(warnings)]
+    use super::*;
+    use std::convert::TryInto;
+
+    #[test]
+    fn test_try_from_sqlstring_helper() {}
 }
