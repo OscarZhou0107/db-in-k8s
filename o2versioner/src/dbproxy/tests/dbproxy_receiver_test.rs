@@ -69,8 +69,6 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
      //PendingQueue
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
     let pending_queue_2 = Arc::clone(&pending_queue);
-    let notify = Arc::new(Notify::new());
-    let notify_2 = notify.clone();
 
     //Prepare - Receiver
     tokio::spawn(async {
