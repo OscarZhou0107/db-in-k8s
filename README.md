@@ -53,6 +53,7 @@ cargo check
 - [ ] MySQL protocol
 
 ### Features
+- [x] msql: simple sql
 - [x] Begin tx stmt
 - [ ] Query stmt
 - [ ] Commit&Abort tx stmt
@@ -72,7 +73,8 @@ o2versioner
 │  ├── sequencer  # sequencer library
 │  ├── util       # utility library
 │  ├── lib.rs     # declaration of the mods above
-│  └── main.rs    # main executable
+│  ├── main.rs    # main executable
+│  └── msql.rs    # msql: simple sql for scheduler frontend
 └── tests         # system level testing
 ```
 
