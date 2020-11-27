@@ -196,117 +196,111 @@ mod tests_tableops {
             ]
         );
 
-        // assert_eq!(
-        //     vec![("table_r_0", Operation::R), ("table_r_1", Operation::R)].into_legal_table_ops(),
-        //     vec![
-        //         TableOp {
-        //             table: String::from("table_r_0"),
-        //             op: Operation::R,
-        //         },
-        //         TableOp {
-        //             table: String::from("table_r_1"),
-        //             op: Operation::R,
-        //         },
-        //     ]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R)
+            ])
+            .into_iter()
+            .collect::<Vec<_>>(),
+            vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R)
+            ]
+        );
 
-        // assert_eq!(
-        //     vec![
-        //         ("table_r_0", Operation::R),
-        //         ("table_w_0", Operation::W),
-        //         ("table_r_1", Operation::R),
-        //         ("table_w_1", Operation::W)
-        //     ]
-        //     .into_legal_table_ops(),
-        //     vec![
-        //         TableOp {
-        //             table: String::from("table_r_0"),
-        //             op: Operation::R,
-        //         },
-        //         TableOp {
-        //             table: String::from("table_r_1"),
-        //             op: Operation::R,
-        //         },
-        //         TableOp {
-        //             table: String::from("table_w_0"),
-        //             op: Operation::W,
-        //         },
-        //         TableOp {
-        //             table: String::from("table_w_1"),
-        //             op: Operation::W,
-        //         },
-        //     ]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_w_0", Operation::W),
+                TableOp::new("table_r_1", Operation::R),
+                TableOp::new("table_w_1", Operation::W)
+            ])
+            .into_vec(),
+            vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R),
+                TableOp::new("table_w_0", Operation::W),
+                TableOp::new("table_w_1", Operation::W),
+            ]
+        );
 
-        // assert_eq!(
-        //     vec![("table_0", Operation::R), ("table_0", Operation::R)].into_legal_table_ops(),
-        //     vec![TableOp {
-        //         table: String::from("table_0"),
-        //         op: Operation::R,
-        //     },]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_0", Operation::R)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", Operation::R)]
+        );
 
-        // assert_eq!(
-        //     vec![("table_0", Operation::W), ("table_0", Operation::W)].into_legal_table_ops(),
-        //     vec![TableOp {
-        //         table: String::from("table_0"),
-        //         op: Operation::W,
-        //     },]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", Operation::W),
+                TableOp::new("table_0", Operation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", Operation::W)]
+        );
 
-        // assert_eq!(
-        //     vec![("table_0", Operation::R), ("table_0", Operation::W)].into_legal_table_ops(),
-        //     vec![TableOp {
-        //         table: String::from("table_0"),
-        //         op: Operation::W,
-        //     },]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_0", Operation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", Operation::W)]
+        );
 
-        // assert_eq!(
-        //     vec![
-        //         ("table_0", Operation::R),
-        //         ("table_0", Operation::R),
-        //         ("table_0", Operation::W)
-        //     ]
-        //     .into_legal_table_ops(),
-        //     vec![TableOp {
-        //         table: String::from("table_0"),
-        //         op: Operation::W,
-        //     },]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_0", Operation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", Operation::W,)]
+        );
 
-        // assert_eq!(
-        //     vec![
-        //         ("table_0", Operation::R),
-        //         ("table_0", Operation::R),
-        //         ("table_0", Operation::W),
-        //         ("table_0", Operation::W)
-        //     ]
-        //     .into_legal_table_ops(),
-        //     vec![TableOp {
-        //         table: String::from("table_0"),
-        //         op: Operation::W,
-        //     },]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_0", Operation::W),
+                TableOp::new("table_0", Operation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", Operation::W)]
+        );
 
-        // assert_eq!(
-        //     vec![
-        //         ("table_0", Operation::R),
-        //         ("table_1", Operation::R),
-        //         ("table_0", Operation::W)
-        //     ]
-        //     .into_legal_table_ops(),
-        //     vec![
-        //         TableOp {
-        //             table: String::from("table_0"),
-        //             op: Operation::W,
-        //         },
-        //         TableOp {
-        //             table: String::from("table_1"),
-        //             op: Operation::R,
-        //         },
-        //     ]
-        // );
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", Operation::R),
+                TableOp::new("table_1", Operation::R),
+                TableOp::new("table_0", Operation::W)
+            ])
+            .into_vec(),
+            vec![
+                TableOp::new("table_0", Operation::W,),
+                TableOp::new("table_1", Operation::R)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_add_tableop() {
+        assert_eq!(
+            TableOps::default()
+                .add_tableop(TableOp::new("table_0", Operation::R))
+                .add_tableop(TableOp::new("table_0", Operation::R))
+                .add_tableop(TableOp::new("table_1", Operation::R))
+                .add_tableop(TableOp::new("table_0", Operation::W))
+                .into_vec(),
+            vec![
+                TableOp::new("table_0".to_owned(), Operation::W),
+                TableOp::new("table_1".to_owned(), Operation::R)
+            ]
+        );
     }
 }
 
