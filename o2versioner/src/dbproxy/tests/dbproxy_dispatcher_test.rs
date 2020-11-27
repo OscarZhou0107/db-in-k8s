@@ -4,7 +4,6 @@ use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task
 use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
-use tokio::sync::Notify;
 
 #[tokio::test(threaded_scheduler)]
 #[ignore]
@@ -22,11 +21,9 @@ async fn test_receive_response_from_new_transactions() {
     //PendingQueue
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
     let pending_queue_2 = Arc::clone(&pending_queue);
-   
     //Responder sender and receiver
     let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
-  
     Dispatcher::run(
         pending_queue,
         responder_sender,
@@ -80,7 +77,6 @@ async fn test_receive_response_from_new_transactions() {
             break;
         }
     }
-    
     assert!(transactions_2.lock().unwrap().len() == 4);
 }
 
@@ -157,6 +153,5 @@ async fn test_receive_response_from_same_transactions() {
             break;
         }
     }
-    
     assert!(transactions_2.lock().unwrap().len() == 3);
 }
