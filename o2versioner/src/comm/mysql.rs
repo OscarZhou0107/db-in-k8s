@@ -19,13 +19,7 @@ pub struct Packet(Bytes);
 impl TryFrom<Packet> for SqlString {
     type Error = ();
 
-    /// Try to construct a `SqlBeginTx` from `SqlString`
-    ///
-    /// The conversion tries to parse for the expecting Sql syntax and then prepares
-    /// for the `SqlBeginTx.tx_name` and `SqlBeginTx.table_ops` fields
-    ///
-    /// # Note
-    /// Refer to `SqlBeginTx::process_tx_name` and `SqlBeginTx::process_table_ops` for processing details
+    /// Try to construct a `SqlString` from `Packet`
     fn try_from(_packet: Packet) -> Result<Self, Self::Error> {
         // Ok(SqlString(blablabla)) if successful; Err(()) otherwise
         todo!()
