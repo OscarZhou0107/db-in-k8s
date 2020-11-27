@@ -120,7 +120,7 @@ impl FromIterator<TableOp> for TableOps {
 
 /// Representing the final form of all `M: IntoMsqlEndString`
 ///
-/// The process of converting into `MsqlEndString` is not revertible.
+/// The process of converting into `MsqlEndString` is not reversible.
 pub struct MsqlEndString(String);
 
 impl<M> From<M> for MsqlEndString
