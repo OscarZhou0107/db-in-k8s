@@ -47,18 +47,18 @@ cargo check
 ## Progress
 
 ### Framework
--[x] (Scheduler)
--[x] (Sequencer)
--[x] (DbProxy)
--[] (MySQL protocol)
+- [x] (Scheduler)
+- [x] (Sequencer)
+- [x] (DbProxy)
+- [ ] (MySQL protocol)
 
 ### Features
--[x] (Begin tx stmt)
--[] (Query stmt)
--[] (Commit&Abort tx stmt)
--[] (Single read)
--[] (Early release)
--[] (Multiple Schedulers)
+- [x] (Begin tx stmt)
+- [ ] (Query stmt)
+- [ ] (Commit&Abort tx stmt)
+- [ ] (Single read)
+- [ ] (Early release)
+- [ ] (Multiple Schedulers)
 
 
 ### Project layout
