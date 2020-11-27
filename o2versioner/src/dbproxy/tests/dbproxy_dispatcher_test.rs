@@ -1,6 +1,6 @@
 
 use crate::core::{sql::Operation as OperationType, version_number::TableVN};
-use crate::{dbproxy::core::{DbVersion, Operation, QueryResult, Task}};
+use crate::{dbproxy::core::{DbVersion, Operation, QueryResult, Task, PendingQueue}};
 use tokio::sync::mpsc;
 use std::{collections::HashMap, sync::Arc};
 use std::sync::Mutex;
@@ -22,27 +22,24 @@ async fn test_receive_response_from_new_transactions() {
 
   
     //PendingQueue
-    let pending_queue: Arc<Mutex<Vec<Operation>>> = Arc::new(Mutex::new(Vec::new()));
+    let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
     let pending_queue_2 = Arc::clone(&pending_queue);
 
     //Dispatcher & Responder
     let version_notify = Arc::new(Notify::new());
 
     //Dispatcher & Main Loop
-    let new_task_notify = Arc::new(Notify::new());
-    let new_task_notify_2 = new_task_notify.clone();
    
     //Responder sender and receiver
     let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
   
+    let new_task_notify = pending_queue.lock().unwrap().get_notify();
     Dispatcher::run(
         pending_queue,
         responder_sender,
         "mysql://root:Rayh8768@localhost:3306/test".to_string(),
         version,
-        new_task_notify,
-        version_notify,
         transactions,
     );
 
@@ -58,7 +55,6 @@ async fn test_receive_response_from_new_transactions() {
 
     while !mock_ops.is_empty() {
         pending_queue_2.lock().unwrap().push(mock_ops.pop().unwrap());
-        new_task_notify_2.notify();
     }
 
     let mut task_num:u64 = 0;
@@ -88,17 +84,10 @@ async fn test_receive_response_from_same_transactions() {
     let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
 
   
-    //PendingQueue
-    let pending_queue: Arc<Mutex<Vec<Operation>>> = Arc::new(Mutex::new(Vec::new()));
-    let pending_queue_2 = Arc::clone(&pending_queue);
+   //PendingQueue
+   let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
+   let pending_queue_2 = Arc::clone(&pending_queue);
 
-    //Dispatcher & Responder
-    let version_notify = Arc::new(Notify::new());
-
-    //Dispatcher & Main Loop
-    let new_task_notify = Arc::new(Notify::new());
-    let new_task_notify_2 = new_task_notify.clone();
-   
     //Responder sender and receiver
     let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
@@ -108,8 +97,6 @@ async fn test_receive_response_from_same_transactions() {
         responder_sender,
         "mysql://root:Rayh8768@localhost:3306/test".to_string(),
         version,
-        new_task_notify,
-        version_notify,
         transactions,
     );
 
@@ -125,7 +112,6 @@ async fn test_receive_response_from_same_transactions() {
 
     while !mock_ops.is_empty() {
         pending_queue_2.lock().unwrap().push(mock_ops.pop().unwrap());
-        new_task_notify_2.notify();
     }
 
     let mut task_num:u64 = 0;

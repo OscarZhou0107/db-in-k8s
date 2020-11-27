@@ -15,7 +15,6 @@ impl Responder {
     pub fn run(
         mut receiver: mpsc::Receiver<QueryResult>,
         version: Arc<Mutex<DbVersion>>,
-        notify: Arc<Notify>,
         tcp_write: OwnedWriteHalf,
     ) {
         tokio::spawn(async move {
@@ -31,7 +30,6 @@ impl Responder {
                         .lock()
                         .unwrap()
                         .release_on_tables(result.contained_newer_versions.clone());
-                    notify.notify();
                 }
 
                 serializer.send(Message::SqlResponse(result)).await.unwrap();

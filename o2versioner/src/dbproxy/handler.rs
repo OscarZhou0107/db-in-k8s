@@ -1,4 +1,4 @@
-use super::core::{DbVersion, Operation, QueryResult};
+use super::core::{DbVersion, Operation, QueryResult, PendingQueue};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
@@ -21,15 +21,8 @@ pub async fn main<A: ToSocketAddrs>(addr : A, sql_url : &str) {
     let version_2 = Arc::clone(&version);
 
     //PendingQueue
-    let pending_queue: Arc<Mutex<Vec<Operation>>> = Arc::new(Mutex::new(Vec::new()));
-    let pending_queue_2: Arc<Mutex<Vec<Operation>>> = Arc::clone(&pending_queue);
-
-    //Dispatcher & Responder
-    let version_notify = Arc::new(Notify::new());
-    let version_notify_2 = version_notify.clone();
-    //Dispatcher & Main Loop
-    let new_task_notify = Arc::new(Notify::new());
-    let new_task_notify_2 = new_task_notify.clone();
+    let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
+    let pending_queue_2: Arc<Mutex<PendingQueue>> = Arc::clone(&pending_queue);
 
     //Responder sender and receiver
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
@@ -44,12 +37,10 @@ pub async fn main<A: ToSocketAddrs>(addr : A, sql_url : &str) {
         responder_sender,
         sql_url.to_string(),
         version,
-        new_task_notify,
-        version_notify,
         transactions,
     );
 
-    Responder::run(responder_receiver, version_2, version_notify_2, tcp_write);
+    Responder::run(responder_receiver, version_2, tcp_write);
 
-    Receiver::run(pending_queue_2, new_task_notify_2, tcp_read);
+    Receiver::run(pending_queue_2, tcp_read);
 }

@@ -2,16 +2,59 @@ use crate::core::sql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{Arc, Mutex}};
+use tokio::sync::Notify;
+
+pub struct PendingQueue {
+    pub queue : Vec<Operation>,
+    pub notify : Arc<Notify>,
+}
+
+impl PendingQueue {
+    pub fn new() -> Self {
+        Self {
+            queue : Vec::new(), 
+            notify : Arc::new(Notify::new()),
+        }
+    }
+
+    pub fn push(&mut self, op : Operation) {
+        self.queue.push(op);
+        self.notify.notify();
+    }
+
+    pub fn get_notify(&self) -> Arc<Notify> {
+        self.notify.clone()
+    }
+
+    pub fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
+    
+        let ready_ops = self.queue
+            .split(|op| version.lock().unwrap().violate_version(op.clone()))
+            .fold(Vec::new(), |mut acc_ops, ops| {
+                ops.iter().for_each(|op| {
+                    acc_ops.push(op.clone());
+                });
+                acc_ops
+            });
+    
+        self.queue.retain(|op| version.lock().unwrap().violate_version(op.clone()));
+        ready_ops
+    }
+}
+
+
 
 pub struct DbVersion {
     table_versions: HashMap<String, u64>,
+    notify : Arc<Notify>,
 }
 
 impl DbVersion {
     pub fn new(table_versions: HashMap<String, u64>) -> Self {
         Self {
             table_versions: table_versions,
+            notify : Arc::new(Notify::new()),
         }
     }
 
@@ -22,14 +65,16 @@ impl DbVersion {
             .for_each(|t| match self.table_versions.get_mut(&t.table) {
                 Some(v) => *v = t.vn + 1,
                 None => println!("Table {} not found to release version.", t.table),
-            })
+            });
+            self.notify.notify();
     }
 
     pub fn release_on_tables(&mut self, tables: Vec<TableVN>) {
         tables.iter().for_each(|t| match self.table_versions.get_mut(&t.table) {
             Some(v) => *v = t.vn + 1,
             None => println!("Table {} not found to release version.", t.table),
-        })
+        });
+        self.notify.notify();
     }
 
     pub fn violate_version(&self, transaction_version: Operation) -> bool {
@@ -41,6 +86,11 @@ impl DbVersion {
             }
         })
     }
+
+    pub fn get_notify(&self) -> Arc<Notify> {
+        self.notify.clone()
+    }
+
 }
 
 pub struct Repository {
@@ -165,9 +215,7 @@ mod tests_dbproxy_core {
         let mut table_versions = HashMap::new();
         table_versions.insert("table1".to_string(), 0);
         table_versions.insert("table2".to_string(), 0);
-        let db_version = DbVersion {
-            table_versions: table_versions,
-        };
+        let db_version = DbVersion::new(table_versions);
         let versions = vec![
             TableVN {
                 table: "table1".to_string(),
@@ -196,9 +244,7 @@ mod tests_dbproxy_core {
         let mut table_versions = HashMap::new();
         table_versions.insert("table1".to_string(), 0);
         table_versions.insert("table2".to_string(), 0);
-        let db_version = DbVersion {
-            table_versions: table_versions,
-        };
+        let db_version = DbVersion::new(table_versions);
         let versions = vec![
             TableVN {
                 table: "table1".to_string(),

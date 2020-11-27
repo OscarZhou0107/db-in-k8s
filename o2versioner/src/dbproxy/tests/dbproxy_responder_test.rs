@@ -16,7 +16,6 @@ use super::Responder;
 #[ignore]
 async fn test_send_items_to_from_multiple_channel() {
     //Prepare - Network
-    let notify = Arc::new(Notify::new());
 
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =  mpsc::channel(100);
 
@@ -33,7 +32,7 @@ async fn test_send_items_to_from_multiple_channel() {
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (_, tcp_write) = tcp_stream.into_split();
 
-        Responder::run(responder_receiver, version, notify, tcp_write);
+        Responder::run(responder_receiver, version, tcp_write);
     });
 
     let result = Arc::new(Mutex::new(Vec::new()));
