@@ -21,6 +21,7 @@ impl TryFrom<Packet> for SqlString {
 
     /// Try to construct a `SqlString` from `Packet`
     fn try_from(_packet: Packet) -> Result<Self, Self::Error> {
+        // _packet.0 blablabla
         // Ok(SqlString(blablabla)) if successful; Err(()) otherwise
         todo!()
     }
