@@ -52,9 +52,9 @@ impl SqlString {
 
 /// Represents a raw Sql begin transaction
 #[derive(Debug, Eq, PartialEq)]
-pub struct SqlBeginTx {
-    pub tx_name: String,
-    pub mark: String,
+struct SqlBeginTx {
+    tx_name: String,
+    mark: String,
 }
 
 impl SqlBeginTx {
@@ -65,6 +65,8 @@ impl SqlBeginTx {
         }
     }
 }
+
+///
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
@@ -303,10 +305,7 @@ mod tests_sqlstring {
             None
         );
 
-        assert_eq!(
-            SqlString::from("BeGin TraNsaction with MarK").to_txtable(false),
-            None
-        );
+        assert_eq!(SqlString::from("BeGin TraNsaction with MarK").to_txtable(false), None);
 
         assert_eq!(SqlString::from("select * from table0;").to_txtable(false), None);
 
