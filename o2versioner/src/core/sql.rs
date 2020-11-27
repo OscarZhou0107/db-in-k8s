@@ -12,19 +12,19 @@ pub enum Operation {
     R,
 }
 
-/// An Sql raw string
+/// Represents a raw Sql string
 ///
 /// This string can be an invalid Sql statement.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SqlRawString(pub String);
+pub struct SqlString(pub String);
 
-impl<'a> From<&'a str> for SqlRawString {
+impl<'a> From<&'a str> for SqlString {
     fn from(s: &'a str) -> Self {
         Self(s.to_owned())
     }
 }
 
-impl SqlRawString {
+impl SqlString {
     /// Parse the transaction name and mark if valid
     ///
     /// Return `Option<SqlBeginTx>`
@@ -166,12 +166,12 @@ impl TxTable {
     }
 }
 
-/// Unit test for `SqlRawString`
+/// Unit test for `SqlString`
 #[cfg(test)]
-mod tests_sql_raw_string {
+mod tests_sqlstring {
     use super::Operation;
     use super::SqlBeginTx;
-    use super::SqlRawString;
+    use super::SqlString;
     use super::TableOp;
     use super::TxTable;
 
@@ -179,44 +179,44 @@ mod tests_sql_raw_string {
     fn test_get_sqlbegintx() {
         let tests = vec![
             (
-                SqlRawString::from("BEGIN TRAN trans1 WITH MARK 'READ table_0 table_1 WRITE table_2';"),
+                SqlString::from("BEGIN TRAN trans1 WITH MARK 'READ table_0 table_1 WRITE table_2';"),
                 Some(("trans1", "READ table_0 table_1 WRITE table_2")),
             ),
             (
-                SqlRawString::from("BEGIN TRAN WITH MARK 'READ table_0 table_1 WRITE table_2';"),
+                SqlString::from("BEGIN TRAN WITH MARK 'READ table_0 table_1 WRITE table_2';"),
                 Some(("", "READ table_0 table_1 WRITE table_2")),
             ),
-            (SqlRawString::from("BEGIN TRAN WITH MARK '';"), Some(("", ""))),
-            (SqlRawString::from("BEGIN TRAN WITH MARK ''"), Some(("", ""))),
+            (SqlString::from("BEGIN TRAN WITH MARK '';"), Some(("", ""))),
+            (SqlString::from("BEGIN TRAN WITH MARK ''"), Some(("", ""))),
             (
-                SqlRawString::from("BEGIN TRANSACTION trans1 WITH MARK 'WRITE table_2 READ table_0 table_1';"),
+                SqlString::from("BEGIN TRANSACTION trans1 WITH MARK 'WRITE table_2 READ table_0 table_1';"),
                 Some(("trans1", "WRITE table_2 READ table_0 table_1")),
             ),
             (
-                SqlRawString::from("BEGIN TRANSACTION WITH MARK 'WRITE table_2 READ table_0 table_1';"),
+                SqlString::from("BEGIN TRANSACTION WITH MARK 'WRITE table_2 READ table_0 table_1';"),
                 Some(("", "WRITE table_2 READ table_0 table_1")),
             ),
-            (SqlRawString::from("BEGIN TRANSACTION WITH MARK '';"), Some(("", ""))),
-            (SqlRawString::from("BEGIN TRANSACTION WITH MARK ''"), Some(("", ""))),
+            (SqlString::from("BEGIN TRANSACTION WITH MARK '';"), Some(("", ""))),
+            (SqlString::from("BEGIN TRANSACTION WITH MARK ''"), Some(("", ""))),
             (
-                SqlRawString::from("     BEGIN  TRANSACTION   WITH MARK '   READ   table_0'   ;  "),
+                SqlString::from("     BEGIN  TRANSACTION   WITH MARK '   READ   table_0'   ;  "),
                 Some(("", "   READ   table_0")),
             ),
-            (SqlRawString::from("SELECT * FROM table_0;"), None),
-            (SqlRawString::from("BGIN TRANSACTION WITH MARK ''"), None),
-            (SqlRawString::from("BEGIN TRENSACTION WITH MARK ''"), None),
-            (SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
-            (SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
-            (SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK'';"), None),
+            (SqlString::from("SELECT * FROM table_0;"), None),
+            (SqlString::from("BGIN TRANSACTION WITH MARK ''"), None),
+            (SqlString::from("BEGIN TRENSACTION WITH MARK ''"), None),
+            (SqlString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
+            (SqlString::from("BEGIN TRANSACTION trans0 WITH MARK;"), None),
+            (SqlString::from("BEGIN TRANSACTION trans0 WITH MARK'';"), None),
             (
-                SqlRawString::from("BEGIN TRANSACTION trans0 WITH MARK 'read table_2 write    table_0';"),
+                SqlString::from("BEGIN TRANSACTION trans0 WITH MARK 'read table_2 write    table_0';"),
                 Some(("trans0", "read table_2 write    table_0")),
             ),
         ];
 
-        tests.into_iter().for_each(|(sql_raw_string, res)| {
+        tests.into_iter().for_each(|(sqlstring, res)| {
             assert_eq!(
-                sql_raw_string.get_sqlbegintx(),
+                sqlstring.get_sqlbegintx(),
                 res.map(|res_ref| SqlBeginTx::new(&res_ref.0.to_ascii_lowercase(), &res_ref.1.to_ascii_lowercase()))
             )
         });
@@ -225,7 +225,7 @@ mod tests_sql_raw_string {
     #[test]
     fn test_to_txtable() {
         assert_eq!(
-            SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
+            SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
                 .to_txtable(false),
             Some(TxTable {
                 tx_name: String::from("tx0"),
@@ -247,7 +247,7 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';")
+            SqlString::from("BeGin TraN with MarK 'table0 read table1 read write table2 table3 read';")
                 .to_txtable(false),
             Some(TxTable {
                 tx_name: String::from(""),
@@ -269,7 +269,7 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'")
+            SqlString::from("BeGin TraNsaction with MarK 'table0 read table1 read write table2 table3 read'")
                 .to_txtable(false),
             Some(TxTable {
                 tx_name: String::from(""),
@@ -291,7 +291,7 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNsaction with MarK ''").to_txtable(false),
+            SqlString::from("BeGin TraNsaction with MarK ''").to_txtable(false),
             Some(TxTable {
                 tx_name: String::from(""),
                 table_ops: vec![]
@@ -299,20 +299,20 @@ mod tests_sql_raw_string {
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'").to_txtable(false),
+            SqlString::from("BeGin TraNssaction with MarK 'read table1 table2 table3'").to_txtable(false),
             None
         );
 
         assert_eq!(
-            SqlRawString::from("BeGin TraNsaction with MarK").to_txtable(false),
+            SqlString::from("BeGin TraNsaction with MarK").to_txtable(false),
             None
         );
 
-        assert_eq!(SqlRawString::from("select * from table0;").to_txtable(false), None);
+        assert_eq!(SqlString::from("select * from table0;").to_txtable(false), None);
 
-        assert_eq!(SqlRawString::from("begin").to_txtable(false), None);
+        assert_eq!(SqlString::from("begin").to_txtable(false), None);
 
-        assert_eq!(SqlRawString::from("").to_txtable(false), None);
+        assert_eq!(SqlString::from("").to_txtable(false), None);
     }
 }
 

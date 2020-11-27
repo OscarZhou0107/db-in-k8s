@@ -1,5 +1,5 @@
 use crate::comm::scheduler_sequencer;
-use crate::core::sql::{SqlRawString, TxTable};
+use crate::core::sql::{SqlString, TxTable};
 use crate::core::version_number::TxVN;
 use crate::util::tcp::*;
 use bb8::Pool;
@@ -70,8 +70,8 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<T
     let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read = SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<SqlRawString>::default());
-    let serded_write = SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<SqlRawString>::default());
+    let serded_read = SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<SqlString>::default());
+    let serded_write = SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<SqlString>::default());
 
     // Process a stream of incoming messages from a single tcp connection
     serded_read
@@ -86,19 +86,19 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<T
 
 /// Process the argument `request` and return a `Result` of response
 async fn process_request(
-    request: SqlRawString,
+    request: SqlString,
     peer_addr: SocketAddr,
     sequencer_socket_pool: Pool<TcpStreamConnectionManager>,
-) -> std::io::Result<SqlRawString> {
+) -> std::io::Result<SqlString> {
     let response = if let Some(txtable) = request.to_txtable(true) {
         request_txvn(txtable, &mut sequencer_socket_pool.get().await.unwrap())
             .await
             .map_or_else(
-                |e| SqlRawString(format!("[{}] failed due to: {}", request.0, e)),
-                |_txvn| SqlRawString(format!("[{}] successful", request.0)),
+                |e| SqlString(format!("[{}] failed due to: {}", request.0, e)),
+                |_txvn| SqlString(format!("[{}] successful", request.0)),
             )
     } else {
-        SqlRawString(format!("[{}] not recognized", request.0))
+        SqlString(format!("[{}] not recognized", request.0))
     };
     debug!("-> [{}] Reply {:?}", peer_addr, response);
     Ok(response)

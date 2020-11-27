@@ -16,11 +16,11 @@ async fn test_sequencer() {
         tokio::spawn(async move {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
-                SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
+                SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
                     .to_txtable(false)
                     .unwrap(),
             ),scheduler_sequencer::Message::TxVNRequest(
-                SqlRawString::from(
+                SqlString::from(
                     "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
                 )
                 .to_txtable(false)
@@ -50,11 +50,11 @@ async fn test_sequencer() {
         tokio::spawn(async move {
             let msgs =
                 vec![scheduler_sequencer::Message::TxVNRequest(
-                SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
+                SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';")
                     .to_txtable(false)
                     .unwrap(),
             ),scheduler_sequencer::Message::TxVNRequest(
-                SqlRawString::from(
+                SqlString::from(
                     "BeGin TraNsaction tx1 with MarK 'table0 read table1 read write table2 table3 read table 2';",
                 )
                 .to_txtable(false)

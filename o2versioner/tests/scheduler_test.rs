@@ -27,9 +27,9 @@ async fn test_scheduler() {
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
-            SqlRawString::from("0-hello"),
-            SqlRawString::from("0-world"),
-            SqlRawString::from(" BeGin TraNsaction tx0 with MarK 'table4 read table4 read write table4 table3 read'"),
+            SqlString::from("0-hello"),
+            SqlString::from("0-world"),
+            SqlString::from(" BeGin TraNsaction tx0 with MarK 'table4 read table4 read write table4 table3 read'"),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -38,9 +38,9 @@ async fn test_scheduler() {
 
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
-            SqlRawString::from("1-hello"),
-            SqlRawString::from("1-world"),
-            SqlRawString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';"),
+            SqlString::from("1-hello"),
+            SqlString::from("1-world"),
+            SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';"),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
