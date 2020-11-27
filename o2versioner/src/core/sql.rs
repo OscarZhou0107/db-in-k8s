@@ -98,7 +98,7 @@ impl SqlBeginTx {
     /// # Notes
     /// 1. Assume Sql keywords are case insensitive.
     /// 2. Others are case sensitive, including transaction name and table name
-    /// Return `Result<(tx_name: String, mark: String), ())>`
+    /// Return `Result<(tx_name: &str, mark: &str), ())>`
     fn try_from_sqlstring_helper(sqlstring: &SqlString) -> Result<(&str, &str), ()> {
         let re = Regex::new(
             r"^\s*(?i)begin(?-i)\s+(?i)(?:tran|transaction)(?-i)\s+(\S*)\s*(?i)with\s+mark(?-i)\s+'(.*)'\s*;?\s*$",
