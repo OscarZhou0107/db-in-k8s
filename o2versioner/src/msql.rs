@@ -19,13 +19,6 @@ pub enum AccessPattern {
     Mixed,
 }
 
-/// Enum representing the end transaction mode, can be either `Abort` or `Commit`
-#[derive(Debug)]
-pub enum EndMode {
-    Abort,
-    Commit,
-}
-
 /// Representing the access mode for `Self::table`, can be either `Operation::R` or `Operation::W`
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
@@ -139,6 +132,7 @@ pub trait IntoMsqlEndString {
 }
 
 /// Begin a Msql transaction
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MsqlBeginTx {
     tx: Option<String>,
     table_ops: TableOps,
@@ -193,6 +187,7 @@ impl MsqlBeginTx {
 }
 
 /// A Msql query statement
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MsqlQuery {
     query: String,
     table_ops: TableOps,
@@ -228,7 +223,44 @@ impl MsqlQuery {
 }
 
 /// End a Msql transaction
-pub struct MsqlEndTx(pub EndMode);
+///
+/// Enum representing the end transaction mode, can be either `Abort` or `Commit`
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MsqlEndTx {
+    Abort,
+    Commit,
+}
+
+/// Represents a Msql command variant.
+/// The main user interface for Msql.
+///
+/// `Msql` can be constructed directly, or converted from `MsqlText`
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Msql {
+    BeginTx(MsqlBeginTx),
+    Query(MsqlQuery),
+    EndTx(MsqlEndTx),
+}
+
+/// Represents a text formatted Msql command variant.
+/// The main user interface for Msql with maximum compatibility.
+/// This is a text version of `Msql`.
+///
+/// `MsqlText` needs to be converted into `Msql` first
+#[derive(Debug, Serialize, Deserialize)]
+pub enum MsqlText {
+    BeginTx {
+        #[serde(default)]
+        tx: Option<String>,
+        table_ops: String,
+    },
+    Query {
+        query: String,
+        table_ops: String,
+    },
+    EndTx(MsqlEndTx),
+}
 
 /// Unit test for `TableOps`
 #[cfg(test)]
