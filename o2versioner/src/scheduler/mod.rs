@@ -1,2 +1,4 @@
 mod core;
-pub mod handler;
+mod handler;
+
+pub use handler::main;

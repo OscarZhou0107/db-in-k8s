@@ -11,6 +11,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::dispatcher::DefaultGuard;
 use tracing::{debug, error, info};
 
+#[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_logger() -> DefaultGuard {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(tracing::Level::DEBUG)

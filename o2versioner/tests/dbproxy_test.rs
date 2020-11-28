@@ -1,9 +1,7 @@
 use futures::prelude::*;
-use o2versioner::dbproxy::{
-    core::{Operation, Task},
-    handler,
-};
 use o2versioner::core::msql::Operation as OperationType;
+use o2versioner::dbproxy;
+use o2versioner::dbproxy::core::{Operation, Task};
 use o2versioner::{comm::scheduler_dbproxy::Message, core::version_number::TableVN};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -15,7 +13,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 #[ignore]
 async fn test_dbproxy_end_to_end() {
     tokio::spawn(async {
-        handler::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await;
+        dbproxy::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await;
     });
 
     let result = Arc::new(Mutex::new(Vec::new()));
