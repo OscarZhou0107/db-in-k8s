@@ -2,7 +2,7 @@ use super::core::State;
 use crate::comm::scheduler_sequencer;
 use crate::util::tcp;
 use futures::prelude::*;
-use log::{debug, warn};
+use tracing::{debug, warn};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
@@ -55,12 +55,12 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
     // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(|msg| match msg {
-            scheduler_sequencer::Message::TxVNRequest(sqlbegintx) => {
-                debug!("<- [{}] TxVNRequest on {:?}", peer_addr, sqlbegintx);
+            scheduler_sequencer::Message::RequestTxVN(sqlbegintx) => {
+                debug!("<- [{}] RequestTxVN on {:?}", peer_addr, sqlbegintx);
                 let mut state = state.lock().unwrap();
                 let txvn = state.assign_vn(sqlbegintx);
                 debug!("-> [{}] Reply {:?}", peer_addr, txvn);
-                future::ok(scheduler_sequencer::Message::TxVNResponse(txvn))
+                future::ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
             }
             other => {
                 warn!("<- [{}] Unsupported message {:?}", peer_addr, other);

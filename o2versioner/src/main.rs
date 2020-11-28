@@ -1,16 +1,16 @@
 use clap::{App, Arg, ArgGroup, ArgMatches};
-use log::{info, LevelFilter};
 use o2versioner::dbproxy;
 use o2versioner::scheduler;
 use o2versioner::sequencer;
 use o2versioner::util::config::Config;
+use tracing::info;
 
-fn init_logger() {
-    env_logger::Builder::from_default_env()
-        .target(env_logger::Target::Stdout)
-        .filter_level(LevelFilter::Debug)
-        .format_timestamp(None)
-        .init();
+pub fn init_logger() {
+    let collector = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .without_time()
+        .finish();
+    tracing::subscriber::set_global_default(collector).unwrap();
 }
 
 /// cargo run -- <args>

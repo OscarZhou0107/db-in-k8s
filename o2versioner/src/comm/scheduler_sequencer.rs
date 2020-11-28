@@ -1,10 +1,10 @@
-use crate::core::sql::SqlBeginTx;
 use crate::core::version_number::TxVN;
+use crate::core::msql::MsqlBeginTx;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
     Invalid,
-    TxVNRequest(SqlBeginTx),
-    TxVNResponse(TxVN),
+    RequestTxVN(MsqlBeginTx),
+    ReplyTxVN(TxVN),
 }

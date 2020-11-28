@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use bb8;
 use futures::future::poll_fn;
-use log::info;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::string::ToString;
 use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
+use tracing::info;
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -114,13 +114,13 @@ mod tests_tcppool {
     use super::TcpStreamConnectionManager;
     use bb8::Pool;
     use futures::future;
-    use log::debug;
     use std::time::Duration;
+    use tracing::debug;
 
     /// cargo test -- --show-output
     #[tokio::test]
     async fn test_pool() {
-        tests_helper::init_logger();
+        let _guard = tests_helper::init_logger();
         let port = "127.0.0.1:24523";
 
         let pool_size = 2;
@@ -182,7 +182,7 @@ mod tests_tcppool {
     /// cargo test -- --show-output
     #[tokio::test]
     async fn test_pool_lifetime() {
-        tests_helper::init_logger();
+        let _guard = tests_helper::init_logger();
         let port = "127.0.0.1:14523";
 
         let pool_size = 2;

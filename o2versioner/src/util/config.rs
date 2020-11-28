@@ -6,7 +6,7 @@ pub struct Config {
     pub scheduler: SchedulerConfig,
     pub sequencer: SequencerConfig,
     pub dbproxy: Vec<DbProxyConfig>,
-    pub dbschemas : Vec<DbSchemaConfig>,
+    pub dbschemas: Vec<DbSchemaConfig>,
 }
 
 impl Config {
@@ -30,9 +30,8 @@ pub struct SequencerConfig {
 #[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
 pub struct DbProxyConfig {
     pub addr: String,
-    pub sql_url: String,
+    pub sql_addr: String,
 }
-
 
 #[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
 pub struct DbSchemaConfig {
@@ -60,11 +59,11 @@ mod tests_config {
                 dbproxy: vec![
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8876"),
-                        sql_url: String::from("mysql://root:Rayh8768@localhost:3306/test")
+                        sql_addr: String::from("mysql://root:Rayh8768@localhost:3306/test")
                     },
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8877"),
-                        sql_url: String::from("mysql://root:Rayh8768@localhost:3306/test")
+                        sql_addr: String::from("mysql://root:Rayh8768@localhost:3306/test")
                     }
                 ],
                 dbschemas: vec![

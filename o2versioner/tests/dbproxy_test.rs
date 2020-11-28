@@ -1,34 +1,34 @@
-
 use futures::prelude::*;
-use o2versioner::{comm::scheduler_dbproxy::Message, core::{sql::Operation as OperationType, version_number::TableVN}};
-use o2versioner::{dbproxy::{handler, core::{Operation, Task}}};
+use o2versioner::dbproxy::{
+    core::{Operation, Task},
+    handler,
+};
+use o2versioner::core::msql::Operation as OperationType;
+use o2versioner::{comm::scheduler_dbproxy::Message, core::version_number::TableVN};
 use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::net::TcpStream;
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-
-
 #[tokio::test(threaded_scheduler)]
 #[ignore]
 async fn test_dbproxy_end_to_end() {
-
     tokio::spawn(async {
-        handler::main("127.0.0.1:2345","mysql://root:Rayh8768@localhost:3306/test").await;
+        handler::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await;
     });
 
     let result = Arc::new(Mutex::new(Vec::new()));
     let result_2 = Arc::clone(&result);
 
-    tokio::spawn(
-        async {
+    tokio::spawn(async {
         let tcp_stream = TcpStream::connect("127.0.0.1:2345").await.unwrap();
         let (tcp_read, tcp_write) = tcp_stream.into_split();
 
         let mut deserializer = SymmetricallyFramed::new(
             FramedRead::new(tcp_read, LengthDelimitedCodec::new()),
-            SymmetricalJson::<Message>::default());
+            SymmetricalJson::<Message>::default(),
+        );
 
         let mut serializer = SymmetricallyFramed::new(
             FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
@@ -50,7 +50,7 @@ async fn test_dbproxy_end_to_end() {
             ];
             let item = Message::SqlRequest(Operation {
                 transaction_id: "t1".to_string(),
-                table_vns: mock_table_vs.clone(),
+                tablevns: mock_table_vs.clone(),
                 task: Task::READ,
             });
             //Action
@@ -58,11 +58,10 @@ async fn test_dbproxy_end_to_end() {
         });
 
         tokio::spawn(async move {
-
             while let Some(msg) = deserializer.try_next().await.unwrap() {
                 match msg {
                     Message::SqlResponse(op) => {
-                        println!("{}",op.result);
+                        println!("{}", op.result);
                         result.lock().unwrap().push(op);
                     }
                     _other => {
@@ -70,11 +69,8 @@ async fn test_dbproxy_end_to_end() {
                     }
                 }
             }
-
         });
     });
-
-    
 
     loop {
         if result_2.lock().unwrap().len() == 1 {
@@ -83,5 +79,4 @@ async fn test_dbproxy_end_to_end() {
     }
 
     assert!(true);
-
 }

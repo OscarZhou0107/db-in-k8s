@@ -6,11 +6,11 @@ addr = "127.0.0.1:9876"
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
-sql_url = "mysql://root:Rayh8768@localhost:3306/test"
+sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
 
 [[dbproxy]]
 addr = "127.0.0.1:8877"
-sql_url = "mysql://root:Rayh8768@localhost:3306/test"
+sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
 
 [[dbschemas]]
 table_name = "table1"

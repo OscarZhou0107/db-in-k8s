@@ -7,7 +7,7 @@ use std::{collections::HashMap, sync::Mutex};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio::sync::mpsc;
 
-pub async fn main<A: ToSocketAddrs>(addr: A, sql_url: &str) {
+pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     //=====================================Continue an ongoing transaction=======================================//
     //Map that holds all ongoing transactions
     let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>> = Arc::new(Mutex::new(HashMap::new()));
@@ -34,7 +34,7 @@ pub async fn main<A: ToSocketAddrs>(addr: A, sql_url: &str) {
     Dispatcher::run(
         pending_queue,
         responder_sender,
-        sql_url.to_string(),
+        sql_addr.to_string(),
         version,
         transactions,
     );

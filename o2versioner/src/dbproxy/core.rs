@@ -1,24 +1,25 @@
-use crate::core::sql::Operation as OperationType;
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use tokio::sync::Notify;
 
 pub struct PendingQueue {
-    pub queue : Vec<Operation>,
-    pub notify : Arc<Notify>,
+    pub queue: Vec<Operation>,
+    pub notify: Arc<Notify>,
 }
 
 impl PendingQueue {
     pub fn new() -> Self {
         Self {
-            queue : Vec::new(), 
-            notify : Arc::new(Notify::new()),
+            queue: Vec::new(),
+            notify: Arc::new(Notify::new()),
         }
     }
 
-    pub fn push(&mut self, op : Operation) {
+    pub fn push(&mut self, op: Operation) {
         self.queue.push(op);
         self.notify.notify();
     }
@@ -28,8 +29,8 @@ impl PendingQueue {
     }
 
     pub fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
-    
-        let ready_ops = self.queue
+        let ready_ops = self
+            .queue
             .split(|op| version.lock().unwrap().violate_version(op.clone()))
             .fold(Vec::new(), |mut acc_ops, ops| {
                 ops.iter().for_each(|op| {
@@ -37,36 +38,35 @@ impl PendingQueue {
                 });
                 acc_ops
             });
-    
-        self.queue.retain(|op| version.lock().unwrap().violate_version(op.clone()));
+
+        self.queue
+            .retain(|op| version.lock().unwrap().violate_version(op.clone()));
         ready_ops
     }
 }
 
-
-
 pub struct DbVersion {
     table_versions: HashMap<String, u64>,
-    notify : Arc<Notify>,
+    notify: Arc<Notify>,
 }
 
 impl DbVersion {
     pub fn new(table_versions: HashMap<String, u64>) -> Self {
         Self {
             table_versions: table_versions,
-            notify : Arc::new(Notify::new()),
+            notify: Arc::new(Notify::new()),
         }
     }
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
         transaction_version
-            .table_vns
+            .tablevns
             .iter()
             .for_each(|t| match self.table_versions.get_mut(&t.table) {
                 Some(v) => *v = t.vn + 1,
                 None => println!("Table {} not found to release version.", t.table),
             });
-            self.notify.notify();
+        self.notify.notify();
     }
 
     pub fn release_on_tables(&mut self, tables: Vec<TableVN>) {
@@ -78,7 +78,7 @@ impl DbVersion {
     }
 
     pub fn violate_version(&self, transaction_version: Operation) -> bool {
-        transaction_version.table_vns.iter().any(|t| {
+        transaction_version.tablevns.iter().any(|t| {
             if let Some(v) = self.table_versions.get(&t.table) {
                 return *v < t.vn;
             } else {
@@ -90,7 +90,6 @@ impl DbVersion {
     pub fn get_notify(&self) -> Arc<Notify> {
         self.notify.clone()
     }
-
 }
 
 pub struct Repository {
@@ -147,7 +146,7 @@ pub struct QueryResult {
 pub struct Operation {
     pub transaction_id: String,
     pub task: Task,
-    pub table_vns: Vec<TableVN>,
+    pub tablevns: Vec<TableVN>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -205,7 +204,7 @@ mod tests_dbproxy_core {
     use super::Operation;
     use super::TableVN;
     use super::Task;
-    use crate::core::sql::Operation as OperationType;
+    use crate::core::msql::Operation as OperationType;
     use mysql_async::prelude::Queryable;
     use std::collections::HashMap;
 
@@ -229,7 +228,7 @@ mod tests_dbproxy_core {
             },
         ];
         let operation = Operation {
-            table_vns: versions,
+            tablevns: versions,
             transaction_id: "t1".to_string(),
             task: Task::READ,
         };
@@ -258,7 +257,7 @@ mod tests_dbproxy_core {
             },
         ];
         let operation = Operation {
-            table_vns: versions,
+            tablevns: versions,
             transaction_id: "t1".to_string(),
             task: Task::READ,
         };

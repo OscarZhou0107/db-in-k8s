@@ -1,6 +1,7 @@
 use super::Receiver;
 use crate::comm::scheduler_dbproxy::Message;
-use crate::core::{sql::Operation as OperationType, version_number::TableVN};
+use crate::core::msql::Operation as OperationType;
+use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{Operation, PendingQueue, Task};
 use futures::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -46,7 +47,7 @@ async fn test_send_single_item_to_receiver() {
 
         let item = Message::SqlRequest(Operation {
             transaction_id: "t1".to_string(),
-            table_vns: mock_table_vs.clone(),
+            tablevns: mock_table_vs.clone(),
             task: Task::READ,
         });
         //Action
@@ -66,7 +67,7 @@ async fn test_send_single_item_to_receiver() {
 #[ignore]
 async fn test_send_an_invalid_item_to_receiver_should_panic() {
     //Prepare - Network
-     //PendingQueue
+    //PendingQueue
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
     let pending_queue_2 = Arc::clone(&pending_queue);
 
@@ -102,7 +103,7 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
 
         let item = Operation {
             transaction_id: "t1".to_string(),
-            table_vns: mock_table_vs.clone(),
+            tablevns: mock_table_vs.clone(),
             task: Task::READ,
         };
         //Action

@@ -1,4 +1,4 @@
-use crate::core::sql::{Operation, SqlBeginTx};
+use crate::core::msql::{MsqlBeginTx, Operation};
 use crate::core::version_number::{TableVN, TxVN, VN};
 use std::collections::HashMap;
 
@@ -47,17 +47,17 @@ impl State {
         }
     }
 
-    pub fn assign_vn(&mut self, sqlbegintx: SqlBeginTx) -> TxVN {
-        let SqlBeginTx { tx_name, table_ops } = sqlbegintx;
+    pub fn assign_vn(&mut self, msqlbegintx: MsqlBeginTx) -> TxVN {
+        let (tx, tableops) = msqlbegintx.unwrap();
 
         TxVN {
-            tx_name,
-            table_vns: table_ops
+            tx,
+            tablevns: tableops
                 .into_iter()
-                .map(|table_op| TableVN {
-                    table: table_op.table.clone(),
-                    vn: self.vn_record.entry(table_op.table).or_default().assign(&table_op.op),
-                    op: table_op.op,
+                .map(|tableop| TableVN {
+                    table: tableop.table.clone(),
+                    vn: self.vn_record.entry(tableop.table).or_default().assign(&tableop.op),
+                    op: tableop.op,
                 })
                 .collect(),
         }
@@ -201,15 +201,9 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
-    use crate::core::sql::{Operation, TableOp, SqlBeginTx};
+    use crate::core::msql::{MsqlBeginTx, Operation, TableOp, TableOps};
     use crate::core::version_number::{TableVN, TxVN};
-
-    fn new_sqlbegintx(table_ops: Vec<TableOp>) -> SqlBeginTx {
-        SqlBeginTx {
-            tx_name: String::from("tx007"),
-            table_ops,
-        }
-    }
+    use std::iter::FromIterator;
 
     #[test]
     fn test_assign_vn() {
@@ -219,23 +213,14 @@ mod tests_state {
         // next_for_read     0     0     0
         // next_for_write    0     0     0
         assert_eq!(
-            state.assign_vn(new_sqlbegintx(vec![
-                TableOp {
-                    table: String::from("a"),
-                    op: Operation::W,
-                },
-                TableOp {
-                    table: String::from("b"),
-                    op: Operation::W,
-                },
-                TableOp {
-                    table: String::from("c"),
-                    op: Operation::R,
-                },
-            ])),
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("a", Operation::W),
+                TableOp::new("b", Operation::W),
+                TableOp::new("c", Operation::R)
+            ]))),
             TxVN {
-                tx_name: String::from("tx007"),
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("a"),
                         vn: 0,
@@ -259,19 +244,13 @@ mod tests_state {
         // next_for_read     1     1     0
         // next_for_write    1     1     1
         assert_eq!(
-            state.assign_vn(new_sqlbegintx(vec![
-                TableOp {
-                    table: String::from("b"),
-                    op: Operation::W,
-                },
-                TableOp {
-                    table: String::from("c"),
-                    op: Operation::R,
-                }
-            ],)),
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("b", Operation::W),
+                TableOp::new("c", Operation::R)
+            ]))),
             TxVN {
-                tx_name: String::from("tx007"),
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("b"),
                         vn: 1,
@@ -290,19 +269,13 @@ mod tests_state {
         // next_for_read     1     2     0
         // next_for_write    1     2     2
         assert_eq!(
-            state.assign_vn(new_sqlbegintx(vec![
-                TableOp {
-                    table: String::from("b"),
-                    op: Operation::R,
-                },
-                TableOp {
-                    table: String::from("c"),
-                    op: Operation::W,
-                }
-            ],)),
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("b", Operation::R),
+                TableOp::new("c", Operation::W)
+            ]))),
             TxVN {
-                tx_name: String::from("tx007"),
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("b"),
                         vn: 2,
@@ -321,23 +294,14 @@ mod tests_state {
         // next_for_read     1     2     3
         // next_for_write    1     3     3
         assert_eq!(
-            state.assign_vn(new_sqlbegintx(vec![
-                TableOp {
-                    table: String::from("a"),
-                    op: Operation::R,
-                },
-                TableOp {
-                    table: String::from("b"),
-                    op: Operation::R,
-                },
-                TableOp {
-                    table: String::from("c"),
-                    op: Operation::W,
-                }
-            ],)),
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("a", Operation::R),
+                TableOp::new("b", Operation::R),
+                TableOp::new("c", Operation::W)
+            ],))),
             TxVN {
-                tx_name: String::from("tx007"),
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("a"),
                         vn: 1,

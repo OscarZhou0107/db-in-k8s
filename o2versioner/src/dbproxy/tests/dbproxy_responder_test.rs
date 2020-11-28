@@ -1,6 +1,6 @@
 use super::Responder;
 use crate::comm::scheduler_dbproxy::Message;
-use crate::core::sql::Operation as OperationType;
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{DbVersion, QueryResult};
 use futures::prelude::*;
