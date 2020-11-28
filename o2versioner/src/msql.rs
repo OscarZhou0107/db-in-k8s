@@ -327,6 +327,16 @@ pub enum Msql {
     EndTx(MsqlEndTx),
 }
 
+impl IntoMsqlFinalString for Msql {
+    fn into_msqlfinalstring(self) -> MsqlFinalString {
+        match self {
+            Msql::BeginTx(msqlbegintx) => msqlbegintx.into_msqlfinalstring(),
+            Msql::Query(msqlquery) => msqlquery.into_msqlfinalstring(),
+            Msql::EndTx(msqlendtx) => msqlendtx.into_msqlfinalstring(),
+        }
+    }
+}
+
 /// Represents a text formatted Msql command variant.
 /// The main user interface for Msql with maximum compatibility.
 /// This is a text version of `Msql`.
@@ -606,6 +616,33 @@ mod tests_into_msqlfinalstring {
         );
 
         let mfs: MsqlFinalString = MsqlEndTx::rollback().set_name(Some("tx1")).into();
+        assert_eq!(mfs, MsqlFinalString(String::from("ROLLBACK TRAN tx1;")));
+    }
+
+    #[test]
+    fn test_from_msql() {
+        assert_eq!(
+            MsqlFinalString::from(Msql::BeginTx(MsqlBeginTx::default().set_table_ops(
+                TableOps::from_iter(vec![
+                    TableOp::new("table0", Operation::R),
+                    TableOp::new("table0", Operation::W),
+                ])
+            ))),
+            MsqlFinalString(String::from("BEGIN TRAN;"))
+        );
+
+        assert_eq!(
+            MsqlFinalString::from(Msql::Query(
+                MsqlQuery::new(
+                    "select * from table0 where true;",
+                    TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+                )
+                .unwrap()
+            )),
+            MsqlFinalString(String::from("select * from table0 where true;"))
+        );
+
+        let mfs: MsqlFinalString = Msql::EndTx(MsqlEndTx::rollback().set_name(Some("tx1"))).into();
         assert_eq!(mfs, MsqlFinalString(String::from("ROLLBACK TRAN tx1;")));
     }
 }
