@@ -1,6 +1,7 @@
 use super::Dispatcher;
-use crate::core::{sql::Operation as OperationType, version_number::TableVN};
+use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
+use crate::msql::Operation as OperationType;
 use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;

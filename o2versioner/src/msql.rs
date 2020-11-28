@@ -242,6 +242,12 @@ impl IntoMsqlFinalString for MsqlBeginTx {
     }
 }
 
+impl From<TableOps> for MsqlBeginTx {
+    fn from(tableops: TableOps) -> Self {
+        Self::default().set_tableops(tableops)
+    }
+}
+
 impl MsqlBeginTx {
     /// Set an optional name for the transacstion, will overwrite previous value
     pub fn set_name<S: Into<String>>(mut self, name: Option<S>) -> Self {
@@ -769,20 +775,19 @@ mod tests_into_msqlfinalstring {
     #[test]
     fn test_from_msqlbegintx() {
         assert_eq!(
-            MsqlFinalString::from(MsqlBeginTx::default().set_tableops(TableOps::from_iter(vec![
+            MsqlFinalString::from(MsqlBeginTx::from(TableOps::from_iter(vec![
                 TableOp::new("table0", Operation::R),
                 TableOp::new("table0", Operation::W),
             ]))),
             MsqlFinalString(String::from("BEGIN TRAN;"))
         );
 
-        let mfs: MsqlFinalString = MsqlBeginTx::default()
-            .set_tableops(TableOps::from_iter(vec![
-                TableOp::new("table0", Operation::R),
-                TableOp::new("table0", Operation::W),
-            ]))
-            .set_name(Some("tx0"))
-            .into();
+        let mfs: MsqlFinalString = MsqlBeginTx::from(TableOps::from_iter(vec![
+            TableOp::new("table0", Operation::R),
+            TableOp::new("table0", Operation::W),
+        ]))
+        .set_name(Some("tx0"))
+        .into();
         assert_eq!(mfs, MsqlFinalString(String::from("BEGIN TRAN tx0;")));
     }
 
@@ -825,12 +830,10 @@ mod tests_into_msqlfinalstring {
     #[test]
     fn test_from_msql() {
         assert_eq!(
-            MsqlFinalString::from(Msql::BeginTx(MsqlBeginTx::default().set_tableops(TableOps::from_iter(
-                vec![
-                    TableOp::new("table0", Operation::R),
-                    TableOp::new("table0", Operation::W),
-                ]
-            )))),
+            MsqlFinalString::from(Msql::BeginTx(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("table0", Operation::R),
+                TableOp::new("table0", Operation::W),
+            ])))),
             MsqlFinalString(String::from("BEGIN TRAN;"))
         );
 
@@ -891,7 +894,7 @@ mod tests_msql {
                 tx: None,
                 tableops: String::from("read table0 read table1 write table2 table3")
             }),
-            Ok(Msql::BeginTx(MsqlBeginTx::default().set_tableops(TableOps::from(
+            Ok(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
                 "read table0 read table1 write table2 table3"
             ))))
         );

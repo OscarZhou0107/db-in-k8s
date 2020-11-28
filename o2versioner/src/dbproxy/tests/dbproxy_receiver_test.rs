@@ -1,7 +1,8 @@
 use super::Receiver;
 use crate::comm::scheduler_dbproxy::Message;
-use crate::core::{sql::Operation as OperationType, version_number::TableVN};
+use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{Operation, PendingQueue, Task};
+use crate::msql::Operation as OperationType;
 use futures::prelude::*;
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
@@ -66,7 +67,7 @@ async fn test_send_single_item_to_receiver() {
 #[ignore]
 async fn test_send_an_invalid_item_to_receiver_should_panic() {
     //Prepare - Network
-     //PendingQueue
+    //PendingQueue
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
     let pending_queue_2 = Arc::clone(&pending_queue);
 

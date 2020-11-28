@@ -2,23 +2,24 @@ use crate::msql;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum QueryResponseMessage {
-    Write(String),
-    Read(String),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ResponseMessage {
-    InvalidRequest,
-    BeginTx(Result<String, String>),
-    Query(String),
-    EndTx(String),
+pub enum ReplyMessage {
+    BeginTx(Result<(), String>),
+    Query(Result<String, String>),
+    EndTx(Result<String, String>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
-    /// For use by appserver using Rust
     RequestMsql(msql::Msql),
     RequestMsqlText(msql::MsqlText),
-    Response(ResponseMessage),
+    InvalidRequest,
+    InvalidMsqlText(String),
+    Reply(ReplyMessage),
+    Test(String),
+}
+
+impl Message {
+    pub fn test<S: Into<String>>(s: S) -> Self {
+        Message::Test(s.into())
+    }
 }

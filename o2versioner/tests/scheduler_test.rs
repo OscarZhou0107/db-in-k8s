@@ -1,4 +1,5 @@
-use o2versioner::core::sql::*;
+use o2versioner::comm::appserver_scheduler;
+use o2versioner::msql::*;
 use o2versioner::scheduler::handler;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
@@ -27,9 +28,11 @@ async fn test_scheduler() {
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
-            SqlString::from("0-hello"),
-            SqlString::from("0-world"),
-            SqlString::from(" BeGin TraNsaction tx0 with MarK 'table4 read table4 read write table4 table3 read'"),
+            appserver_scheduler::Message::test("0-hello"),
+            appserver_scheduler::Message::test("0-world"),
+            appserver_scheduler::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+                "READ table0 WRITE table1 table2 read table3",
+            )))),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -38,9 +41,11 @@ async fn test_scheduler() {
 
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
-            SqlString::from("1-hello"),
-            SqlString::from("1-world"),
-            SqlString::from("BeGin TraN tx0 with MarK 'table0 read table1 read write table2 table3 read';"),
+            appserver_scheduler::Message::test("0-hello"),
+            appserver_scheduler::Message::test("0-world"),
+            appserver_scheduler::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+                "READ table0 WRITE table1 table2 read table3",
+            )))),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();

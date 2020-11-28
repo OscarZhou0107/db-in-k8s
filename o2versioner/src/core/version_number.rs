@@ -1,4 +1,4 @@
-use super::sql::Operation;
+use crate::msql::Operation;
 use serde::{Deserialize, Serialize};
 
 /// Version number
@@ -15,7 +15,7 @@ pub struct TableVN {
 /// Version numbers of tables declared by a transaction
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
-    pub tx_name: String,
-    // A single vec storing all W and R `TableVN` for now
+    pub tx_name: Option<String>,
+    /// A single vec storing all W and R `TableVN` for now
     pub table_vns: Vec<TableVN>,
 }
