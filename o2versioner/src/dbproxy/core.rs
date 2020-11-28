@@ -291,9 +291,18 @@ mod tests_dbproxy_core {
         let mut conn = pool.get_conn().await.unwrap();
 
         let mut raw = conn.query_iter("select * from cats").await.unwrap();
-        let results: Vec<mysql_async::Row> = raw.collect().await.unwrap();
-        results.iter().for_each(|r| {
-            println!("len {}", r.len());
+        let mut results: Vec<mysql_async::Row> = raw.collect().await.unwrap();
+        results.iter_mut().for_each(|r| {
+            let len = r.len();
+            r.columns().iter().for_each(|c| {
+                println!("col {}", c.name_str());
+                
+            });
+
+            for i in 0..len {
+                let val : String = r.take(i).unwrap();
+                println!("len {}", val);
+            }
         });
     }
 }
