@@ -1,6 +1,3 @@
-use super::mysql::Packet;
-//use crate::core::sql::SqlBeginTx;
-use crate::core::version_number::TxVN;
 use crate::dbproxy::core::{Operation, QueryResult};
 use serde::{Deserialize, Serialize};
 
@@ -21,16 +18,4 @@ pub enum EndTx {
 pub enum Error {
     MissingTxBegin,
     Invalid,
-}
-
-pub enum RealMessage {
-    Invalid,
-    // Request from Scheduler to Dbproxy
-    RequestBypass(Packet),
-    RequestQuery(Packet, TxVN),
-    RequestEndTx(EndTx, TxVN),
-    // Response from Dbproxy to Scheduler
-    ResponseBypass(Result<Packet, Error>),
-    ResponseQuery(Result<Packet, Error>),
-    ResponseEndTx(Result<Packet, Error>),
 }

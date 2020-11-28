@@ -337,6 +337,10 @@ impl IntoMsqlFinalString for Msql {
     }
 }
 
+// impl TryFrom<MsqlText> for Msql{
+
+// }
+
 /// Represents a text formatted Msql command variant.
 /// The main user interface for Msql with maximum compatibility.
 /// This is a text version of `Msql`.
