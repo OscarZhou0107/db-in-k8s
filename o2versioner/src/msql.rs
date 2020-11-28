@@ -39,8 +39,28 @@ impl TableOp {
 
 /// Representing a collection of TableOp
 ///
-/// Is automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
+/// Automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
 /// (`Operation`s with same `String` are ordered such that `Operation::W` comes before `Operation::R`)
+///
+/// # Examples
+/// ```
+/// use o2versioner::msql::{Operation, TableOp, TableOps};
+/// use std::iter::FromIterator;
+///
+/// let tableops0 = TableOps::from_iter(vec![
+///     TableOp::new("table0", Operation::R),
+///     TableOp::new("table1", Operation::W),
+/// ]);
+///
+/// let tableops1 = TableOps::from("read table0 write  table1");
+///
+/// let tableops2 = TableOps::default()
+///     .add_tableop(TableOp::new("table1", Operation::W))
+///     .add_tableop(TableOp::new("table0", Operation::R));
+///
+/// assert_eq!(tableops0, tableops1);
+/// assert_eq!(tableops1, tableops2);
+/// ```
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOps(Vec<TableOp>);
 
