@@ -54,7 +54,7 @@ cargo check
 
 ### Features
 - [x] msql: simple sql
-- [ ] msql: Msql and MsqlText interface
+- [x] msql: Msql and MsqlText interface
 - [x] msql: annotation-based
 - [ ] msql: auto annotation
 - [x] Begin tx stmt
