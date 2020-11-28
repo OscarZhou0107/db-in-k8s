@@ -1,6 +1,6 @@
 #![allow(warnings)]
+use crate::core::database_version::*;
 use crate::core::version_number::*;
-use crate::core::vn_database::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
@@ -35,13 +35,13 @@ impl ConnectionState {
 }
 
 pub struct SchedulerState {
-    dbproxy_vndatabase: HashMap<SocketAddr, VNDatabase>,
+    dbproxy_dbvn: HashMap<SocketAddr, DbVN>,
 }
 
 impl SchedulerState {
     pub fn new() -> Self {
         Self {
-            dbproxy_vndatabase: HashMap::new(),
+            dbproxy_dbvn: HashMap::new(),
         }
     }
 }
