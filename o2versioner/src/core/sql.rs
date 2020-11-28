@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use unicase::UniCase;
+// remove this crate
 use uuid::Uuid;
 
 /// Enum representing either W (write) or R (read)

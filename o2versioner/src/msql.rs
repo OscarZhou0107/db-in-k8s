@@ -4,7 +4,6 @@ use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use unicase::UniCase;
-use uuid::Uuid;
 
 /// Enum representing either a W (write) or R (read) for a table
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
@@ -247,16 +246,6 @@ impl MsqlBeginTx {
     /// Set an optional name for the transacstion, will overwrite previous value
     pub fn set_name<S: Into<String>>(mut self, name: Option<S>) -> Self {
         self.tx = name.map(|s| s.into());
-        self
-    }
-
-    /// Append a uuid to the end of the transaction name
-    pub fn add_uuid(mut self) -> Self {
-        self.tx = self.tx.map(|mut tx| {
-            tx.push_str("_");
-            tx.push_str(&Uuid::new_v4().to_string());
-            tx
-        });
         self
     }
 
