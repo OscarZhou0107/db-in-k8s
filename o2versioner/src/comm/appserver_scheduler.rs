@@ -9,6 +9,7 @@ pub enum ReplyMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Message {
     RequestMsql(msql::Msql),
     RequestMsqlText(msql::MsqlText),

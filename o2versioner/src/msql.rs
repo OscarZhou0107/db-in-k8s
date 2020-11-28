@@ -329,7 +329,7 @@ impl MsqlQuery {
 
 /// Enum representing the end transaction mode, can be either `Rollback` or `Commit`
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum MsqlEndTxMode {
     Commit,
     Rollback,
@@ -481,11 +481,11 @@ impl TryFrom<MsqlText> for Msql {
 ///     }
 /// );
 ///
-/// // "type":"begintx" suggests MsqlText::BeginTx
+/// // "type":"begin_tx" suggests MsqlText::BeginTx
 /// // Use null for Option<String>::None
 /// let begintx_str = r#"
 /// {
-///     "type":"begintx",
+///     "type":"begin_tx",
 ///     "tx":null,
 ///     "tableops":"read table0 write table1 read table2"
 /// }"#;
@@ -501,7 +501,7 @@ impl TryFrom<MsqlText> for Msql {
 /// // Can also skip the value for Option<String>::None
 /// let begintx_str = r#"
 /// {
-///     "type":"begintx",
+///     "type":"begin_tx",
 ///     "tableops":"read table0 write table1 read table2"
 /// }"#;
 /// let begintx: MsqlText = serde_json::from_str(begintx_str).unwrap();
@@ -513,13 +513,13 @@ impl TryFrom<MsqlText> for Msql {
 ///     }
 /// );
 ///
-/// // "type":"endtx" suggests MsqlText::EndTx
+/// // "type":"end_tx" suggests MsqlText::EndTx
 /// // Simply enter the value for Option<String>::Some(String)
 /// // Use "commit" for MsqlEndTxMode::Commit
 /// // Use "rollback" for MsqlEndTxMode::Rollback
 /// let endtx_str = r#"
 /// {
-///     "type":"endtx",
+///     "type":"end_tx",
 ///     "mode":"commit",
 ///     "tx":"tx2"
 /// }"#;
@@ -533,7 +533,7 @@ impl TryFrom<MsqlText> for Msql {
 /// );
 /// ```
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MsqlText {
     BeginTx {
         #[serde(default)]
@@ -1018,7 +1018,7 @@ mod tests_msqltext {
 
         let a = r#"
         {
-            "type":"endtx",
+            "type":"end_tx",
             "tx":"tx0",
             "mode":"commit"
         }"#;
@@ -1027,7 +1027,7 @@ mod tests_msqltext {
 
         let a = r#"
         {
-            "type":"endtx",
+            "type":"end_tx",
             "tx":null,
             "mode":"rollback"
         }"#;
@@ -1036,7 +1036,7 @@ mod tests_msqltext {
 
         let a = r#"
         {
-            "type":"endtx",
+            "type":"end_tx",
             "mode":"rollback"
         }"#;
         let b: MsqlText = serde_json::from_str(a).unwrap();
