@@ -6,7 +6,7 @@ use tokio::net::TcpStream;
 
 #[tokio::test]
 async fn test_scheduler() {
-    tests_helper::init_logger();
+    let _guard = tests_helper::init_logger();
 
     let sequencer_addr = "127.0.0.1:6379";
     let scheduler_addr = "127.0.0.1:16379";

@@ -7,7 +7,7 @@ use tokio::net::TcpStream;
 
 #[tokio::test]
 async fn test_sequencer() {
-    tests_helper::init_logger();
+    let _guard = tests_helper::init_logger();
     let port = "127.0.0.1:6389";
 
     let sequencer_handle = tokio::spawn(handler::main(port, Some(2)));

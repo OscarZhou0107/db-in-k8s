@@ -11,12 +11,12 @@ impl Dispatcher {
     pub fn run(
         pending_queue: Arc<Mutex<PendingQueue>>,
         sender: mpsc::Sender<QueryResult>,
-        sql_url: String,
+        sql_addr: String,
         mut version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>>,
     ) {
         tokio::spawn(async move {
-            let pool = mysql_async::Pool::new(sql_url);
+            let pool = mysql_async::Pool::new(sql_addr);
             let mut task_notify = pending_queue.lock().unwrap().get_notify();
             let mut version_notify = version.lock().unwrap().get_notify();
 

@@ -2,7 +2,7 @@ use super::core::State;
 use crate::comm::scheduler_sequencer;
 use crate::util::tcp;
 use futures::prelude::*;
-use log::{debug, warn};
+use tracing::{debug, warn};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;

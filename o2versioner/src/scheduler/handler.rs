@@ -4,7 +4,7 @@ use crate::msql::*;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;
-use log::debug;
+use tracing::debug;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tokio::net::{TcpStream, ToSocketAddrs};

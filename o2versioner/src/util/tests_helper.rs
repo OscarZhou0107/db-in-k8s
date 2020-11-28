@@ -1,6 +1,5 @@
 use super::tcp;
 use futures::prelude::*;
-use log::{debug, error, info, LevelFilter};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::panic::{RefUnwindSafe, UnwindSafe};
@@ -9,13 +8,16 @@ use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::dispatcher::DefaultGuard;
+use tracing::{debug, error, info};
 
-pub fn init_logger() {
-    let _ = env_logger::Builder::from_default_env()
-        .filter_level(LevelFilter::Debug)
-        .format_timestamp(None)
-        .is_test(true)
-        .try_init();
+pub fn init_logger() -> DefaultGuard {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::DEBUG)
+        .without_time()
+        .with_test_writer()
+        .finish();
+    tracing::subscriber::set_default(subscriber)
 }
 
 /// A mock echo server for testing
