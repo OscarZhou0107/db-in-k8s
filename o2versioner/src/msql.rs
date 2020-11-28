@@ -561,7 +561,6 @@ mod tests_tableops {
 #[cfg(test)]
 mod tests_into_msqlfinalstring {
     use super::*;
-    use std::convert::Into;
 
     #[test]
     fn test_from_msqlbegintx() {
