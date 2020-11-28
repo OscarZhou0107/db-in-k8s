@@ -459,8 +459,81 @@ impl TryFrom<MsqlText> for Msql {
 /// The main user interface for Msql with maximum compatibility.
 /// This is a text version of `Msql`.
 ///
-/// `MsqlText` needs to be converted into `Msql` first
-#[derive(Debug, Serialize, Deserialize)]
+/// `MsqlText` needs to be converted into `Msql` first.
+///
+/// # Examples - Json conversion
+/// ```
+/// use o2versioner::msql::{MsqlEndTxMode, MsqlText};
+///
+/// // "type":"query" suggests MsqlText::Query
+/// let query_str = r#"
+/// {
+///     "type":"query",
+///     "query":"select * from t;",
+///     "tableops":"read t"
+/// }"#;
+/// let query: MsqlText = serde_json::from_str(query_str).unwrap();
+/// assert_eq!(
+///     query,
+///     MsqlText::Query {
+///         query: String::from("select * from t;"),
+///         tableops: String::from("read t")
+///     }
+/// );
+///
+/// // "type":"begintx" suggests MsqlText::BeginTx
+/// // Use null for Option<String>::None
+/// let begintx_str = r#"
+/// {
+///     "type":"begintx",
+///     "tx":null,
+///     "tableops":"read table0 write table1 read table2"
+/// }"#;
+/// let begintx: MsqlText = serde_json::from_str(begintx_str).unwrap();
+/// assert_eq!(
+///     begintx,
+///     MsqlText::BeginTx {
+///         tx: None,
+///         tableops: String::from("read table0 write table1 read table2")
+///     }
+/// );
+///
+/// // Can also skip the value for Option<String>::None
+/// let begintx_str = r#"
+/// {
+///     "type":"begintx",
+///     "tableops":"read table0 write table1 read table2"
+/// }"#;
+/// let begintx: MsqlText = serde_json::from_str(begintx_str).unwrap();
+/// assert_eq!(
+///     begintx,
+///     MsqlText::BeginTx {
+///         tx: None,
+///         tableops: String::from("read table0 write table1 read table2")
+///     }
+/// );
+///
+/// // "type":"endtx" suggests MsqlText::EndTx
+/// // Simply enter the value for Option<String>::Some(String)
+/// // Use "commit" for MsqlEndTxMode::Commit
+/// // Use "rollback" for MsqlEndTxMode::Rollback
+/// let endtx_str = r#"
+/// {
+///     "type":"endtx",
+///     "mode":"commit",
+///     "tx":"tx2"
+/// }"#;
+/// let endtx: MsqlText = serde_json::from_str(endtx_str).unwrap();
+/// assert_eq!(
+///     endtx,
+///     MsqlText::EndTx {
+///         tx: Some(String::from("tx2")),
+///         mode: MsqlEndTxMode::Commit
+///     }
+/// );
+/// ```
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum MsqlText {
     BeginTx {
         #[serde(default)]
@@ -918,5 +991,55 @@ mod tests_msql {
             }),
             Ok(Msql::EndTx(MsqlEndTx::rollback().set_name(Some("t3"))))
         )
+    }
+}
+
+#[cfg(test)]
+mod tests_msqltext {
+    use crate::msql::*;
+
+    #[test]
+    fn test_msqltext_endtx_json() {
+        println!("SERIALIZE");
+
+        let a = MsqlText::EndTx {
+            tx: Some(String::from("tx0")),
+            mode: MsqlEndTxMode::Commit,
+        };
+        println!("{}", serde_json::to_string(&a).unwrap());
+
+        let a = MsqlText::EndTx {
+            tx: None,
+            mode: MsqlEndTxMode::Rollback,
+        };
+        println!("{}", serde_json::to_string(&a).unwrap());
+
+        println!("DESERIALIZE");
+
+        let a = r#"
+        {
+            "type":"endtx",
+            "tx":"tx0",
+            "mode":"commit"
+        }"#;
+        let b: MsqlText = serde_json::from_str(a).unwrap();
+        println!("{:?}", b);
+
+        let a = r#"
+        {
+            "type":"endtx",
+            "tx":null,
+            "mode":"rollback"
+        }"#;
+        let b: MsqlText = serde_json::from_str(a).unwrap();
+        println!("{:?}", b);
+
+        let a = r#"
+        {
+            "type":"endtx",
+            "mode":"rollback"
+        }"#;
+        let b: MsqlText = serde_json::from_str(a).unwrap();
+        println!("{:?}", b);
     }
 }
