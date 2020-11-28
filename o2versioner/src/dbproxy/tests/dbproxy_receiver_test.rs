@@ -1,8 +1,8 @@
 use super::Receiver;
 use crate::comm::scheduler_dbproxy::Message;
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{Operation, PendingQueue, Task};
-use crate::msql::Operation as OperationType;
 use futures::prelude::*;
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};

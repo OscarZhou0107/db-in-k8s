@@ -1,4 +1,4 @@
-use crate::msql;
+use crate::core::msql;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -13,7 +13,7 @@ pub enum ReplyMessage {
 /// # Examples - Json conversion
 /// ```
 /// use o2versioner::comm::appserver_scheduler::Message;
-/// use o2versioner::msql::{MsqlEndTxMode, MsqlText};
+/// use o2versioner::core::msql::{MsqlEndTxMode, MsqlText};
 ///
 /// let rmt_begin_tx_str = r#"
 /// {
@@ -69,7 +69,7 @@ impl Message {
 #[cfg(test)]
 mod tests_message {
     use super::*;
-    use crate::msql::*;
+    use crate::core::msql::*;
 
     #[test]
     fn test_requestmsqltext_json() {

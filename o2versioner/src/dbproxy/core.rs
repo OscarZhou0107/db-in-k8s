@@ -1,5 +1,5 @@
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN};
-use crate::msql::Operation as OperationType;
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -204,7 +204,7 @@ mod tests_dbproxy_core {
     use super::Operation;
     use super::TableVN;
     use super::Task;
-    use crate::msql::Operation as OperationType;
+    use crate::core::msql::Operation as OperationType;
     use mysql_async::prelude::Queryable;
     use std::collections::HashMap;
 

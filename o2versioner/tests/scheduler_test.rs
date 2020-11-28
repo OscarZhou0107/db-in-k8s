@@ -1,5 +1,5 @@
 use o2versioner::comm::appserver_scheduler;
-use o2versioner::msql::*;
+use o2versioner::core::msql::*;
 use o2versioner::scheduler::handler;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;

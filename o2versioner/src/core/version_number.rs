@@ -1,4 +1,4 @@
-use crate::msql::Operation;
+use crate::core::msql::Operation;
 use serde::{Deserialize, Serialize};
 
 /// Version number

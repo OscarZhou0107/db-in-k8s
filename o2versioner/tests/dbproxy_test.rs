@@ -3,7 +3,7 @@ use o2versioner::dbproxy::{
     core::{Operation, Task},
     handler,
 };
-use o2versioner::msql::Operation as OperationType;
+use o2versioner::core::msql::Operation as OperationType;
 use o2versioner::{comm::scheduler_dbproxy::Message, core::version_number::TableVN};
 use std::sync::Arc;
 use std::sync::Mutex;

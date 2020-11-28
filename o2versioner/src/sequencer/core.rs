@@ -1,5 +1,5 @@
+use crate::core::msql::{MsqlBeginTx, Operation};
 use crate::core::version_number::{TableVN, TxVN, VN};
-use crate::msql::{MsqlBeginTx, Operation};
 use std::collections::HashMap;
 
 /// Version number info for a single table
@@ -201,8 +201,8 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
+    use crate::core::msql::{MsqlBeginTx, Operation, TableOp, TableOps};
     use crate::core::version_number::{TableVN, TxVN};
-    use crate::msql::{MsqlBeginTx, Operation, TableOp, TableOps};
     use std::iter::FromIterator;
 
     #[test]

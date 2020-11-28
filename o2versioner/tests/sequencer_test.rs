@@ -1,6 +1,6 @@
 use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::version_number::*;
-use o2versioner::msql::*;
+use o2versioner::core::msql::*;
 use o2versioner::sequencer::handler;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
