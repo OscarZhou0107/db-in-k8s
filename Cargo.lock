@@ -162,12 +162,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
 
 [[package]]
-name = "bytes"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0dcbc35f504eb6fc275a6d20e4ebcda18cf50d40ba6fabff8c711fa16cb3b16"
-
-[[package]]
 name = "cc"
 version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -882,7 +876,7 @@ version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a8415183fe5b89eaf49d2c241892ab7524ca8ef5a281dd6078a6131bea1aebc"
 dependencies = [
- "bytes 0.5.6",
+ "bytes",
  "crossbeam",
  "futures-core",
  "futures-sink",
@@ -914,7 +908,7 @@ dependencies = [
  "bigdecimal",
  "bitflags",
  "byteorder",
- "bytes 0.5.6",
+ "bytes",
  "chrono",
  "flate2",
  "lazy_static",
@@ -1028,7 +1022,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bb8",
- "bytes 0.6.0",
  "clap",
  "config",
  "env_logger",
@@ -1038,6 +1031,7 @@ dependencies = [
  "mysql_async",
  "regex",
  "serde 1.0.117",
+ "serde_json",
  "tokio",
  "tokio-serde",
  "tokio-util",
@@ -1706,7 +1700,7 @@ version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6d7ad61edd59bfcc7e80dababf0f4aed2e6d5e0ba1659356ae889752dfc12ff"
 dependencies = [
- "bytes 0.5.6",
+ "bytes",
  "fnv",
  "futures-core",
  "iovec",
@@ -1742,7 +1736,7 @@ version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebdd897b01021779294eb09bb3b52b6e11b0747f9f7e333a84bef532b656de99"
 dependencies = [
- "bytes 0.5.6",
+ "bytes",
  "derivative",
  "futures",
  "pin-project 0.4.27",
@@ -1766,7 +1760,7 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be8242891f2b6cbef26a2d7e8605133c2c554cd35b3e4948ea892d6d68436499"
 dependencies = [
- "bytes 0.5.6",
+ "bytes",
  "futures-core",
  "futures-sink",
  "log",
