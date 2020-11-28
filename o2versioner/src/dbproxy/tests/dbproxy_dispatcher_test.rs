@@ -49,22 +49,22 @@ async fn test_receive_response_from_new_transactions() {
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t2".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t3".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t4".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
 
     while !mock_ops.is_empty() {
@@ -125,22 +125,22 @@ async fn test_receive_response_from_same_transactions() {
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t2".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t3".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
 
     while !mock_ops.is_empty() {

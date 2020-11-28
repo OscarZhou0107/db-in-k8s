@@ -25,9 +25,9 @@ async fn test_sequencer() {
                 .set_name(Some("tx1")),
             ),
             scheduler_sequencer::Message::ReplyTxVN(TxVN {
-                tx_name: Some(String::from("tx2")),
+                tx: Some(String::from("tx2")),
                 // A single vec storing all W and R `TableVN` for now
-                table_vns: vec![
+                tablevns: vec![
                     TableVN {
                         table: String::from("table0"),
                         vn: 0,
@@ -60,9 +60,9 @@ async fn test_sequencer() {
                 .set_name(Some("tx1")),
             ),
             scheduler_sequencer::Message::ReplyTxVN(TxVN {
-                tx_name: Some(String::from("tx2")),
+                tx: Some(String::from("tx2")),
                 // A single vec storing all W and R `TableVN` for now
-                table_vns: vec![
+                tablevns: vec![
                     TableVN {
                         table: String::from("table0"),
                         vn: 0,
