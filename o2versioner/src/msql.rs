@@ -574,10 +574,40 @@ mod tests_into_msqlfinalstring {
     }
 
     #[test]
-    fn test_from_msqlquery() {}
+    fn test_from_msqlquery() {
+        assert_eq!(
+            MsqlFinalString::from(
+                MsqlQuery::new(
+                    "select * from table0 where true;",
+                    TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+                )
+                .unwrap()
+            ),
+            MsqlFinalString(String::from("select * from table0 where true;"))
+        );
+
+        let mfs: MsqlFinalString = MsqlQuery::new(
+            "update table1 set name=\"ray\" where id = 20;",
+            TableOps::from_iter(vec![TableOp::new("table1", Operation::W)]),
+        )
+        .unwrap()
+        .into();
+        assert_eq!(
+            mfs,
+            MsqlFinalString(String::from("update table1 set name=\"ray\" where id = 20;"))
+        );
+    }
 
     #[test]
-    fn test_from_msqlendtx() {}
+    fn test_from_msqlendtx() {
+        assert_eq!(
+            MsqlFinalString::from(MsqlEndTx::commit()),
+            MsqlFinalString(String::from("COMMIT TRAN;"))
+        );
+
+        let mfs: MsqlFinalString = MsqlEndTx::rollback().set_name(Some("tx1")).into();
+        assert_eq!(mfs, MsqlFinalString(String::from("ROLLBACK TRAN tx1;")));
+    }
 }
 
 /// Unit test for `MsqlQuery`
