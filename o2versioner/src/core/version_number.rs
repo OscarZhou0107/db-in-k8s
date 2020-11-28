@@ -19,3 +19,12 @@ pub struct TxVN {
     /// A single vec storing all W and R `TableVN` for now
     pub table_vns: Vec<TableVN>,
 }
+
+impl Default for TxVN {
+    fn default() -> Self {
+        Self {
+            tx_name: None,
+            table_vns: Vec::new(),
+        }
+    }
+}

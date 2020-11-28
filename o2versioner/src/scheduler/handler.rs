@@ -1,16 +1,17 @@
+use super::core::*;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::version_number::TxVN;
 use crate::msql::*;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;
-use tracing::debug;
 use std::convert::TryFrom;
 use std::net::SocketAddr;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::debug;
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -64,7 +65,11 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<T
     let peer_addr = socket.peer_addr().unwrap();
     let (tcp_read, tcp_write) = socket.split();
 
-    // Connection specific storage here
+    // Each individual connection communication is executed in blocking order,
+    // the socket is dedicated for one session only, opposed to being shared for multiple sessions.
+    // At any given point, there is at most one transaction.
+    // Connection specific storage
+    let mut _conn_state = ConnectionState::new();
 
     // Delimit frames from bytes using a length header
     let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
