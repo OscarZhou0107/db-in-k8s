@@ -56,7 +56,7 @@ cargo check
 - [x] msql: simple sql
 - [x] msql: Msql and MsqlText interface
 - [x] msql: annotation-based
-- [ ] msql: auto annotation
+- [ ] msql: query auto annotation
 - [x] Begin tx stmt
 - [ ] Query stmt
 - [ ] Commit&Abort tx stmt
