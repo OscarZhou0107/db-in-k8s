@@ -1,7 +1,9 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::convert::TryFrom;
 use std::iter::FromIterator;
+use unicase::UniCase;
 use uuid::Uuid;
 
 /// Enum representing either a W (write) or R (read) for a table
@@ -87,6 +89,10 @@ impl IntoIterator for TableOps {
 }
 
 impl FromIterator<TableOp> for TableOps {
+    /// Convert the input `IntoIterator<Item = TableOp>` into `TableOps`
+    ///
+    /// Sort input `Iterator<Item = TableOp>` in ascending order by `TableOp::name` and by `TableOp::op`
+    /// (`TableOp`s with same `TableOp::name` are ordered such that `Operation::W` comes before `Operation::R`)
     fn from_iter<I: IntoIterator<Item = TableOp>>(iter: I) -> Self {
         Self(
             iter.into_iter()
@@ -107,6 +113,55 @@ impl FromIterator<TableOp> for TableOps {
                 })
                 .dedup_by(|left, right| left.table == right.table)
                 .collect(),
+        )
+    }
+}
+
+impl<S> From<S> for TableOps
+where
+    S: Into<String>,
+{
+    /// Convert the input `Into<String>` into `TableOps`
+    ///
+    /// # Examples
+    /// ```
+    /// use o2versioner::msql::TableOps;
+    /// let tableops = TableOps::from("read t0 write t1 read t2");
+    /// ```
+    ///
+    /// # Note
+    /// 1. Keywords, such as "read" and "write", are case insensitive.
+    /// 2. It supports multiple occurance for read or write keyword
+    /// 3. Any space-separated identifier are associated with the previous keyword if existed; else, will be discarded
+    /// 4. If no identifier is followed after a keyword, the keyword will be ignored
+    /// 5. See comment in `TableOps::from_iter`
+    fn from(str_like: S) -> Self {
+        let read_ci = UniCase::new("read");
+        let write_ci = UniCase::new("write");
+        Self::from_iter(
+            str_like
+                .into()
+                .split_whitespace()
+                .map(|token| UniCase::new(token))
+                .skip_while(|token_ci| *token_ci != read_ci && *token_ci != write_ci)
+                .scan(None, |is_read_st, token_ci| {
+                    if token_ci == read_ci {
+                        *is_read_st = Some(true);
+                        return Some(None);
+                    } else if token_ci == write_ci {
+                        *is_read_st = Some(false);
+                        return Some(None);
+                    } else {
+                        // is_read_st can't be None here because
+                        // we should have met at least one key word
+                        if is_read_st.unwrap() {
+                            return Some(Some(TableOp::new(token_ci.into_inner(), Operation::R)));
+                        } else {
+                            return Some(Some(TableOp::new(token_ci.into_inner(), Operation::W)));
+                        }
+                    }
+                })
+                .filter_map(|token_op| token_op),
         )
     }
 }
@@ -132,17 +187,26 @@ pub trait IntoMsqlFinalString {
 }
 
 /// Begin a Msql transaction
-#[derive(Debug, Serialize, Deserialize)]
+///
+/// # Examples
+/// ```
+/// use o2versioner::msql::{MsqlBeginTx, TableOps};
+///
+/// MsqlBeginTx::default()
+///     .set_name(Some("tx0"))
+///     .set_tableops(TableOps::from("READ table0 WRITE table1 table2 read table3"));
+/// ```
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlBeginTx {
     tx: Option<String>,
-    table_ops: TableOps,
+    tableops: TableOps,
 }
 
 impl Default for MsqlBeginTx {
     fn default() -> Self {
         Self {
             tx: None,
-            table_ops: TableOps::default(),
+            tableops: TableOps::default(),
         }
     }
 }
@@ -177,8 +241,8 @@ impl MsqlBeginTx {
     }
 
     /// Set the `TableOps` for the transaction, will overwrite previous value
-    pub fn set_table_ops(mut self, table_ops: TableOps) -> Self {
-        self.table_ops = table_ops;
+    pub fn set_tableops(mut self, tableops: TableOps) -> Self {
+        self.tableops = tableops;
         self
     }
 
@@ -188,21 +252,29 @@ impl MsqlBeginTx {
     }
 
     /// Get a ref to the `TableOps` of the transaction
-    pub fn table_ops(&self) -> &TableOps {
-        &self.table_ops
+    pub fn tableops(&self) -> &TableOps {
+        &self.tableops
     }
 
-    /// Unwrap into (name: Option<String>, table_ops: TableOps)
+    /// Unwrap into (name: Option<String>, tableops: TableOps)
     pub fn unwrap(self) -> (Option<String>, TableOps) {
-        (self.tx, self.table_ops)
+        (self.tx, self.tableops)
     }
 }
 
 /// A Msql query statement
-#[derive(Debug, Serialize, Deserialize)]
+///
+/// # Examples
+/// ```
+/// use o2versioner::msql::{MsqlQuery, TableOps};
+///
+/// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
+///     .unwrap();
+/// ```
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlQuery {
     query: String,
-    table_ops: TableOps,
+    tableops: TableOps,
 }
 
 impl IntoMsqlFinalString for MsqlQuery {
@@ -212,14 +284,14 @@ impl IntoMsqlFinalString for MsqlQuery {
 }
 
 impl MsqlQuery {
-    /// Create a new query, `table_ops` must correctly annotate the `query`
-    pub fn new<S: Into<String>>(query: S, table_ops: TableOps) -> Result<Self, &'static str> {
-        if let AccessPattern::Mixed = table_ops.access_pattern() {
+    /// Create a new query, `tableops` must correctly annotate the `query`
+    pub fn new<S: Into<String>>(query: S, tableops: TableOps) -> Result<Self, &'static str> {
+        if let AccessPattern::Mixed = tableops.access_pattern() {
             Err("Only read-only or write-only Msql query is supported, but not the mixed!")
         } else {
             Ok(Self {
                 query: query.into(),
-                table_ops,
+                tableops,
             })
         }
     }
@@ -230,18 +302,18 @@ impl MsqlQuery {
     }
 
     /// Get a ref to the `TableOps` of the query
-    pub fn table_ops(&self) -> &TableOps {
-        &self.table_ops
+    pub fn tableops(&self) -> &TableOps {
+        &self.tableops
     }
 
-    /// Unwrap into (query: String, table_ops: TableOps)
+    /// Unwrap into (query: String, tableops: TableOps)
     pub fn unwrap(self) -> (String, TableOps) {
-        (self.query, self.table_ops)
+        (self.query, self.tableops)
     }
 }
 
 /// Enum representing the end transaction mode, can be either `Rollback` or `Commit`
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MsqlEndTxMode {
     Commit,
@@ -249,7 +321,15 @@ pub enum MsqlEndTxMode {
 }
 
 /// End a Msql transaction
-#[derive(Debug, Serialize, Deserialize)]
+///
+/// # Examples
+/// ```
+/// use o2versioner::msql::MsqlEndTx;
+///
+/// MsqlEndTx::commit();
+/// MsqlEndTx::rollback().set_name(Some("tx1"));
+/// ```
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlEndTx {
     tx: Option<String>,
     mode: MsqlEndTxMode,
@@ -268,6 +348,12 @@ impl IntoMsqlFinalString for MsqlEndTx {
         }
         sql.push_str(";");
         MsqlFinalString(sql)
+    }
+}
+
+impl From<MsqlEndTxMode> for MsqlEndTx {
+    fn from(mode: MsqlEndTxMode) -> Self {
+        Self { tx: None, mode }
     }
 }
 
@@ -320,7 +406,7 @@ impl MsqlEndTx {
 /// The main user interface for Msql.
 ///
 /// `Msql` can be constructed directly, or converted from `MsqlText`
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Msql {
     BeginTx(MsqlBeginTx),
     Query(MsqlQuery),
@@ -337,9 +423,22 @@ impl IntoMsqlFinalString for Msql {
     }
 }
 
-// impl TryFrom<MsqlText> for Msql{
-
-// }
+impl TryFrom<MsqlText> for Msql {
+    type Error = &'static str;
+    fn try_from(msqltext: MsqlText) -> Result<Self, Self::Error> {
+        match msqltext {
+            MsqlText::BeginTx { tx, tableops } => Ok(Msql::BeginTx(
+                MsqlBeginTx::default()
+                    .set_name(tx)
+                    .set_tableops(TableOps::from(tableops)),
+            )),
+            MsqlText::Query { query, tableops } => {
+                MsqlQuery::new(query, TableOps::from(tableops)).map(|mq| Msql::Query(mq))
+            }
+            MsqlText::EndTx { tx, mode } => Ok(Msql::EndTx(MsqlEndTx::from(mode).set_name(tx))),
+        }
+    }
+}
 
 /// Represents a text formatted Msql command variant.
 /// The main user interface for Msql with maximum compatibility.
@@ -351,11 +450,11 @@ pub enum MsqlText {
     BeginTx {
         #[serde(default)]
         tx: Option<String>,
-        table_ops: String,
+        tableops: String,
     },
     Query {
         query: String,
-        table_ops: String,
+        tableops: String,
     },
     EndTx {
         #[serde(default)]
@@ -477,6 +576,98 @@ mod tests_tableops {
     }
 
     #[test]
+    fn test_from_string() {
+        assert_eq!(
+            TableOps::from("ReAd table_R_0 table_r_1 WRite table_w_0").into_vec(),
+            vec![
+                TableOp::new("table_R_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R),
+                TableOp::new("table_w_0", Operation::W)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from(" read     tAble_r_0   tAble_r_1    WRITE  tAble_w_0 ").into_vec(),
+            vec![
+                TableOp::new("tAble_r_0", Operation::R),
+                TableOp::new("tAble_r_1", Operation::R),
+                TableOp::new("tAble_w_0", Operation::W)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from("WrItE Table_w_0 read table_r_0 table_r_1").into_vec(),
+            vec![
+                TableOp::new("Table_w_0", Operation::W),
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from("write table_w_0writE read table_r_0read writetable_r_1reAd").into_vec(),
+            vec![
+                TableOp::new("table_r_0read", Operation::R),
+                TableOp::new("table_w_0writE", Operation::W),
+                TableOp::new("writetable_r_1reAd", Operation::R),
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from("write read Table_r_0 Table_r_1").into_vec(),
+            vec![
+                TableOp::new("Table_r_0", Operation::R),
+                TableOp::new("Table_r_1", Operation::R),
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from("read table_r_0 Table_r_1 write").into_vec(),
+            vec![
+                TableOp::new("Table_r_1", Operation::R),
+                TableOp::new("table_r_0", Operation::R)
+            ]
+        );
+
+        assert_eq!(TableOps::from("ReaD WriTE").into_vec(), vec![]);
+
+        assert_eq!(TableOps::from("").into_vec(), vec![]);
+
+        assert_eq!(
+            TableOps::from("ReAd table_R_0 WrItE table_W_0 rEad table_R_1 ").into_vec(),
+            vec![
+                TableOp::new("table_R_0", Operation::R),
+                TableOp::new("table_R_1", Operation::R),
+                TableOp::new("table_W_0", Operation::W)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from("read Table_r_0 WRITE REAd").into_vec(),
+            vec![TableOp::new("Table_r_0", Operation::R)]
+        );
+
+        assert_eq!(
+            TableOps::from("Read table_r_0 writereAD").into_vec(),
+            vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("writereAD", Operation::R)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from("table0 table1 table2 read table_r_0 table_r_1 Write table_w_0").into_vec(),
+            vec![
+                TableOp::new("table_r_0", Operation::R),
+                TableOp::new("table_r_1", Operation::R),
+                TableOp::new("table_w_0", Operation::W)
+            ]
+        );
+
+        assert_eq!(TableOps::from("tAble0 taBle1 tabLe2").into_vec(), vec![]);
+    }
+
+    #[test]
     fn test_add_tableop() {
         let tableops = TableOps::default();
 
@@ -569,7 +760,7 @@ mod tests_into_msqlfinalstring {
     #[test]
     fn test_from_msqlbegintx() {
         assert_eq!(
-            MsqlFinalString::from(MsqlBeginTx::default().set_table_ops(TableOps::from_iter(vec![
+            MsqlFinalString::from(MsqlBeginTx::default().set_tableops(TableOps::from_iter(vec![
                 TableOp::new("table0", Operation::R),
                 TableOp::new("table0", Operation::W),
             ]))),
@@ -577,7 +768,7 @@ mod tests_into_msqlfinalstring {
         );
 
         let mfs: MsqlFinalString = MsqlBeginTx::default()
-            .set_table_ops(TableOps::from_iter(vec![
+            .set_tableops(TableOps::from_iter(vec![
                 TableOp::new("table0", Operation::R),
                 TableOp::new("table0", Operation::W),
             ]))
@@ -625,12 +816,12 @@ mod tests_into_msqlfinalstring {
     #[test]
     fn test_from_msql() {
         assert_eq!(
-            MsqlFinalString::from(Msql::BeginTx(MsqlBeginTx::default().set_table_ops(
-                TableOps::from_iter(vec![
+            MsqlFinalString::from(Msql::BeginTx(MsqlBeginTx::default().set_tableops(TableOps::from_iter(
+                vec![
                     TableOp::new("table0", Operation::R),
                     TableOp::new("table0", Operation::W),
-                ])
-            ))),
+                ]
+            )))),
             MsqlFinalString(String::from("BEGIN TRAN;"))
         );
 
@@ -677,5 +868,43 @@ mod tests_msqlquery {
             ])
         )
         .is_err());
+    }
+}
+
+/// Unit test for `Msql`
+#[cfg(test)]
+mod tests_msql {
+    use super::*;
+    #[test]
+    fn test_from_msqltext() {
+        assert_eq!(
+            Msql::try_from(MsqlText::BeginTx {
+                tx: None,
+                tableops: String::from("read table0 read table1 write table2 table3")
+            }),
+            Ok(Msql::BeginTx(MsqlBeginTx::default().set_tableops(TableOps::from(
+                "read table0 read table1 write table2 table3"
+            ))))
+        );
+
+        assert_eq!(
+            Msql::try_from(MsqlText::Query {
+                query: String::from("select * from table0;"),
+                tableops: String::from("read table0")
+            }),
+            MsqlQuery::new(
+                "select * from table0;",
+                TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+            )
+            .map(|q| Msql::Query(q))
+        );
+
+        assert_eq!(
+            Msql::try_from(MsqlText::EndTx {
+                tx: Some(String::from("t3")),
+                mode: MsqlEndTxMode::Rollback,
+            }),
+            Ok(Msql::EndTx(MsqlEndTx::rollback().set_name(Some("t3"))))
+        )
     }
 }
