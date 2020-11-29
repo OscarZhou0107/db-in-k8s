@@ -8,11 +8,13 @@ pub struct ConnectionState {
     cur_txvn: Option<TxVN>,
 }
 
-impl ConnectionState {
-    pub fn new() -> Self {
+impl Default for ConnectionState {
+    fn default() -> Self {
         Self { cur_txvn: None }
     }
+}
 
+impl ConnectionState {
     pub fn current_txvn(&self) -> &Option<TxVN> {
         &self.cur_txvn
     }
@@ -38,8 +40,8 @@ pub struct SchedulerState {
     dbproxy_dbvn: HashMap<SocketAddr, DbVN>,
 }
 
-impl SchedulerState {
-    pub fn new() -> Self {
+impl Default for SchedulerState {
+    fn default() -> Self {
         Self {
             dbproxy_dbvn: HashMap::new(),
         }
@@ -53,7 +55,7 @@ mod tests_connection_state {
 
     #[test]
     fn test_take_current_txvn() {
-        let mut conn_state = ConnectionState::new();
+        let mut conn_state = ConnectionState::default();
         assert_eq!(*conn_state.current_txvn(), None);
         conn_state.insert_txvn(TxVN::default());
         assert_eq!(conn_state.take_current_txvn(), TxVN::default());
@@ -63,14 +65,14 @@ mod tests_connection_state {
     #[test]
     #[should_panic]
     fn test_take_current_txvn_panic() {
-        let mut conn_state = ConnectionState::new();
+        let mut conn_state = ConnectionState::default();
         conn_state.take_current_txvn();
     }
 
     #[test]
     #[should_panic]
     fn test_insert_txvn_panic() {
-        let mut conn_state = ConnectionState::new();
+        let mut conn_state = ConnectionState::default();
         conn_state.insert_txvn(TxVN::default());
         conn_state.insert_txvn(TxVN::default());
     }

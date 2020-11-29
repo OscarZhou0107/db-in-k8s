@@ -1,7 +1,7 @@
 use o2versioner::comm::scheduler_sequencer;
-use o2versioner::core::version_number::*;
 use o2versioner::core::msql::*;
-use o2versioner::sequencer::handler;
+use o2versioner::core::version_number::*;
+use o2versioner::sequencer;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 
@@ -10,7 +10,7 @@ async fn test_sequencer() {
     let _guard = tests_helper::init_logger();
     let port = "127.0.0.1:6389";
 
-    let sequencer_handle = tokio::spawn(handler::main(port, Some(2)));
+    let sequencer_handle = tokio::spawn(sequencer::main(port, Some(2)));
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![

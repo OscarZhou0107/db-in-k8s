@@ -69,7 +69,7 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<T
     // the socket is dedicated for one session only, opposed to being shared for multiple sessions.
     // At any given point, there is at most one transaction.
     // Connection specific storage
-    let mut _conn_state = ConnectionState::new();
+    let mut _conn_state = ConnectionState::default();
 
     // Delimit frames from bytes using a length header
     let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
@@ -133,8 +133,8 @@ async fn process_msql(
         Msql::BeginTx(msqlbegintx) => request_txvn(msqlbegintx, &mut sequencer_socket_pool.get().await.unwrap())
             .await
             .map_or_else(
-                |e| appserver_scheduler::Message::Reply(appserver_scheduler::ReplyMessage::BeginTx(Err(e))),
-                |_txvn| appserver_scheduler::Message::Reply(appserver_scheduler::ReplyMessage::BeginTx(Ok(()))),
+                |e| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(e))),
+                |_txvn| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Ok(()))),
             ),
         Msql::Query(_msqlquery) => appserver_scheduler::Message::InvalidRequest,
         Msql::EndTx(_msqlendtx) => appserver_scheduler::Message::InvalidRequest,

@@ -1,6 +1,6 @@
 use o2versioner::comm::appserver_scheduler;
 use o2versioner::core::msql::*;
-use o2versioner::scheduler::handler;
+use o2versioner::scheduler;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 
@@ -13,7 +13,7 @@ async fn test_scheduler() {
     let scheduler_max_connection = 2;
     let sequencer_max_connection = 2;
 
-    let scheduler_handle = tokio::spawn(handler::main(
+    let scheduler_handle = tokio::spawn(scheduler::main(
         scheduler_addr,
         Some(scheduler_max_connection),
         sequencer_addr,
