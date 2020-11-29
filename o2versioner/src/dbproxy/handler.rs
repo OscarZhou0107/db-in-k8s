@@ -27,7 +27,7 @@ pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
 
-    let mut listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
     let (tcp_stream, _) = listener.accept().await.unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 

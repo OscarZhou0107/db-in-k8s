@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_send_items_to_from_multiple_channel() {
     //Prepare - Network
@@ -29,7 +29,7 @@ async fn test_send_items_to_from_multiple_channel() {
     let _r = tokio::spawn(async move {
         println!("a-1");
         let addr = "127.0.0.1:2345";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (_, tcp_write) = tcp_stream.into_split();
 
@@ -81,7 +81,7 @@ async fn test_send_items_to_from_multiple_channel() {
     //Action - Spwan worker thread to send response
     let _w = tokio::spawn(async move {
         for _ in 0..worker_num {
-            let mut s = responder_sender.clone();
+            let s = responder_sender.clone();
             let r_c = r.clone();
             tokio::spawn(async move {
                 let _a = s.send(r_c).await;

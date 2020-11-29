@@ -50,7 +50,7 @@ impl Dispatcher {
         });
     }
 
-    fn spawn_transaction(pool : Pool, mut rec : mpsc::Receiver<Operation>, mut sender : mpsc::Sender<QueryResult>){
+    fn spawn_transaction(pool : Pool, mut rec : mpsc::Receiver<Operation>, sender : mpsc::Sender<QueryResult>){
         
         tokio::spawn(async move {
 
@@ -85,7 +85,7 @@ impl Dispatcher {
         });
     }
 
-    fn spawn_unblock_send(mut sender : mpsc::Sender<Operation>, op : Operation){
+    fn spawn_unblock_send(sender : mpsc::Sender<Operation>, op : Operation){
         tokio::spawn(async move {
             let _ = sender.send(op).await;
         });

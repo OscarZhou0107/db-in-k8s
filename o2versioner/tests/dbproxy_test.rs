@@ -9,7 +9,7 @@ use tokio::net::TcpStream;
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_dbproxy_end_to_end() {
     tokio::spawn(async {

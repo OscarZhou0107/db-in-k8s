@@ -9,8 +9,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
-#[tokio::test(threaded_scheduler)]
-//#[ignore]
+#[tokio::test]
+#[ignore]
 async fn test_send_single_item_to_receiver() {
     //Prepare - Network
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
@@ -19,7 +19,7 @@ async fn test_send_single_item_to_receiver() {
     //Prepare - Receiver
     tokio::spawn(async {
         let addr = "127.0.0.1:2345";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (tcp_read, _) = tcp_stream.into_split();
 
@@ -74,7 +74,7 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
     //Prepare - Receiver
     tokio::spawn(async {
         let addr = "127.0.0.1:2345";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (tcp_read, _) = tcp_stream.into_split();
 

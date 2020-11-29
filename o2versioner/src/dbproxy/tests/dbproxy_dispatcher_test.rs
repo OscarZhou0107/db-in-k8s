@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_receive_response_from_new_transactions() {
     //Prepare - Network
@@ -81,7 +81,7 @@ async fn test_receive_response_from_new_transactions() {
     assert!(transactions_2.lock().unwrap().len() == 4);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_receive_response_from_same_transactions() {
     //Prepare - Network
