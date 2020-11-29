@@ -6,13 +6,13 @@ pub type VN = u64;
 
 /// Version number of a table
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
-pub struct TableVN {
+pub struct TxTableVN {
     pub table: String,
     pub vn: VN,
     pub op: Operation,
 }
 
-impl TableVN {
+impl TxTableVN {
     pub fn new<S: Into<String>>(table: S, vn: VN, op: Operation) -> Self {
         Self {
             table: table.into(),
@@ -21,10 +21,10 @@ impl TableVN {
         }
     }
 
-    /// Check whether the current `TableVN` matches with the argument `TableOp`
+    /// Check whether the current `TxTableVN` matches with the argument `TableOp`
     ///
-    /// If `TableOp` is of `Operation::R`, then only need to match the name with `TableVN`;
-    /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TableVN`
+    /// If `TableOp` is of `Operation::R`, then only need to match the name with `TxTableVN`;
+    /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TxTableVN`
     pub fn match_with(&self, tableop: &TableOp) -> bool {
         match tableop.op {
             Operation::R => self.table == tableop.table,
@@ -39,26 +39,26 @@ impl TableVN {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
     pub tx: Option<String>,
-    /// A single vec storing all W and R `TableVN` for now
-    pub tablevns: Vec<TableVN>,
+    /// A single vec storing all W and R `TxTableVN` for now
+    pub txtablevns: Vec<TxTableVN>,
 }
 
 impl Default for TxVN {
     fn default() -> Self {
         Self {
             tx: None,
-            tablevns: Vec::new(),
+            txtablevns: Vec::new(),
         }
     }
 }
 
 impl TxVN {
-    /// Find the `TableVN` that matches with the argument `TableOp` from the `TxVN`
+    /// Find the `TxTableVN` that matches with the argument `TableOp` from the `TxVN`
     ///
-    /// If `TableOp` is of `Operation::R`, then only need to match the name with `TableVN`;
-    /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TableVN`
-    pub fn find(&self, tableop: &TableOp) -> Option<&TableVN> {
-        self.tablevns.iter().find(|tablevn| tablevn.match_with(tableop))
+    /// If `TableOp` is of `Operation::R`, then only need to match the name with `TxTableVN`;
+    /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TxTableVN`
+    pub fn find(&self, tableop: &TableOp) -> Option<&TxTableVN> {
+        self.txtablevns.iter().find(|txtablevn| txtablevn.match_with(tableop))
     }
 }
 
@@ -70,21 +70,21 @@ mod tests_txvn {
     fn test_find() {
         let txvn = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 0, Operation::R), TableVN::new("t1", 2, Operation::W)],
+            txtablevns: vec![TxTableVN::new("t0", 0, Operation::R), TxTableVN::new("t1", 2, Operation::W)],
         };
 
         assert_eq!(
             txvn.find(&TableOp::new("t0", Operation::R)),
-            Some(&TableVN::new("t0", 0, Operation::R))
+            Some(&TxTableVN::new("t0", 0, Operation::R))
         );
         assert_eq!(txvn.find(&TableOp::new("t0", Operation::W)), None);
         assert_eq!(
             txvn.find(&TableOp::new("t1", Operation::R)),
-            Some(&TableVN::new("t1", 2, Operation::W))
+            Some(&TxTableVN::new("t1", 2, Operation::W))
         );
         assert_eq!(
             txvn.find(&TableOp::new("t1", Operation::W)),
-            Some(&TableVN::new("t1", 2, Operation::W))
+            Some(&TxTableVN::new("t1", 2, Operation::W))
         );
     }
 }

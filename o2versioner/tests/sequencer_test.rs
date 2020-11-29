@@ -1,6 +1,6 @@
 use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::msql::*;
-use o2versioner::core::version_number::*;
+use o2versioner::core::transaction_version::*;
 use o2versioner::sequencer;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
@@ -26,14 +26,14 @@ async fn test_sequencer() {
             ),
             scheduler_sequencer::Message::ReplyTxVN(TxVN {
                 tx: Some(String::from("tx2")),
-                // A single vec storing all W and R `TableVN` for now
-                tablevns: vec![
-                    TableVN {
+                // A single vec storing all W and R `TxTableVN` for now
+                txtablevns: vec![
+                    TxTableVN {
                         table: String::from("table0"),
                         vn: 0,
                         op: Operation::W,
                     },
-                    TableVN {
+                    TxTableVN {
                         table: String::from("table1"),
                         vn: 2,
                         op: Operation::R,
@@ -61,14 +61,14 @@ async fn test_sequencer() {
             ),
             scheduler_sequencer::Message::ReplyTxVN(TxVN {
                 tx: Some(String::from("tx2")),
-                // A single vec storing all W and R `TableVN` for now
-                tablevns: vec![
-                    TableVN {
+                // A single vec storing all W and R `TxTableVN` for now
+                txtablevns: vec![
+                    TxTableVN {
                         table: String::from("table0"),
                         vn: 0,
                         op: Operation::W,
                     },
-                    TableVN {
+                    TxTableVN {
                         table: String::from("table1"),
                         vn: 2,
                         op: Operation::R,

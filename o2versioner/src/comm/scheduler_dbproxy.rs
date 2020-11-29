@@ -1,6 +1,6 @@
 use super::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
-use crate::core::version_number::*;
+use crate::core::transaction_version::*;
 use crate::dbproxy::core::{Operation, QueryResult};
 use serde::{Deserialize, Serialize};
 

@@ -1,5 +1,5 @@
 use super::msql::*;
-use super::version_number::*;
+use super::transaction_version::*;
 use std::collections::HashMap;
 
 /// Version number for a single database instance
@@ -39,17 +39,17 @@ impl DbVN {
         };
 
         tableops.get().iter().all(|tableop| {
-            let tablevn = txvn
+            let txtablevn = txvn
                 .find(tableop)
                 .expect(&format!("TableOp {:?} does not match with TxVN {:?}", tableop, txvn));
-            rule(self.0.get(&tableop.table).cloned().unwrap_or_default(), tablevn.vn)
+            rule(self.0.get(&tableop.table).cloned().unwrap_or_default(), txtablevn.vn)
         })
     }
 
     /// Increment all database versions by 1 for tables listed in `TxVN`
     pub fn release_version(&mut self, txvn: &TxVN) {
-        txvn.tablevns.iter().for_each(|table_vn| {
-            *self.0.entry(table_vn.table.to_owned()).or_default() += 1;
+        txvn.txtablevns.iter().for_each(|txtablevn| {
+            *self.0.entry(txtablevn.table.to_owned()).or_default() += 1;
         });
     }
 }
@@ -68,19 +68,31 @@ mod tests_dbvn {
 
         let txvn0 = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 5, Operation::W), TableVN::new("t1", 5, Operation::R)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 5, Operation::W),
+                TxTableVN::new("t1", 5, Operation::R),
+            ],
         };
         let txvn1 = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 6, Operation::W), TableVN::new("t1", 7, Operation::W)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 6, Operation::W),
+                TxTableVN::new("t1", 7, Operation::W),
+            ],
         };
         let txvn2 = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 5, Operation::W), TableVN::new("t1", 6, Operation::W)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 5, Operation::W),
+                TxTableVN::new("t1", 6, Operation::W),
+            ],
         };
         let txvn3 = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 3, Operation::R), TableVN::new("t1", 2, Operation::R)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 3, Operation::R),
+                TxTableVN::new("t1", 2, Operation::R),
+            ],
         };
 
         let vndb = DbVN::default();
@@ -113,7 +125,10 @@ mod tests_dbvn {
         let vndb = DbVN::default();
         let txvn = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 5, Operation::W), TableVN::new("t1", 5, Operation::R)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 5, Operation::W),
+                TxTableVN::new("t1", 5, Operation::R),
+            ],
         };
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::W), TableOp::new("t1", Operation::R)]);
         vndb.can_execute_query(&tableops, &txvn);
@@ -125,7 +140,10 @@ mod tests_dbvn {
         let vndb = DbVN::default();
         let txvn = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 5, Operation::W), TableVN::new("t1", 5, Operation::R)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 5, Operation::W),
+                TxTableVN::new("t1", 5, Operation::R),
+            ],
         };
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t1", Operation::W)]);
@@ -144,16 +162,19 @@ mod tests_dbvn {
 
         let txvn0 = TxVN {
             tx: None,
-            tablevns: vec![
-                TableVN::new("t0", 5, Operation::W),
-                TableVN::new("t1", 6, Operation::W),
-                TableVN::new("t2", 6, Operation::R),
+            txtablevns: vec![
+                TxTableVN::new("t0", 5, Operation::W),
+                TxTableVN::new("t1", 6, Operation::W),
+                TxTableVN::new("t2", 6, Operation::R),
             ],
         };
 
         let txvn1 = TxVN {
             tx: None,
-            tablevns: vec![TableVN::new("t0", 6, Operation::W), TableVN::new("t1", 7, Operation::R)],
+            txtablevns: vec![
+                TxTableVN::new("t0", 6, Operation::W),
+                TxTableVN::new("t1", 7, Operation::R),
+            ],
         };
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]);

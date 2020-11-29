@@ -1,7 +1,7 @@
 use super::Receiver;
 use crate::comm::scheduler_dbproxy::Message;
 use crate::core::msql::Operation as OperationType;
-use crate::core::version_number::TableVN;
+use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{Operation, PendingQueue, Task};
 use futures::prelude::*;
 use std::sync::{Arc, Mutex};
@@ -30,12 +30,12 @@ async fn test_send_single_item_to_receiver() {
     tokio::spawn(async {
         let addr = "127.0.0.1:2345";
         let mock_table_vs = vec![
-            TableVN {
+            TxTableVN {
                 table: "table1".to_string(),
                 vn: 0,
                 op: OperationType::R,
             },
-            TableVN {
+            TxTableVN {
                 table: "table2".to_string(),
                 vn: 0,
                 op: OperationType::R,
@@ -47,7 +47,7 @@ async fn test_send_single_item_to_receiver() {
 
         let item = Message::SqlRequest(Operation {
             transaction_id: "t1".to_string(),
-            tablevns: mock_table_vs.clone(),
+            txtablevns: mock_table_vs.clone(),
             task: Task::READ,
         });
         //Action
@@ -85,12 +85,12 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
     tokio::spawn(async {
         let addr = "127.0.0.1:2345";
         let mock_table_vs = vec![
-            TableVN {
+            TxTableVN {
                 table: "table1".to_string(),
                 vn: 0,
                 op: OperationType::R,
             },
-            TableVN {
+            TxTableVN {
                 table: "table2".to_string(),
                 vn: 0,
                 op: OperationType::R,
@@ -103,7 +103,7 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
 
         let item = Operation {
             transaction_id: "t1".to_string(),
-            tablevns: mock_table_vs.clone(),
+            txtablevns: mock_table_vs.clone(),
             task: Task::READ,
         };
         //Action

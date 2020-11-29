@@ -3,7 +3,7 @@ use super::core::DbVNManager;
 use super::dbproxy_manager::DbproxyManager;
 use crate::comm::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
-use crate::core::version_number::*;
+use crate::core::transaction_version::*;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;

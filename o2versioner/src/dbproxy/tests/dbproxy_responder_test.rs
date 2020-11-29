@@ -1,7 +1,7 @@
 use super::Responder;
 use crate::comm::scheduler_dbproxy::Message;
 use crate::core::msql::Operation as OperationType;
-use crate::core::version_number::TableVN;
+use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{DbVersion, QueryResult};
 use futures::prelude::*;
 use std::sync::Mutex;
@@ -60,12 +60,12 @@ async fn test_send_items_to_from_multiple_channel() {
 
     //Prepare - Data
     let mock_table_vs = vec![
-        TableVN {
+        TxTableVN {
             table: "table1".to_string(),
             vn: 0,
             op: OperationType::R,
         },
-        TableVN {
+        TxTableVN {
             table: "table2".to_string(),
             vn: 0,
             op: OperationType::R,
