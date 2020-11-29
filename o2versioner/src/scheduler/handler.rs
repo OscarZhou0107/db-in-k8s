@@ -1,7 +1,7 @@
 use super::core::*;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
-use crate::core::version_number::TxVN;
+// use crate::core::version_number::TxVN;
 use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
@@ -105,6 +105,7 @@ async fn process_request(
     let response = match request {
         appserver_scheduler::Message::RequestMsql(msql) => process_msql(msql, sequencer_socket_pool).await,
         appserver_scheduler::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
+            // Try to convert MsqlText to Msql first
             Ok(msql) => process_msql(msql, sequencer_socket_pool).await,
             Err(e) => appserver_scheduler::Message::InvalidMsqlText(e.to_owned()),
         },
@@ -120,34 +121,30 @@ async fn process_msql(
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
 ) -> appserver_scheduler::Message {
     match msql {
-        Msql::BeginTx(msqlbegintx) => request_txvn(msqlbegintx, &mut sequencer_socket_pool.get().await.unwrap())
-            .await
-            .map_or_else(
-                |e| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(e))),
-                |_txvn| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Ok(()))),
-            ),
-        Msql::Query(_msqlquery) => appserver_scheduler::Message::InvalidRequest,
-        Msql::EndTx(_msqlendtx) => appserver_scheduler::Message::InvalidRequest,
+        Msql::BeginTx(msqlbegintx) => {
+            let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
+            let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
+            debug!(
+                "[{}] -> Request to Sequencer: {:?}",
+                sequencer_socket.local_addr().unwrap(),
+                msg
+            );
+
+            tcp::send_and_receive_as_json(&mut sequencer_socket, std::iter::once(msg), "Scheduler handler")
+                .await
+                .into_iter()
+                .next()
+                .expect("Expecting one reply message from Sequencer")
+                .map_err(|e| e.to_string())
+                .and_then(|res| match res {
+                    scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
+                    _ => Err(String::from("Invalid response from Sequencer")),
+                })
+                .map_or_else(
+                    |e| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(e))),
+                    |_txvn| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Ok(()))),
+                )
+        }
+        _ => unimplemented!(),
     }
-}
-
-/// Attempt to request a `TxVN` from the Sequencer based on the argument `SqlBeginTx`
-async fn request_txvn(msqlbegintx: MsqlBeginTx, sequencer_socket: &mut TcpStream) -> Result<TxVN, String> {
-    let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
-    debug!(
-        "[{}] -> Request to Sequencer: {:?}",
-        sequencer_socket.local_addr().unwrap(),
-        msg
-    );
-
-    tcp::send_and_receive_as_json(sequencer_socket, std::iter::once(msg), "Scheduler handler")
-        .await
-        .into_iter()
-        .next()
-        .expect("Expecting one reply message from Sequencer")
-        .map_err(|e| e.to_string())
-        .and_then(|res| match res {
-            scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
-            _ => Err(String::from("Invalid response from Sequencer")),
-        })
 }
