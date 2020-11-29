@@ -2,12 +2,13 @@ use super::core::State;
 use crate::comm::scheduler_sequencer;
 use crate::util::tcp;
 use futures::prelude::*;
-use tracing::{debug, warn};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::{debug, warn};
 
 type ArcState = Arc<Mutex<State>>;
 
@@ -54,17 +55,22 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
 
     // Process a stream of incoming messages from a single tcp connection
     serded_read
-        .and_then(|msg| match msg {
-            scheduler_sequencer::Message::RequestTxVN(sqlbegintx) => {
-                debug!("<- [{}] RequestTxVN on {:?}", peer_addr, sqlbegintx);
-                let mut state = state.lock().unwrap();
-                let txvn = state.assign_vn(sqlbegintx);
-                debug!("-> [{}] Reply {:?}", peer_addr, txvn);
-                future::ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
-            }
-            other => {
-                warn!("<- [{}] Unsupported message {:?}", peer_addr, other);
-                future::ok(scheduler_sequencer::Message::Invalid)
+        .and_then(move |msg| {
+            let state_cloned = state.clone();
+            async move {
+                match msg {
+                    scheduler_sequencer::Message::RequestTxVN(sqlbegintx) => {
+                        debug!("<- [{}] RequestTxVN on {:?}", peer_addr, sqlbegintx);
+                        let mut state = state_cloned.lock().await;
+                        let txvn = state.assign_vn(sqlbegintx);
+                        debug!("-> [{}] Reply {:?}", peer_addr, txvn);
+                        Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
+                    }
+                    other => {
+                        warn!("<- [{}] Unsupported message {:?}", peer_addr, other);
+                        Ok(scheduler_sequencer::Message::Invalid)
+                    }
+                }
             }
         })
         .forward(serded_write)

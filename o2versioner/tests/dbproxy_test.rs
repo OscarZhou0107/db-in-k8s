@@ -4,12 +4,12 @@ use o2versioner::dbproxy;
 use o2versioner::dbproxy::core::{Operation, Task};
 use o2versioner::{comm::scheduler_dbproxy::Message, core::transaction_version::TxTableVN};
 use std::sync::Arc;
-use std::sync::Mutex;
 use tokio::net::TcpStream;
+use tokio::sync::Mutex;
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_dbproxy_end_to_end() {
     tokio::spawn(async {
@@ -60,7 +60,7 @@ async fn test_dbproxy_end_to_end() {
                 match msg {
                     Message::SqlResponse(op) => {
                         println!("{}", op.result);
-                        result.lock().unwrap().push(op);
+                        result.lock().await.push(op);
                     }
                     _other => {
                         println!("nope");
@@ -71,7 +71,7 @@ async fn test_dbproxy_end_to_end() {
     });
 
     loop {
-        if result_2.lock().unwrap().len() == 1 {
+        if result_2.lock().await.len() == 1 {
             break;
         }
     }

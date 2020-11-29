@@ -1,9 +1,11 @@
 use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::{TxTableVN, TxVN};
+use futures::prelude::*;
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::sync::Notify;
 extern crate csv;
 use csv::Writer;
@@ -23,27 +25,23 @@ impl PendingQueue {
 
     pub fn push(&mut self, op: Operation) {
         self.queue.push(op);
-        self.notify.notify();
+        self.notify.notify_one();
     }
 
     pub fn get_notify(&self) -> Arc<Notify> {
         self.notify.clone()
     }
 
-    pub fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
-        let ready_ops = self
-            .queue
-            .split(|op| version.lock().unwrap().violate_version(op.clone()))
-            .fold(Vec::new(), |mut acc_ops, ops| {
-                ops.iter().for_each(|op| {
-                    acc_ops.push(op.clone());
-                });
-                acc_ops
-            });
+    pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
+        let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
+            .then(|op| async { (op.clone(), version.lock().await.violate_version(op)) })
+            .collect()
+            .await;
+        let (unready_ops, ready_ops): (Vec<_>, Vec<_>) =
+            partitioned_queue.into_iter().partition(|(_, violate)| *violate);
+        self.queue = unready_ops.into_iter().map(|(op, _)| op).collect();
 
-        self.queue
-            .retain(|op| version.lock().unwrap().violate_version(op.clone()));
-        ready_ops
+        ready_ops.into_iter().map(|(op, _)| op).collect()
     }
 }
 
@@ -68,7 +66,7 @@ impl DbVersion {
                 Some(v) => *v = t.vn + 1,
                 None => println!("Table {} not found to release version.", t.table),
             });
-        self.notify.notify();
+        self.notify.notify_one();
     }
 
     pub fn release_on_tables(&mut self, tables: Vec<TxTableVN>) {
@@ -76,7 +74,7 @@ impl DbVersion {
             Some(v) => *v = t.vn + 1,
             None => println!("Table {} not found to release version.", t.table),
         });
-        self.notify.notify();
+        self.notify.notify_one();
     }
 
     pub fn violate_version(&self, transaction_version: Operation) -> bool {
@@ -280,6 +278,7 @@ mod tests_dbproxy_core {
         assert!(!db_version.violate_version(operation));
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_sql_connection() {
         let url = "mysql://root:Rayh8768@localhost:3306/test";

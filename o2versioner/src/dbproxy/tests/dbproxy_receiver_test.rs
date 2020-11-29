@@ -4,13 +4,13 @@ use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{Operation, PendingQueue, Task};
 use futures::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
-#[tokio::test(threaded_scheduler)]
-//#[ignore]
+#[tokio::test]
 async fn test_send_single_item_to_receiver() {
     //Prepare - Network
     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
@@ -19,7 +19,7 @@ async fn test_send_single_item_to_receiver() {
     //Prepare - Receiver
     tokio::spawn(async {
         let addr = "127.0.0.1:2345";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (tcp_read, _) = tcp_stream.into_split();
 
@@ -56,7 +56,7 @@ async fn test_send_single_item_to_receiver() {
 
     //Assert
     loop {
-        if pending_queue_2.lock().unwrap().queue.len() == 1 {
+        if pending_queue_2.lock().await.queue.len() == 1 {
             break;
         }
     }
@@ -74,7 +74,7 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
     //Prepare - Receiver
     tokio::spawn(async {
         let addr = "127.0.0.1:2345";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (tcp_read, _) = tcp_stream.into_split();
 
@@ -111,5 +111,5 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
     });
 
     //Assert
-    assert!(pending_queue_2.lock().unwrap().queue.len() == 0);
+    assert!(pending_queue_2.lock().await.queue.len() == 0);
 }

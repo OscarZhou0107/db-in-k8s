@@ -1,9 +1,9 @@
 use super::core::PendingQueue;
 use crate::comm::scheduler_dbproxy::Message;
 use std::sync::Arc;
-use std::sync::Mutex;
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::stream::StreamExt;
+use tokio::sync::Mutex;
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
@@ -20,7 +20,7 @@ impl Receiver {
             while let Some(msg) = deserializer.try_next().await.unwrap() {
                 match msg {
                     Message::SqlRequest(op) => {
-                        pending_queue.lock().unwrap().push(op);
+                        pending_queue.lock().await.push(op);
                     }
                     _other => {
                         println!("nope")

@@ -32,7 +32,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     Fut: Future<Output = ()> + Send + 'static,
     S: ToString,
 {
-    let mut listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.to_string();

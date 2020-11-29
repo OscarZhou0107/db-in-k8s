@@ -4,15 +4,15 @@ use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{DbVersion, QueryResult};
 use futures::prelude::*;
-use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_send_items_to_from_multiple_channel() {
     //Prepare - Network
@@ -29,7 +29,7 @@ async fn test_send_items_to_from_multiple_channel() {
     let _r = tokio::spawn(async move {
         println!("a-1");
         let addr = "127.0.0.1:2345";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let (tcp_stream, _) = listener.accept().await.unwrap();
         let (_, tcp_write) = tcp_stream.into_split();
 
@@ -49,7 +49,7 @@ async fn test_send_items_to_from_multiple_channel() {
         while let Some(msg) = deserialize.try_next().await.unwrap() {
             match msg {
                 Message::SqlResponse(op) => {
-                    result.lock().unwrap().push(op);
+                    result.lock().await.push(op);
                 }
                 _other => {
                     println!("nope");
@@ -81,7 +81,7 @@ async fn test_send_items_to_from_multiple_channel() {
     //Action - Spwan worker thread to send response
     let _w = tokio::spawn(async move {
         for _ in 0..worker_num {
-            let mut s = responder_sender.clone();
+            let s = responder_sender.clone();
             let r_c = r.clone();
             tokio::spawn(async move {
                 let _a = s.send(r_c).await;
@@ -90,7 +90,7 @@ async fn test_send_items_to_from_multiple_channel() {
     });
 
     loop {
-        if result_2.lock().unwrap().len() == 5 {
+        if result_2.lock().await.len() == 5 {
             break;
         }
     }
