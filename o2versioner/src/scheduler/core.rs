@@ -1,8 +1,11 @@
 #![allow(warnings)]
 use crate::core::database_version::*;
-use crate::core::version_number::*;
+use crate::core::operation::*;
+use crate::core::transaction_version::*;
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::net::SocketAddr;
+use tracing::warn;
 
 pub struct ConnectionState {
     cur_txvn: Option<TxVN>,
@@ -36,15 +39,39 @@ impl ConnectionState {
     }
 }
 
-pub struct SchedulerState {
-    dbproxy_dbvn: HashMap<SocketAddr, DbVN>,
+/// TODO: need unit testing
+pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
+
+impl FromIterator<SocketAddr> for DbVNManager {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = SocketAddr>,
+    {
+        Self(iter.into_iter().map(|addr| (addr, DbVN::default())).collect())
+    }
 }
 
-impl Default for SchedulerState {
-    fn default() -> Self {
-        Self {
-            dbproxy_dbvn: HashMap::new(),
+impl DbVNManager {
+    pub fn get_all_that_can_execute_read_query(
+        &self,
+        tableops: &TableOps,
+        txvn: &TxVN,
+    ) -> Vec<(SocketAddr, Vec<DbTableVN>)> {
+        self.0
+            .iter()
+            .filter(|(_, dbvn)| dbvn.can_execute_query(tableops, txvn))
+            .map(|(addr, dbvn)| (addr.clone(), dbvn.get_from_tableops(tableops)))
+            .collect()
+    }
+
+    pub fn release_version(&mut self, dbproxy_addr: SocketAddr, txvn: &TxVN) {
+        if !self.0.contains_key(&dbproxy_addr) {
+            warn!(
+                "DbVNManager does not have a DbVN for {} yet, is this a newly added dbproxy?",
+                dbproxy_addr
+            );
         }
+        self.0.entry(dbproxy_addr).or_default().release_version(txvn);
     }
 }
 

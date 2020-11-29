@@ -1,8 +1,8 @@
 use futures::prelude::*;
-use o2versioner::core::msql::Operation as OperationType;
+use o2versioner::core::operation::Operation as OperationType;
 use o2versioner::dbproxy;
 use o2versioner::dbproxy::core::{Operation, Task};
-use o2versioner::{comm::scheduler_dbproxy::Message, core::version_number::TableVN};
+use o2versioner::{comm::scheduler_dbproxy::Message, core::transaction_version::TxTableVN};
 use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::net::TcpStream;
@@ -35,12 +35,12 @@ async fn test_dbproxy_end_to_end() {
 
         tokio::spawn(async move {
             let mock_table_vs = vec![
-                TableVN {
+                TxTableVN {
                     table: "table1".to_string(),
                     vn: 0,
                     op: OperationType::R,
                 },
-                TableVN {
+                TxTableVN {
                     table: "table2".to_string(),
                     vn: 0,
                     op: OperationType::R,
@@ -48,7 +48,7 @@ async fn test_dbproxy_end_to_end() {
             ];
             let item = Message::SqlRequest(Operation {
                 transaction_id: "t1".to_string(),
-                tablevns: mock_table_vs.clone(),
+                txtablevns: mock_table_vs.clone(),
                 task: Task::READ,
             });
             //Action

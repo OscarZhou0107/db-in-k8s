@@ -1,11 +1,18 @@
 use async_trait::async_trait;
 use bb8;
 use futures::future::poll_fn;
+use futures::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::string::ToString;
 use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
-use tracing::info;
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::{debug, info};
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -59,6 +66,66 @@ pub async fn start_tcplistener<A, C, Fut, S>(
         "[{}] {} TcpListener says service terminated, have a good night",
         local_addr, server_name
     );
+}
+
+/// Send a collection of msg through the argument `TcpStream`, and expecting a reply for each of the msg sent.
+/// The msgs are send received using a json encoding.
+///
+/// Note:
+/// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
+/// 2. `msgs: Msgs` must be an owned collection that contains owned data types.
+/// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
+pub async fn send_and_receive_as_json<Msgs, S>(
+    tcp_stream: &mut TcpStream,
+    msgs: Msgs,
+    client_name: S,
+) -> Vec<std::io::Result<Msgs::Item>>
+where
+    Msgs: IntoIterator,
+    for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
+    S: Into<String>,
+{
+    let local_addr = tcp_stream.local_addr().unwrap();
+    let (tcp_read, tcp_write) = tcp_stream.split();
+
+    // Delimit frames from bytes using a length header
+    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
+    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
+
+    // Deserialize/Serialize frames using JSON codec
+    let serded_read = SymmetricallyFramed::new(length_delimited_read, SymmetricalJson::<Msgs::Item>::default());
+    let serded_write = SymmetricallyFramed::new(length_delimited_write, SymmetricalJson::<Msgs::Item>::default());
+
+    let mut responses = Vec::new();
+    stream::iter(msgs)
+        .fold(
+            (serded_read, serded_write, &mut responses),
+            |(mut serded_read, mut serded_write, responses), send_msg| async move {
+                debug!("[{}] -> SEND REQUEST: {:?}", local_addr, send_msg);
+                responses.push(
+                    serded_write
+                        .send(send_msg)
+                        .and_then(|_| serded_read.try_next())
+                        .map_ok(|received_msg| {
+                            let received_msg = received_msg.unwrap();
+                            debug!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
+                            received_msg
+                        })
+                        .await,
+                );
+
+                (serded_read, serded_write, responses)
+            },
+        )
+        .await;
+
+    let client_name = client_name.into();
+    debug!(
+        "[{}] {} TcpStream says task done, have a good day",
+        local_addr, client_name
+    );
+
+    responses
 }
 
 #[derive(Debug)]

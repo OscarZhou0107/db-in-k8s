@@ -1,5 +1,5 @@
-use crate::core::msql::Operation as OperationType;
-use crate::core::version_number::{TableVN, TxVN};
+use crate::core::operation::Operation as OperationType;
+use crate::core::transaction_version::{TxTableVN, TxVN};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -62,7 +62,7 @@ impl DbVersion {
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
         transaction_version
-            .tablevns
+            .txtablevns
             .iter()
             .for_each(|t| match self.table_versions.get_mut(&t.table) {
                 Some(v) => *v = t.vn + 1,
@@ -71,7 +71,7 @@ impl DbVersion {
         self.notify.notify();
     }
 
-    pub fn release_on_tables(&mut self, tables: Vec<TableVN>) {
+    pub fn release_on_tables(&mut self, tables: Vec<TxTableVN>) {
         tables.iter().for_each(|t| match self.table_versions.get_mut(&t.table) {
             Some(v) => *v = t.vn + 1,
             None => println!("Table {} not found to release version.", t.table),
@@ -80,7 +80,7 @@ impl DbVersion {
     }
 
     pub fn violate_version(&self, transaction_version: Operation) -> bool {
-        transaction_version.tablevns.iter().any(|t| {
+        transaction_version.txtablevns.iter().any(|t| {
             if let Some(v) = self.table_versions.get(&t.table) {
                 return *v < t.vn;
             } else {
@@ -153,14 +153,14 @@ impl MySqlToCsvWriter {
 pub struct QueryResult {
     pub result: String,
     pub version_release: bool,
-    pub contained_newer_versions: Vec<TableVN>,
+    pub contained_newer_versions: Vec<TxTableVN>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Operation {
     pub transaction_id: String,
     pub task: Task,
-    pub tablevns: Vec<TableVN>,
+    pub txtablevns: Vec<TxTableVN>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -173,12 +173,12 @@ pub enum Task {
 
 fn test_helper_get_query_result_version_release() -> QueryResult {
     let mock_table_vs = vec![
-        TableVN {
+        TxTableVN {
             table: "table1".to_string(),
             vn: 0,
             op: OperationType::R,
         },
-        TableVN {
+        TxTableVN {
             table: "table2".to_string(),
             vn: 0,
             op: OperationType::R,
@@ -193,12 +193,12 @@ fn test_helper_get_query_result_version_release() -> QueryResult {
 
 fn test_helper_get_query_result_non_release() -> QueryResult {
     let mock_table_vs = vec![
-        TableVN {
+        TxTableVN {
             table: "table1".to_string(),
             vn: 0,
             op: OperationType::R,
         },
-        TableVN {
+        TxTableVN {
             table: "table2".to_string(),
             vn: 0,
             op: OperationType::R,
@@ -216,9 +216,9 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 mod tests_dbproxy_core {
     use super::DbVersion;
     use super::Operation;
-    use super::TableVN;
     use super::Task;
-    use crate::core::msql::Operation as OperationType;
+    use super::TxTableVN;
+    use crate::core::operation::Operation as OperationType;
     use mysql_async::prelude::Queryable;
     use std::collections::HashMap;
 
@@ -230,19 +230,19 @@ mod tests_dbproxy_core {
         table_versions.insert("table2".to_string(), 0);
         let db_version = DbVersion::new(table_versions);
         let versions = vec![
-            TableVN {
+            TxTableVN {
                 table: "table1".to_string(),
                 vn: 0,
                 op: OperationType::R,
             },
-            TableVN {
+            TxTableVN {
                 table: "table2".to_string(),
                 vn: 1,
                 op: OperationType::R,
             },
         ];
         let operation = Operation {
-            tablevns: versions,
+            txtablevns: versions,
             transaction_id: "t1".to_string(),
             task: Task::READ,
         };
@@ -259,19 +259,19 @@ mod tests_dbproxy_core {
         table_versions.insert("table2".to_string(), 0);
         let db_version = DbVersion::new(table_versions);
         let versions = vec![
-            TableVN {
+            TxTableVN {
                 table: "table1".to_string(),
                 vn: 0,
                 op: OperationType::R,
             },
-            TableVN {
+            TxTableVN {
                 table: "table2".to_string(),
                 vn: 0,
                 op: OperationType::R,
             },
         ];
         let operation = Operation {
-            tablevns: versions,
+            txtablevns: versions,
             transaction_id: "t1".to_string(),
             task: Task::READ,
         };
