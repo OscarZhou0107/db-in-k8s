@@ -2,7 +2,7 @@ use crate::core::msql;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ReplyMessage {
+pub enum MsqlResponse {
     BeginTx(Result<(), String>),
     Query(Result<String, String>),
     EndTx(Result<String, String>),
@@ -55,7 +55,7 @@ pub enum Message {
     RequestMsqlText(msql::MsqlText),
     InvalidRequest,
     InvalidMsqlText(String),
-    Reply(ReplyMessage),
+    Reply(MsqlResponse),
     Test(String),
 }
 
