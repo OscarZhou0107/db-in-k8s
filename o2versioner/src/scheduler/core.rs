@@ -1,5 +1,6 @@
 #![allow(warnings)]
 use crate::core::database_version::*;
+use crate::core::msql::*;
 use crate::core::transaction_version::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -41,6 +42,16 @@ pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
 impl Default for DbVNManager {
     fn default() -> Self {
         Self(HashMap::new())
+    }
+}
+
+impl DbVNManager {
+    pub fn get_all_that_can_execute_read_query(
+        &self,
+        tableops: &TableOps,
+        txvn: &TxVN,
+    ) -> Vec<(SocketAddr, Vec<DbTableVN>)> {
+        todo!()
     }
 }
 

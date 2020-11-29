@@ -96,6 +96,7 @@ impl State {
             // by the database proxy, the scheduler does not block such queries.
 
             // Find the replica that has the highest version number for the query
+            unimplemented!()
 
             // TODO:
             // The scheduler attempts to reduce this wait by
@@ -107,7 +108,9 @@ impl State {
         todo!()
     }
 
+    /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`
     async fn release_version(&mut self, _msqlendtx: &MsqlEndTx) {
+        // Notify all others on any DbVN changes
         todo!()
     }
 }
