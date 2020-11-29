@@ -233,5 +233,79 @@ mod tests_dbvnmanager {
     }
 
     #[test]
-    fn test_release_version() {}
+    fn test_release_version() {
+        let mut dbvnmanager = DbVNManager::from_iter(vec![
+            "127.0.0.1:10000".parse().unwrap(),
+            "127.0.0.1:10001".parse().unwrap(),
+        ]);
+
+        let txvn0 = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 0, Operation::R),
+            ],
+        };
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn0
+            ),
+            vec![
+                (
+                    "127.0.0.1:10000".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 0), DbTableVN::new("t1", 0)]
+                ),
+                (
+                    "127.0.0.1:10001".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 0), DbTableVN::new("t1", 0)]
+                )
+            ]
+        );
+
+        let txvn1 = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 1, Operation::R),
+            ],
+        };
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn1
+            ),
+            vec![]
+        );
+
+        dbvnmanager.release_version("127.0.0.1:10000".parse().unwrap(), &txvn0);
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn1
+            ),
+            vec![(
+                "127.0.0.1:10000".parse().unwrap(),
+                vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+            )]
+        );
+
+        dbvnmanager.release_version("127.0.0.1:10001".parse().unwrap(), &txvn0);
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn1
+            ),
+            vec![
+                (
+                    "127.0.0.1:10000".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+                ),
+                (
+                    "127.0.0.1:10001".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+                )
+            ]
+        );
+    }
 }
