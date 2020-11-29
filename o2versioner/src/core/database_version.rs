@@ -2,7 +2,14 @@ use super::msql::*;
 use super::transaction_version::*;
 use std::collections::HashMap;
 
-/// Version number for a single database instance
+/// Version number of a table of on a single database instance
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct DbTableVN {
+    pub table: String,
+    pub vn: VN,
+}
+
+/// Version number of all tables on a single database instance
 pub struct DbVN(HashMap<String, VN>);
 
 impl Default for DbVN {
@@ -40,7 +47,7 @@ impl DbVN {
 
         tableops.get().iter().all(|tableop| {
             let txtablevn = txvn
-                .find(tableop)
+                .find_tableop(tableop)
                 .expect(&format!("TableOp {:?} does not match with TxVN {:?}", tableop, txvn));
             rule(self.0.get(&tableop.table).cloned().unwrap_or_default(), txtablevn.vn)
         })
