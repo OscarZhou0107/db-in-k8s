@@ -1,5 +1,6 @@
 use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::msql::*;
+use o2versioner::core::operation::*;
 use o2versioner::core::transaction_version::*;
 use o2versioner::sequencer;
 use o2versioner::util::tests_helper;

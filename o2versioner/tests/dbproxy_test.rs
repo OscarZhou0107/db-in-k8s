@@ -1,5 +1,5 @@
 use futures::prelude::*;
-use o2versioner::core::msql::Operation as OperationType;
+use o2versioner::core::operation::Operation as OperationType;
 use o2versioner::dbproxy;
 use o2versioner::dbproxy::core::{Operation, Task};
 use o2versioner::{comm::scheduler_dbproxy::Message, core::transaction_version::TxTableVN};

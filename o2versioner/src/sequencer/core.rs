@@ -1,4 +1,5 @@
-use crate::core::msql::{MsqlBeginTx, Operation};
+use crate::core::msql::MsqlBeginTx;
+use crate::core::operation::Operation;
 use crate::core::transaction_version::{TxTableVN, TxVN, VN};
 use std::collections::HashMap;
 
@@ -201,7 +202,8 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
-    use crate::core::msql::{MsqlBeginTx, Operation, TableOp, TableOps};
+    use crate::core::msql::MsqlBeginTx;
+    use crate::core::operation::*;
     use crate::core::transaction_version::{TxTableVN, TxVN};
     use std::iter::FromIterator;
 

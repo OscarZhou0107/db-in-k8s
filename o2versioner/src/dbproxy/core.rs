@@ -1,4 +1,4 @@
-use crate::core::msql::Operation as OperationType;
+use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::{TxTableVN, TxVN};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -202,9 +202,9 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 mod tests_dbproxy_core {
     use super::DbVersion;
     use super::Operation;
-    use super::TxTableVN;
     use super::Task;
-    use crate::core::msql::Operation as OperationType;
+    use super::TxTableVN;
+    use crate::core::operation::Operation as OperationType;
     use mysql_async::prelude::Queryable;
     use std::collections::HashMap;
 

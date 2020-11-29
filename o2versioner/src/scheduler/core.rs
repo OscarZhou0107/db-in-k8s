@@ -1,6 +1,7 @@
 #![allow(warnings)]
 use crate::core::database_version::*;
 use crate::core::msql::*;
+use crate::core::operation::*;
 use crate::core::transaction_version::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;

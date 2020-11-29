@@ -1,5 +1,5 @@
 use super::Dispatcher;
-use crate::core::msql::Operation as OperationType;
+use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
 use std::sync::Mutex;
