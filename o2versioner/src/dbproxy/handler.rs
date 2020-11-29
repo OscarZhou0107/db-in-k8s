@@ -2,10 +2,11 @@ use super::core::{DbVersion, Operation, PendingQueue, QueryResult};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::{collections::HashMap, sync::Mutex};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     //=====================================Continue an ongoing transaction=======================================//

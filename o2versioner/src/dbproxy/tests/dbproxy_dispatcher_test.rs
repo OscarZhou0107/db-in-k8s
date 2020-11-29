@@ -2,9 +2,9 @@ use super::Dispatcher;
 use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
-use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 #[tokio::test]
 #[ignore]
@@ -68,7 +68,7 @@ async fn test_receive_response_from_new_transactions() {
     });
 
     while !mock_ops.is_empty() {
-        pending_queue_2.lock().unwrap().push(mock_ops.pop().unwrap());
+        pending_queue_2.lock().await.push(mock_ops.pop().unwrap());
     }
 
     let mut task_num: u64 = 0;
@@ -78,7 +78,7 @@ async fn test_receive_response_from_new_transactions() {
             break;
         }
     }
-    assert!(transactions_2.lock().unwrap().len() == 4);
+    assert!(transactions_2.lock().await.len() == 4);
 }
 
 #[tokio::test]
@@ -144,7 +144,7 @@ async fn test_receive_response_from_same_transactions() {
     });
 
     while !mock_ops.is_empty() {
-        pending_queue_2.lock().unwrap().push(mock_ops.pop().unwrap());
+        pending_queue_2.lock().await.push(mock_ops.pop().unwrap());
     }
 
     let mut task_num: u64 = 0;
@@ -154,5 +154,5 @@ async fn test_receive_response_from_same_transactions() {
             break;
         }
     }
-    assert!(transactions_2.lock().unwrap().len() == 3);
+    assert!(transactions_2.lock().await.len() == 3);
 }

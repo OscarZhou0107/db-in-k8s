@@ -1,9 +1,11 @@
 use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::{TxTableVN, TxVN};
+use futures::prelude::*;
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::sync::Notify;
 
 pub struct PendingQueue {
@@ -28,20 +30,16 @@ impl PendingQueue {
         self.notify.clone()
     }
 
-    pub fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
-        let ready_ops = self
-            .queue
-            .split(|op| version.lock().unwrap().violate_version(op.clone()))
-            .fold(Vec::new(), |mut acc_ops, ops| {
-                ops.iter().for_each(|op| {
-                    acc_ops.push(op.clone());
-                });
-                acc_ops
-            });
+    pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
+        let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
+            .then(|op| async { (op.clone(), version.lock().await.violate_version(op)) })
+            .collect()
+            .await;
+        let (unready_ops, ready_ops): (Vec<_>, Vec<_>) =
+            partitioned_queue.into_iter().partition(|(_, violate)| *violate);
+        self.queue = unready_ops.into_iter().map(|(op, _)| op).collect();
 
-        self.queue
-            .retain(|op| version.lock().unwrap().violate_version(op.clone()));
-        ready_ops
+        ready_ops.into_iter().map(|(op, _)| op).collect()
     }
 }
 

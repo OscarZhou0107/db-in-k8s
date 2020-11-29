@@ -4,11 +4,11 @@ use crate::core::operation::Operation as OperationType;
 use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{DbVersion, QueryResult};
 use futures::prelude::*;
-use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
@@ -49,7 +49,7 @@ async fn test_send_items_to_from_multiple_channel() {
         while let Some(msg) = deserialize.try_next().await.unwrap() {
             match msg {
                 Message::SqlResponse(op) => {
-                    result.lock().unwrap().push(op);
+                    result.lock().await.push(op);
                 }
                 _other => {
                     println!("nope");
@@ -90,7 +90,7 @@ async fn test_send_items_to_from_multiple_channel() {
     });
 
     loop {
-        if result_2.lock().unwrap().len() == 5 {
+        if result_2.lock().await.len() == 5 {
             break;
         }
     }
