@@ -51,10 +51,15 @@ pub enum MsqlResponse {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
+    /// Request in `Msql` format
     RequestMsql(msql::Msql),
+    /// Request in `MsqlText` format
     RequestMsqlText(msql::MsqlText),
+    /// Response to an invalid request, for exmample, sending `Reply(MsqlResponse)` to the Scheduler
     InvalidRequest,
+    /// Invalid `MsqlText`, happens when `MsqlText` cannot be converted into `Msql`
     InvalidMsqlText(String),
+    /// Response to the incoming `RequestMsql` or `RequestMsqlText`
     Reply(MsqlResponse),
     Test(String),
 }

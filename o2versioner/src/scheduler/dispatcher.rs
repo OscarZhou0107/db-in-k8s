@@ -59,7 +59,13 @@ impl State {
         }
     }
 
-    // pub fn can_
+    //     pub fn execute_query(&mut self) -> {
+    //         todo!()
+    //     }
+
+    //     pub fn release_version(&mut self) {
+    // todo!()
+    //     }
 }
 
 pub struct Dispatcher {
