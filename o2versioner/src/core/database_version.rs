@@ -32,6 +32,14 @@ impl DbVN {
         DbTableVN::new(&tableop.table, self.0.get(&tableop.table).cloned().unwrap_or_default())
     }
 
+    pub fn get_from_tableops(&self, tableops: &TableOps) -> Vec<DbTableVN> {
+        tableops
+            .get()
+            .iter()
+            .map(|tableop| self.get_from_tableop(tableop))
+            .collect()
+    }
+
     /// Check whether the query with the `TableOps` and belongs to transaction with `TxVN`
     /// is allowed to execute
     ///
@@ -100,6 +108,51 @@ mod tests_dbvn {
         assert_eq!(
             dbvn.get_from_tableop(&TableOp::new("t2", Operation::R)),
             DbTableVN::new("t2", 0)
+        );
+    }
+
+    #[test]
+    fn test_get_from_tableops() {
+        let dbvn = DbVN(
+            [("t0", 5), ("t1", 6)]
+                .iter()
+                .cloned()
+                .map(|(s, vn)| (s.to_owned(), vn as VN))
+                .collect(),
+        );
+
+        assert_eq!(
+            dbvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t0", Operation::R)])),
+            vec![DbTableVN::new("t0", 5)]
+        );
+        assert_eq!(
+            dbvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t1", Operation::R)])),
+            vec![DbTableVN::new("t1", 6)]
+        );
+        assert_eq!(
+            dbvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t2", Operation::R)])),
+            vec![DbTableVN::new("t2", 0)]
+        );
+
+        assert_eq!(
+            dbvn.get_from_tableops(&TableOps::from_iter(vec![
+                TableOp::new("t0", Operation::R),
+                TableOp::new("t1", Operation::R)
+            ])),
+            vec![DbTableVN::new("t0", 5), DbTableVN::new("t1", 6)]
+        );
+
+        assert_eq!(
+            dbvn.get_from_tableops(&TableOps::from_iter(vec![
+                TableOp::new("t0", Operation::R),
+                TableOp::new("t1", Operation::R),
+                TableOp::new("t2", Operation::R)
+            ])),
+            vec![
+                DbTableVN::new("t0", 5),
+                DbTableVN::new("t1", 6),
+                DbTableVN::new("t2", 0)
+            ]
         );
     }
 
