@@ -31,8 +31,15 @@ impl DbproxyManager {
         )
     }
 
-    pub fn get(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
+    pub fn all(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
         &self.0
+    }
+
+    pub fn get(&self, dbproxy_addr: &SocketAddr) -> Pool<TcpStreamConnectionManager> {
+        self.0
+            .get(dbproxy_addr)
+            .expect(&format!("{} is not in the DbproxyManager", dbproxy_addr))
+            .clone()
     }
 
     pub fn to_vec(&self) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {

@@ -14,6 +14,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::Notify;
 use tokio::sync::RwLock;
+use tracing::debug;
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
@@ -85,8 +86,37 @@ impl State {
     ) -> (SocketAddr, Pool<TcpStreamConnectionManager>) {
         assert_eq!(msqlquery.tableops().access_pattern(), AccessPattern::ReadOnly);
 
-        if let Some(_txvn) = txvn {
+        if let Some(txvn) = txvn {
+            // The scheduler blocks read queries until at least one database has, for all tables in the query,
+            // version numbers that are greater than or equal to the version numbers assigned to the transaction
+            // for these tables. If there are several such replicas, the least loaded replica is chosen
+
+            let mut avail_dbproxy;
             // Need to wait on version
+            loop {
+                avail_dbproxy = self
+                    .dbvn_manager
+                    .read()
+                    .await
+                    .get_all_that_can_execute_read_query(msqlquery.tableops(), txvn);
+
+                // Found a dbproxy that can execute the read query
+                if avail_dbproxy.len() > 0 {
+                    break;
+                } else {
+                    // Did not find any dbproxy that can execute the read quer, need to wait on version
+                    // Wait for any updates on dbvn_manager
+                    self.dbvn_manager_notify.notified().await;
+                }
+            }
+
+            // For now, pick the first dbproxy from all available
+            let dbproxy_addr = avail_dbproxy[0].0;
+            debug!(
+                "Found {} for executing the ReadOnly {:?} with {:?}",
+                dbproxy_addr, msqlquery, txvn
+            );
+            (dbproxy_addr, self.dbproxy_manager.get(&dbproxy_addr))
         } else {
             // Single read operation that does not have a TxVN
             // Since a single-read transaction executes only at one replica,
@@ -106,7 +136,6 @@ impl State {
             // equal to the highest version number assigned to any previous transaction on that table.
             // Such a replica may not necessarily exist.
         }
-        todo!()
     }
 
     /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`

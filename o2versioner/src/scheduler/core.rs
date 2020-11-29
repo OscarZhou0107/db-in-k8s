@@ -71,14 +71,14 @@ impl DbVNManager {
             .collect()
     }
 
-    pub fn release_version(&mut self, dbproxy_addr: SocketAddr, txvn: &TxVN) {
-        if !self.0.contains_key(&dbproxy_addr) {
+    pub fn release_version(&mut self, dbproxy_addr: &SocketAddr, txvn: &TxVN) {
+        if !self.0.contains_key(dbproxy_addr) {
             warn!(
                 "DbVNManager does not have a DbVN for {} yet, is this a newly added dbproxy?",
                 dbproxy_addr
             );
         }
-        self.0.entry(dbproxy_addr).or_default().release_version(txvn);
+        self.0.entry(dbproxy_addr.clone()).or_default().release_version(txvn);
     }
 
     pub fn get(&self) -> &HashMap<SocketAddr, DbVN> {
@@ -277,7 +277,7 @@ mod tests_dbvnmanager {
             vec![]
         );
 
-        dbvnmanager.release_version("127.0.0.1:10000".parse().unwrap(), &txvn0);
+        dbvnmanager.release_version(&"127.0.0.1:10000".parse().unwrap(), &txvn0);
         assert_eq!(
             dbvnmanager.get_all_that_can_execute_read_query(
                 &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
@@ -289,7 +289,7 @@ mod tests_dbvnmanager {
             )]
         );
 
-        dbvnmanager.release_version("127.0.0.1:10001".parse().unwrap(), &txvn0);
+        dbvnmanager.release_version(&"127.0.0.1:10001".parse().unwrap(), &txvn0);
         assert_eq!(
             dbvnmanager.get_all_that_can_execute_read_query(
                 &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),

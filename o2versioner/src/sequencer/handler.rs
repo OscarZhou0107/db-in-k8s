@@ -61,8 +61,7 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
                 match msg {
                     scheduler_sequencer::Message::RequestTxVN(sqlbegintx) => {
                         debug!("<- [{}] RequestTxVN on {:?}", peer_addr, sqlbegintx);
-                        let mut state = state_cloned.lock().await;
-                        let txvn = state.assign_vn(sqlbegintx);
+                        let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
                         debug!("-> [{}] Reply {:?}", peer_addr, txvn);
                         Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
                     }
