@@ -1,4 +1,4 @@
-#![allow(warnings)]
+#![allow(dead_code)]
 use super::core::DbVNManager;
 use crate::comm::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use tokio::sync::Notify;
+//use tokio::sync::Notify;
 use tokio::sync::RwLock;
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
@@ -30,15 +30,15 @@ impl Request {
                 AccessPattern::ReadOnly => self.work_readonly_query(state).await,
                 AccessPattern::WriteOnly => self.work_writeonly_query(state).await,
             },
-            Msql::EndTx(msqlendtx) => self.work_endtx(state).await,
+            Msql::EndTx(_) => self.work_endtx(state).await,
         };
     }
 
-    async fn work_readonly_query(&self, state: State) {}
+    async fn work_readonly_query(&self, _state: State) {}
 
-    async fn work_writeonly_query(&self, state: State) {}
+    async fn work_writeonly_query(&self, _state: State) {}
 
-    async fn work_endtx(&self, state: State) {}
+    async fn work_endtx(&self, _state: State) {}
 }
 
 /// A state containing shareed variables

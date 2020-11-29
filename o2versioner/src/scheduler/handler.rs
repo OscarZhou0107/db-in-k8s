@@ -111,16 +111,6 @@ async fn process_request(
         _ => appserver_scheduler::Message::InvalidRequest,
     };
 
-    // let response = if let Ok(sqlbegintx) = SqlBeginTx::try_from(request.clone()) {
-    //     request_txvn(sqlbegintx.add_uuid(), &mut sequencer_socket_pool.get().await.unwrap())
-    //         .await
-    //         .map_or_else(
-    //             |e| SqlString(format!("[{}] failed due to: {}", request.0, e)),
-    //             |_txvn| SqlString(format!("[{}] successful", request.0)),
-    //         )
-    // } else {
-    //     SqlString(format!("[{}] not recognized", request.0))
-    // };
     debug!("-> [{}] Reply {:?}", peer_addr, response);
     Ok(response)
 }
