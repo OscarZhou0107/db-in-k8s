@@ -39,6 +39,7 @@ impl ConnectionState {
     }
 }
 
+/// TODO: need unit testing
 pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
 
 impl FromIterator<SocketAddr> for DbVNManager {
