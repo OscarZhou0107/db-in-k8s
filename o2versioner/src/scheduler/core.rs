@@ -36,15 +36,11 @@ impl ConnectionState {
     }
 }
 
-pub struct SchedulerState {
-    dbproxy_dbvn: HashMap<SocketAddr, DbVN>,
-}
+pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
 
-impl Default for SchedulerState {
+impl Default for DbVNManager {
     fn default() -> Self {
-        Self {
-            dbproxy_dbvn: HashMap::new(),
-        }
+        Self(HashMap::new())
     }
 }
 
