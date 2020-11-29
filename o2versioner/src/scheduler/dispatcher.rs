@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use super::core::DbVNManager;
+use super::dbproxy_manager::DbproxyManager;
 use crate::comm::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
 use crate::core::version_number::*;
@@ -8,7 +9,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-//use tokio::sync::Notify;
+use tokio::sync::Notify;
 use tokio::sync::RwLock;
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
@@ -45,14 +46,20 @@ impl Request {
 #[derive(Clone)]
 pub struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
+    dbvn_manager_notify: Arc<Notify>,
+    dbproxy_manager: DbproxyManager,
 }
 
 impl State {
-    pub fn new(dbvn_manager: DbVNManager) -> Self {
+    pub fn new(dbvn_manager: DbVNManager, dbproxy_manager: DbproxyManager) -> Self {
         Self {
             dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
+            dbvn_manager_notify: Arc::new(Notify::new()),
+            dbproxy_manager,
         }
     }
+
+    // pub fn can_
 }
 
 pub struct Dispatcher {
