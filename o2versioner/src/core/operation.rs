@@ -143,7 +143,7 @@ where
     ///
     /// # Examples
     /// ```
-    /// use o2versioner::core::msql::TableOps;
+    /// use o2versioner::core::operation::TableOps;
     /// let tableops = TableOps::from("read t0 write t1 read t2");
     /// ```
     ///
