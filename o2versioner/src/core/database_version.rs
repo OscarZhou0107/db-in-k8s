@@ -9,6 +9,15 @@ pub struct DbTableVN {
     pub vn: VN,
 }
 
+impl DbTableVN {
+    pub fn new<S: Into<String>>(table: S, vn: VN) -> Self {
+        Self {
+            table: table.into(),
+            vn,
+        }
+    }
+}
+
 /// Version number of all tables on a single database instance
 pub struct DbVN(HashMap<String, VN>);
 
@@ -19,6 +28,10 @@ impl Default for DbVN {
 }
 
 impl DbVN {
+    pub fn get_from_tableop(&self, tableop: &TableOp) -> DbTableVN {
+        DbTableVN::new(&tableop.table, self.0.get(&tableop.table).cloned().unwrap_or_default())
+    }
+
     /// Check whether the query with the `TableOps` and belongs to transaction with `TxVN`
     /// is allowed to execute
     ///
@@ -47,9 +60,9 @@ impl DbVN {
 
         tableops.get().iter().all(|tableop| {
             let txtablevn = txvn
-                .find_tableop(tableop)
+                .find_from_tableop(tableop)
                 .expect(&format!("TableOp {:?} does not match with TxVN {:?}", tableop, txvn));
-            rule(self.0.get(&tableop.table).cloned().unwrap_or_default(), txtablevn.vn)
+            rule(self.get_from_tableop(&tableop).vn, txtablevn.vn)
         })
     }
 
@@ -65,6 +78,30 @@ impl DbVN {
 mod tests_dbvn {
     use super::*;
     use std::iter::FromIterator;
+
+    #[test]
+    fn test_get_from_tableop() {
+        let dbvn = DbVN(
+            [("t0", 5), ("t1", 6)]
+                .iter()
+                .cloned()
+                .map(|(s, vn)| (s.to_owned(), vn as VN))
+                .collect(),
+        );
+
+        assert_eq!(
+            dbvn.get_from_tableop(&TableOp::new("t0", Operation::R)),
+            DbTableVN::new("t0", 5)
+        );
+        assert_eq!(
+            dbvn.get_from_tableop(&TableOp::new("t1", Operation::R)),
+            DbTableVN::new("t1", 6)
+        );
+        assert_eq!(
+            dbvn.get_from_tableop(&TableOp::new("t2", Operation::R)),
+            DbTableVN::new("t2", 0)
+        );
+    }
 
     #[test]
     fn test_can_execute_query() {
@@ -102,34 +139,34 @@ mod tests_dbvn {
             ],
         };
 
-        let vndb = DbVN::default();
-        assert!(!vndb.can_execute_query(&tableops0, &txvn0));
+        let dbvn = DbVN::default();
+        assert!(!dbvn.can_execute_query(&tableops0, &txvn0));
 
-        let vndb = DbVN(
+        let dbvn = DbVN(
             [("t0", 5), ("t1", 6)]
                 .iter()
                 .cloned()
                 .map(|(s, vn)| (s.to_owned(), vn as VN))
                 .collect(),
         );
-        assert!(vndb.can_execute_query(&tableops0, &txvn0));
-        assert!(!vndb.can_execute_query(&tableops0, &txvn1));
-        assert!(vndb.can_execute_query(&tableops0, &txvn2));
+        assert!(dbvn.can_execute_query(&tableops0, &txvn0));
+        assert!(!dbvn.can_execute_query(&tableops0, &txvn1));
+        assert!(dbvn.can_execute_query(&tableops0, &txvn2));
 
-        assert!(!vndb.can_execute_query(&tableops1, &txvn1));
-        assert!(vndb.can_execute_query(&tableops1, &txvn2));
+        assert!(!dbvn.can_execute_query(&tableops1, &txvn1));
+        assert!(dbvn.can_execute_query(&tableops1, &txvn2));
 
-        assert!(vndb.can_execute_query(&tableops2, &txvn0));
-        assert!(!vndb.can_execute_query(&tableops2, &txvn1));
-        assert!(vndb.can_execute_query(&tableops2, &txvn2));
+        assert!(dbvn.can_execute_query(&tableops2, &txvn0));
+        assert!(!dbvn.can_execute_query(&tableops2, &txvn1));
+        assert!(dbvn.can_execute_query(&tableops2, &txvn2));
 
-        assert!(vndb.can_execute_query(&tableops3, &txvn3));
+        assert!(dbvn.can_execute_query(&tableops3, &txvn3));
     }
 
     #[test]
     #[should_panic]
     fn test_can_execute_queyr_panic_0() {
-        let vndb = DbVN::default();
+        let dbvn = DbVN::default();
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
@@ -138,13 +175,13 @@ mod tests_dbvn {
             ],
         };
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::W), TableOp::new("t1", Operation::R)]);
-        vndb.can_execute_query(&tableops, &txvn);
+        dbvn.can_execute_query(&tableops, &txvn);
     }
 
     #[test]
     #[should_panic]
     fn test_can_execute_query_panic_1() {
-        let vndb = DbVN::default();
+        let dbvn = DbVN::default();
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
@@ -154,12 +191,12 @@ mod tests_dbvn {
         };
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t1", Operation::W)]);
-        vndb.can_execute_query(&tableops, &txvn);
+        dbvn.can_execute_query(&tableops, &txvn);
     }
 
     #[test]
     fn test_release_version() {
-        let mut vndb = DbVN(
+        let mut dbvn = DbVN(
             [("t0", 5), ("t1", 6), ("t2", 7), ("t3", 8)]
                 .iter()
                 .cloned()
@@ -186,9 +223,9 @@ mod tests_dbvn {
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]);
 
-        assert!(vndb.can_execute_query(&tableops, &txvn0));
-        assert!(!vndb.can_execute_query(&tableops, &txvn1));
-        vndb.release_version(&txvn0);
-        assert!(vndb.can_execute_query(&tableops, &txvn1));
+        assert!(dbvn.can_execute_query(&tableops, &txvn0));
+        assert!(!dbvn.can_execute_query(&tableops, &txvn1));
+        dbvn.release_version(&txvn0);
+        assert!(dbvn.can_execute_query(&tableops, &txvn1));
     }
 }
