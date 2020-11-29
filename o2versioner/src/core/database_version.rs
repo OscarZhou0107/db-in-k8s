@@ -31,7 +31,7 @@ impl DbVN {
     /// until the transaction owning that VN is ended. In such case, although the read-only
     /// query is still executed based on the read-only VN rule, tables using W VN are still implicitly
     /// blocked until the database version == the assigned VN.
-    pub fn can_execute(&self, tableops: &TableOps, txvn: &TxVN) -> bool {
+    pub fn can_execute_query(&self, tableops: &TableOps, txvn: &TxVN) -> bool {
         let rule = match tableops.access_pattern() {
             AccessPattern::WriteOnly => |db_vn, assigned_vn| db_vn == assigned_vn,
             AccessPattern::ReadOnly => |db_vn, assigned_vn| db_vn >= assigned_vn,
@@ -60,7 +60,7 @@ mod tests_dbvn {
     use std::iter::FromIterator;
 
     #[test]
-    fn test_can_execute() {
+    fn test_can_execute_query() {
         let tableops0 = TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]);
         let tableops1 = TableOps::from_iter(vec![TableOp::new("t0", Operation::W), TableOp::new("t1", Operation::W)]);
         let tableops2 = TableOps::from_iter(vec![TableOp::new("t0", Operation::W)]);
@@ -84,7 +84,7 @@ mod tests_dbvn {
         };
 
         let vndb = DbVN::default();
-        assert!(!vndb.can_execute(&tableops0, &txvn0));
+        assert!(!vndb.can_execute_query(&tableops0, &txvn0));
 
         let vndb = DbVN(
             [("t0", 5), ("t1", 6)]
@@ -93,35 +93,35 @@ mod tests_dbvn {
                 .map(|(s, vn)| (s.to_owned(), vn as VN))
                 .collect(),
         );
-        assert!(vndb.can_execute(&tableops0, &txvn0));
-        assert!(!vndb.can_execute(&tableops0, &txvn1));
-        assert!(vndb.can_execute(&tableops0, &txvn2));
+        assert!(vndb.can_execute_query(&tableops0, &txvn0));
+        assert!(!vndb.can_execute_query(&tableops0, &txvn1));
+        assert!(vndb.can_execute_query(&tableops0, &txvn2));
 
-        assert!(!vndb.can_execute(&tableops1, &txvn1));
-        assert!(vndb.can_execute(&tableops1, &txvn2));
+        assert!(!vndb.can_execute_query(&tableops1, &txvn1));
+        assert!(vndb.can_execute_query(&tableops1, &txvn2));
 
-        assert!(vndb.can_execute(&tableops2, &txvn0));
-        assert!(!vndb.can_execute(&tableops2, &txvn1));
-        assert!(vndb.can_execute(&tableops2, &txvn2));
+        assert!(vndb.can_execute_query(&tableops2, &txvn0));
+        assert!(!vndb.can_execute_query(&tableops2, &txvn1));
+        assert!(vndb.can_execute_query(&tableops2, &txvn2));
 
-        assert!(vndb.can_execute(&tableops3, &txvn3));
+        assert!(vndb.can_execute_query(&tableops3, &txvn3));
     }
 
     #[test]
     #[should_panic]
-    fn test_can_execute_panic_0() {
+    fn test_can_execute_queyr_panic_0() {
         let vndb = DbVN::default();
         let txvn = TxVN {
             tx: None,
             tablevns: vec![TableVN::new("t0", 5, Operation::W), TableVN::new("t1", 5, Operation::R)],
         };
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::W), TableOp::new("t1", Operation::R)]);
-        vndb.can_execute(&tableops, &txvn);
+        vndb.can_execute_query(&tableops, &txvn);
     }
 
     #[test]
     #[should_panic]
-    fn test_can_execute_panic_1() {
+    fn test_can_execute_query_panic_1() {
         let vndb = DbVN::default();
         let txvn = TxVN {
             tx: None,
@@ -129,7 +129,7 @@ mod tests_dbvn {
         };
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t1", Operation::W)]);
-        vndb.can_execute(&tableops, &txvn);
+        vndb.can_execute_query(&tableops, &txvn);
     }
 
     #[test]
@@ -158,9 +158,9 @@ mod tests_dbvn {
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]);
 
-        assert!(vndb.can_execute(&tableops, &txvn0));
-        assert!(!vndb.can_execute(&tableops, &txvn1));
+        assert!(vndb.can_execute_query(&tableops, &txvn0));
+        assert!(!vndb.can_execute_query(&tableops, &txvn1));
         vndb.release_version(&txvn0);
-        assert!(vndb.can_execute(&tableops, &txvn1));
+        assert!(vndb.can_execute_query(&tableops, &txvn1));
     }
 }

@@ -34,4 +34,8 @@ impl DbproxyManager {
     pub fn get(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
         &self.0
     }
+
+    pub fn to_vec(&self) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
+        self.0.iter().map(|(addr, pool)| (addr.clone(), pool.clone())).collect()
+    }
 }

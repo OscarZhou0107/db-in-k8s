@@ -4,6 +4,8 @@ use super::dbproxy_manager::DbproxyManager;
 use crate::comm::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
 use crate::core::version_number::*;
+use crate::util::tcp::*;
+use bb8::Pool;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -19,27 +21,7 @@ struct Request {
     command: Msql,
     txvn: Option<TxVN>,
     /// A single use reply channel
-    reply: oneshot::Sender<MsqlResponse>,
-}
-
-impl Request {
-    async fn work(self, state: State) {
-        match &self.command {
-            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
-            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
-                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
-                AccessPattern::ReadOnly => self.work_readonly_query(state).await,
-                AccessPattern::WriteOnly => self.work_writeonly_query(state).await,
-            },
-            Msql::EndTx(_) => self.work_endtx(state).await,
-        };
-    }
-
-    async fn work_readonly_query(&self, _state: State) {}
-
-    async fn work_writeonly_query(&self, _state: State) {}
-
-    async fn work_endtx(&self, _state: State) {}
+    reply: Option<oneshot::Sender<MsqlResponse>>,
 }
 
 /// A state containing shareed variables
@@ -59,13 +41,53 @@ impl State {
         }
     }
 
-    //     pub fn execute_query(&mut self) -> {
-    //         todo!()
-    //     }
+    async fn process(&self, request: Request) {
+        match &request.command {
+            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
+            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
+                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
+                _ => self.execute_query(request).await,
+            },
+            Msql::EndTx(_) => self.execute_endtx(request).await,
+        };
+        todo!()
+    }
 
-    //     pub fn release_version(&mut self) {
-    // todo!()
-    //     }
+    async fn execute_query(&self, _request: Request) {
+        todo!()
+    }
+
+    async fn execute_endtx(&self, _request: Request) {
+        todo!()
+    }
+
+    async fn assign_dbproxy_for_execution(
+        &self,
+        msql: &Msql,
+        txvn: &Option<TxVN>,
+    ) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
+        match msql {
+            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
+            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
+                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
+                AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, txvn).await],
+                AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
+            },
+            Msql::EndTx(_) => self.dbproxy_manager.to_vec(),
+        }
+    }
+
+    async fn wait_on_version(
+        &self,
+        _msqlquery: &MsqlQuery,
+        _txvn: &Option<TxVN>,
+    ) -> (SocketAddr, Pool<TcpStreamConnectionManager>) {
+        todo!()
+    }
+
+    async fn release_version(&mut self) {
+        todo!()
+    }
 }
 
 pub struct Dispatcher {
@@ -83,7 +105,7 @@ impl Dispatcher {
         // Handle each Request concurrently
         let Dispatcher { state, rx } = self;
         rx.for_each_concurrent(None, |dispatch_request| async {
-            dispatch_request.work(state.clone()).await
+            state.clone().process(dispatch_request).await
         })
         .await;
     }
@@ -113,7 +135,7 @@ impl DispatcherAddr {
             client_addr,
             command,
             txvn,
-            reply: tx,
+            reply: Some(tx),
         };
 
         // Send the request
