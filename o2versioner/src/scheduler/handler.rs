@@ -2,7 +2,7 @@ use super::core::*;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
 use crate::core::version_number::TxVN;
-use crate::util::tcp::*;
+use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
@@ -44,11 +44,11 @@ pub async fn main<A>(
     // max_lifetime being set.
     let sequencer_socket_pool = Pool::builder()
         .max_size(sequencer_max_connection)
-        .build(TcpStreamConnectionManager::new(sequencer_addr).await)
+        .build(tcp::TcpStreamConnectionManager::new(sequencer_addr).await)
         .await
         .unwrap();
 
-    start_tcplistener(
+    tcp::start_tcplistener(
         scheduler_addr,
         |tcp_stream| process_connection(tcp_stream, sequencer_socket_pool.clone()),
         sceduler_max_connection,
@@ -61,7 +61,7 @@ pub async fn main<A>(
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<TcpStreamConnectionManager>) {
+async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>) {
     let peer_addr = socket.peer_addr().unwrap();
     let (tcp_read, tcp_write) = socket.split();
 
@@ -100,7 +100,7 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<T
 async fn process_request(
     request: appserver_scheduler::Message,
     peer_addr: SocketAddr,
-    sequencer_socket_pool: Pool<TcpStreamConnectionManager>,
+    sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
 ) -> std::io::Result<appserver_scheduler::Message> {
     let response = match request {
         appserver_scheduler::Message::RequestMsql(msql) => process_msql(msql, sequencer_socket_pool).await,
@@ -127,7 +127,7 @@ async fn process_request(
 
 async fn process_msql(
     msql: Msql,
-    sequencer_socket_pool: Pool<TcpStreamConnectionManager>,
+    sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
 ) -> appserver_scheduler::Message {
     match msql {
         Msql::BeginTx(msqlbegintx) => request_txvn(msqlbegintx, &mut sequencer_socket_pool.get().await.unwrap())
@@ -140,39 +140,24 @@ async fn process_msql(
         Msql::EndTx(_msqlendtx) => appserver_scheduler::Message::InvalidRequest,
     }
 }
+
 /// Attempt to request a `TxVN` from the Sequencer based on the argument `SqlBeginTx`
 async fn request_txvn(msqlbegintx: MsqlBeginTx, sequencer_socket: &mut TcpStream) -> Result<TxVN, String> {
-    let local_addr = sequencer_socket.local_addr().unwrap();
-    let (tcp_read, tcp_write) = sequencer_socket.split();
-
-    // Delimit frames from bytes using a length header
-    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
-    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
-
-    // Deserialize/Serialize frames using JSON codec
-    let mut serded_read = SymmetricallyFramed::new(
-        length_delimited_read,
-        SymmetricalJson::<scheduler_sequencer::Message>::default(),
-    );
-    let mut serded_write = SymmetricallyFramed::new(
-        length_delimited_write,
-        SymmetricalJson::<scheduler_sequencer::Message>::default(),
-    );
-
     let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
-    debug!("[{}] -> Request to Sequencer: {:?}", local_addr, msg);
-    let sequencer_response = serded_write
-        .send(msg)
-        .and_then(|_| serded_read.try_next())
-        .map_ok(|received_msg| {
-            let received_msg = received_msg.unwrap();
-            debug!("[{}] <- Reply from Sequencer: {:?}", local_addr, received_msg);
-            received_msg
-        })
-        .await;
+    debug!(
+        "[{}] -> Request to Sequencer: {:?}",
+        sequencer_socket.local_addr().unwrap(),
+        msg
+    );
 
-    sequencer_response.map_err(|e| e.to_string()).and_then(|res| match res {
-        scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
-        _ => Err(String::from("Invalid response from Sequencer")),
-    })
+    tcp::send_and_receive_as_json(sequencer_socket, std::iter::once(msg), "Scheduler handler")
+        .await
+        .into_iter()
+        .next()
+        .expect("Expecting one reply message from Sequencer")
+        .map_err(|e| e.to_string())
+        .and_then(|res| match res {
+            scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
+            _ => Err(String::from("Invalid response from Sequencer")),
+        })
 }
