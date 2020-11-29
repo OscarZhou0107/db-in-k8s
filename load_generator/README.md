@@ -3,7 +3,7 @@
 - 3 load mixes -> build their trans (max 15) and prob tables
     - see tpcw/rbe/EBTPCW?Factory.java
 
-- 48 sql queries 
+- 48 sql queries -> done
     - see sql-mysql.properties
 - 14 webpages
     - see tpcw/rbe/RBE.java
