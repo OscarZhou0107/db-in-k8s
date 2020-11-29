@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::Notify;
+extern crate csv;
+use csv::Writer;
 
 pub struct PendingQueue {
     pub queue: Vec<Operation>,
@@ -134,6 +136,18 @@ impl Repository {
         test_helper_get_query_result_version_release()
     }
 }
+
+pub struct MySqlToCsvWriter {    
+    w : Writer<Vec>,
+}
+
+impl MySqlToCsvWriter {
+    pub fn new() -> Self {
+        Self {w : Writer::from_writer(vec![])}
+    }
+}
+
+
 
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct QueryResult {
@@ -290,6 +304,7 @@ mod tests_dbproxy_core {
         let mut conn = pool.get_conn().await.unwrap();
 
         let mut raw = conn.query_iter("select * from cats").await.unwrap();
+        
         let mut results: Vec<mysql_async::Row> = raw.collect().await.unwrap();
         results.iter_mut().for_each(|r| {
             let len = r.len();
