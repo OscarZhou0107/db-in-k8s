@@ -1,8 +1,8 @@
 use super::Receiver;
 use crate::comm::scheduler_dbproxy::Message;
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{Operation, PendingQueue, Task};
-use crate::msql::Operation as OperationType;
 use futures::prelude::*;
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
@@ -47,7 +47,7 @@ async fn test_send_single_item_to_receiver() {
 
         let item = Message::SqlRequest(Operation {
             transaction_id: "t1".to_string(),
-            table_vns: mock_table_vs.clone(),
+            tablevns: mock_table_vs.clone(),
             task: Task::READ,
         });
         //Action
@@ -103,7 +103,7 @@ async fn test_send_an_invalid_item_to_receiver_should_panic() {
 
         let item = Operation {
             transaction_id: "t1".to_string(),
-            table_vns: mock_table_vs.clone(),
+            tablevns: mock_table_vs.clone(),
             task: Task::READ,
         };
         //Action

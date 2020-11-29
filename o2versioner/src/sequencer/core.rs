@@ -1,5 +1,5 @@
+use crate::core::msql::{MsqlBeginTx, Operation};
 use crate::core::version_number::{TableVN, TxVN, VN};
-use crate::msql::{MsqlBeginTx, Operation};
 use std::collections::HashMap;
 
 /// Version number info for a single table
@@ -48,16 +48,16 @@ impl State {
     }
 
     pub fn assign_vn(&mut self, msqlbegintx: MsqlBeginTx) -> TxVN {
-        let (tx_name, table_ops) = msqlbegintx.unwrap();
+        let (tx, tableops) = msqlbegintx.unwrap();
 
         TxVN {
-            tx_name,
-            table_vns: table_ops
+            tx,
+            tablevns: tableops
                 .into_iter()
-                .map(|table_op| TableVN {
-                    table: table_op.table.clone(),
-                    vn: self.vn_record.entry(table_op.table).or_default().assign(&table_op.op),
-                    op: table_op.op,
+                .map(|tableop| TableVN {
+                    table: tableop.table.clone(),
+                    vn: self.vn_record.entry(tableop.table).or_default().assign(&tableop.op),
+                    op: tableop.op,
                 })
                 .collect(),
         }
@@ -201,8 +201,8 @@ mod tests_table_vn_record {
 #[cfg(test)]
 mod tests_state {
     use super::State;
+    use crate::core::msql::{MsqlBeginTx, Operation, TableOp, TableOps};
     use crate::core::version_number::{TableVN, TxVN};
-    use crate::msql::{MsqlBeginTx, Operation, TableOp, TableOps};
     use std::iter::FromIterator;
 
     #[test]
@@ -219,8 +219,8 @@ mod tests_state {
                 TableOp::new("c", Operation::R)
             ]))),
             TxVN {
-                tx_name: None,
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("a"),
                         vn: 0,
@@ -249,8 +249,8 @@ mod tests_state {
                 TableOp::new("c", Operation::R)
             ]))),
             TxVN {
-                tx_name: None,
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("b"),
                         vn: 1,
@@ -274,8 +274,8 @@ mod tests_state {
                 TableOp::new("c", Operation::W)
             ]))),
             TxVN {
-                tx_name: None,
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("b"),
                         vn: 2,
@@ -300,8 +300,8 @@ mod tests_state {
                 TableOp::new("c", Operation::W)
             ],))),
             TxVN {
-                tx_name: None,
-                table_vns: vec![
+                tx: None,
+                tablevns: vec![
                     TableVN {
                         table: String::from("a"),
                         vn: 1,

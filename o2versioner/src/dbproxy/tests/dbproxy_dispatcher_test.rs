@@ -1,7 +1,7 @@
 use super::Dispatcher;
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::TableVN;
 use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
-use crate::msql::Operation as OperationType;
 use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
@@ -49,22 +49,22 @@ async fn test_receive_response_from_new_transactions() {
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t2".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t3".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t4".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
 
     while !mock_ops.is_empty() {
@@ -125,22 +125,22 @@ async fn test_receive_response_from_same_transactions() {
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t2".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t3".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        table_vns: mock_vs.clone(),
+        tablevns: mock_vs.clone(),
     });
 
     while !mock_ops.is_empty() {

@@ -43,7 +43,7 @@ impl TableOp {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::msql::{Operation, TableOp, TableOps};
+/// use o2versioner::core::msql::{Operation, TableOp, TableOps};
 /// use std::iter::FromIterator;
 ///
 /// let tableops0 = TableOps::from_iter(vec![
@@ -144,7 +144,7 @@ where
     ///
     /// # Examples
     /// ```
-    /// use o2versioner::msql::TableOps;
+    /// use o2versioner::core::msql::TableOps;
     /// let tableops = TableOps::from("read t0 write t1 read t2");
     /// ```
     ///
@@ -209,7 +209,7 @@ pub trait IntoMsqlFinalString {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::msql::{MsqlBeginTx, TableOps};
+/// use o2versioner::core::msql::{MsqlBeginTx, TableOps};
 ///
 /// MsqlBeginTx::default()
 ///     .set_name(Some("tx0"))
@@ -281,7 +281,7 @@ impl MsqlBeginTx {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::msql::{MsqlQuery, TableOps};
+/// use o2versioner::core::msql::{MsqlQuery, TableOps};
 ///
 /// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
 ///     .unwrap();
@@ -339,7 +339,7 @@ pub enum MsqlEndTxMode {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::msql::MsqlEndTx;
+/// use o2versioner::core::msql::MsqlEndTx;
 ///
 /// MsqlEndTx::commit();
 /// MsqlEndTx::rollback().set_name(Some("tx1"));
@@ -463,7 +463,7 @@ impl TryFrom<MsqlText> for Msql {
 ///
 /// # Examples - Json conversion
 /// ```
-/// use o2versioner::msql::{MsqlEndTxMode, MsqlText};
+/// use o2versioner::core::msql::{MsqlEndTxMode, MsqlText};
 ///
 /// // "op":"query" suggests MsqlText::Query
 /// let query_str = r#"
@@ -996,7 +996,7 @@ mod tests_msql {
 
 #[cfg(test)]
 mod tests_msqltext {
-    use crate::msql::*;
+    use crate::core::msql::*;
 
     #[test]
     fn test_msqltext_endtx_json() {

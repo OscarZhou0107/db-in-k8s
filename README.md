@@ -56,7 +56,7 @@ cargo check
 - [x] msql: simple sql
 - [x] msql: Msql and MsqlText interface
 - [x] msql: annotation-based
-- [ ] msql: auto annotation
+- [ ] msql: query auto annotation
 - [x] Begin tx stmt
 - [ ] Query stmt
 - [ ] Commit&Abort tx stmt
@@ -76,8 +76,7 @@ o2versioner
 │  ├── sequencer  # sequencer library
 │  ├── util       # utility library
 │  ├── lib.rs     # declaration of the mods above
-│  ├── main.rs    # main executable
-│  └── msql.rs    # msql: simple sql for scheduler frontend
+│  └── main.rs    # main executable
 └── tests         # system level testing
 ```
 

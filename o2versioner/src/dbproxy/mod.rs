@@ -1,5 +1,7 @@
 pub mod core;
 pub mod dispatcher;
-pub mod handler;
+mod handler;
 pub mod receiver;
 pub mod responder;
+
+pub use handler::main;

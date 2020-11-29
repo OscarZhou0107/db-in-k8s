@@ -1,5 +1,5 @@
+use crate::core::msql::Operation as OperationType;
 use crate::core::version_number::{TableVN, TxVN};
-use crate::msql::Operation as OperationType;
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ impl DbVersion {
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
         transaction_version
-            .table_vns
+            .tablevns
             .iter()
             .for_each(|t| match self.table_versions.get_mut(&t.table) {
                 Some(v) => *v = t.vn + 1,
@@ -78,7 +78,7 @@ impl DbVersion {
     }
 
     pub fn violate_version(&self, transaction_version: Operation) -> bool {
-        transaction_version.table_vns.iter().any(|t| {
+        transaction_version.tablevns.iter().any(|t| {
             if let Some(v) = self.table_versions.get(&t.table) {
                 return *v < t.vn;
             } else {
@@ -146,7 +146,7 @@ pub struct QueryResult {
 pub struct Operation {
     pub transaction_id: String,
     pub task: Task,
-    pub table_vns: Vec<TableVN>,
+    pub tablevns: Vec<TableVN>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -204,7 +204,7 @@ mod tests_dbproxy_core {
     use super::Operation;
     use super::TableVN;
     use super::Task;
-    use crate::msql::Operation as OperationType;
+    use crate::core::msql::Operation as OperationType;
     use mysql_async::prelude::Queryable;
     use std::collections::HashMap;
 
@@ -228,7 +228,7 @@ mod tests_dbproxy_core {
             },
         ];
         let operation = Operation {
-            table_vns: versions,
+            tablevns: versions,
             transaction_id: "t1".to_string(),
             task: Task::READ,
         };
@@ -257,7 +257,7 @@ mod tests_dbproxy_core {
             },
         ];
         let operation = Operation {
-            table_vns: versions,
+            tablevns: versions,
             transaction_id: "t1".to_string(),
             task: Task::READ,
         };
