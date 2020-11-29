@@ -2,6 +2,7 @@
 use super::core::DbVNManager;
 use crate::comm::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
+use crate::core::version_number::*;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -15,24 +16,41 @@ struct Request {
     /// For debugging
     client_addr: SocketAddr,
     command: Msql,
+    txvn: Option<TxVN>,
     /// A single use reply channel
     reply: oneshot::Sender<MsqlResponse>,
 }
 
 impl Request {
-    async fn work(self, state: State) {}
+    async fn work(self, state: State) {
+        match &self.command {
+            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
+            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
+                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
+                AccessPattern::ReadOnly => self.work_readonly_query(state).await,
+                AccessPattern::WriteOnly => self.work_writeonly_query(state).await,
+            },
+            Msql::EndTx(msqlendtx) => self.work_endtx(state).await,
+        };
+    }
+
+    async fn work_readonly_query(&self, state: State) {}
+
+    async fn work_writeonly_query(&self, state: State) {}
+
+    async fn work_endtx(&self, state: State) {}
 }
 
-/// A state containing shareved variables
+/// A state containing shareed variables
 #[derive(Clone)]
-struct State {
+pub struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
 }
 
 impl State {
-    fn new() -> Self {
+    pub fn new(dbvn_manager: DbVNManager) -> Self {
         Self {
-            dbvn_manager: Arc::new(RwLock::new(DbVNManager::default())),
+            dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
         }
     }
 }
@@ -43,15 +61,9 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(queue_size: usize) -> (DispatcherAddr, Dispatcher) {
+    pub fn new(queue_size: usize, state: State) -> (DispatcherAddr, Dispatcher) {
         let (tx, rx) = mpsc::channel(queue_size);
-        (
-            DispatcherAddr { tx },
-            Dispatcher {
-                state: State::new(),
-                rx,
-            },
-        )
+        (DispatcherAddr { tx }, Dispatcher { state, rx })
     }
 
     pub async fn run(self) {
@@ -65,7 +77,7 @@ impl Dispatcher {
 }
 
 /// Encloses a way to talk to the Dispatcher
-/// 
+///
 /// TODO: provide a way to shutdown the `Dispatcher`
 #[derive(Debug, Clone)]
 pub struct DispatcherAddr {
@@ -73,7 +85,13 @@ pub struct DispatcherAddr {
 }
 
 impl DispatcherAddr {
-    async fn request(&mut self, client_addr: SocketAddr, command: Msql) -> Result<MsqlResponse, String> {
+    /// `Option<TxVN>` is to support single read query in the future
+    async fn request(
+        &mut self,
+        client_addr: SocketAddr,
+        command: Msql,
+        txvn: Option<TxVN>,
+    ) -> Result<MsqlResponse, String> {
         // Create a reply oneshot channel
         let (tx, rx) = oneshot::channel();
 
@@ -81,6 +99,7 @@ impl DispatcherAddr {
         let request = Request {
             client_addr,
             command,
+            txvn,
             reply: tx,
         };
 
