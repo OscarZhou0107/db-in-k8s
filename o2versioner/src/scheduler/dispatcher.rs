@@ -79,13 +79,35 @@ impl State {
 
     async fn wait_on_version(
         &self,
-        _msqlquery: &MsqlQuery,
-        _txvn: &Option<TxVN>,
+        msqlquery: &MsqlQuery,
+        txvn: &Option<TxVN>,
     ) -> (SocketAddr, Pool<TcpStreamConnectionManager>) {
+        assert_eq!(msqlquery.tableops().access_pattern(), AccessPattern::ReadOnly);
+
+        if let Some(_txvn) = txvn {
+            // Need to wait on version
+        } else {
+            // Single read operation that does not have a TxVN
+            // Since a single-read transaction executes only at one replica,
+            // there is no need to assign cluster-wide version numbers to such a transaction. Instead,
+            // the scheduler forwards the transaction to the chosen replica, without assigning version
+            // numbers.
+            // Because the order of execution for a single-read transaction is ultimately decided
+            // by the database proxy, the scheduler does not block such queries.
+
+            // Find the replica that has the highest version number for the query
+
+            // TODO:
+            // The scheduler attempts to reduce this wait by
+            // selecting a replica that has an up-to-date version of each table needed by the query. In
+            // this case, up-to-date version means that the table has a version number greater than or
+            // equal to the highest version number assigned to any previous transaction on that table.
+            // Such a replica may not necessarily exist.
+        }
         todo!()
     }
 
-    async fn release_version(&mut self) {
+    async fn release_version(&mut self, _msqlendtx: &MsqlEndTx) {
         todo!()
     }
 }
