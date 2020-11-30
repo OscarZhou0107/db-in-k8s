@@ -23,7 +23,7 @@ impl Dispatcher {
         transactions: Arc<Mutex<HashMap<String, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
-            let pool = mysql_async::Pool::new(sql_addr);
+
             let mut task_notify = pending_queue.lock().await.get_notify();
             let mut version_notify = version.lock().await.get_notify();
 

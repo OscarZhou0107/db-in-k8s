@@ -5,14 +5,11 @@ use bb8_postgres::{
     PostgresConnectionManager,
 };
 use futures::prelude::*;
-use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-//extern crate csv;
-//use csv::Writer;
 use async_trait::async_trait;
 use csv::*;
 use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
@@ -169,53 +166,6 @@ trait Repository {
 //         todo!()
 //     }
 // }
-
-pub struct MySqlRepository {
-    conn: mysql_async::Conn,
-}
-
-impl MySqlRepository {
-    pub async fn new(pool: mysql_async::Pool) -> Self {
-        let conn = pool.get_conn().await.unwrap();
-        Self { conn: conn }
-    }
-}
-
-#[async_trait]
-impl Repository for MySqlRepository {
-    async fn start_transaction(&mut self) {
-        self.conn.query_drop("START TRANSACTION;").await.unwrap();
-    }
-
-    async fn execute_read(&mut self) -> QueryResult {
-        let _ = self
-            .conn
-            .query_iter("INSERT INTO cats (name, owner, birth) VALUES ('haha2', 'haha3', CURDATE())")
-            .await
-            .unwrap();
-        test_helper_get_query_result_non_release()
-    }
-
-    async fn execute_write(&mut self) -> QueryResult {
-        let _ = self
-            .conn
-            .query_iter("INSERT INTO cats (name, owner, birth) VALUES ('haha2', 'haha3', CURDATE())")
-            .await
-            .unwrap();
-        test_helper_get_query_result_non_release()
-    }
-
-    async fn commit(&mut self) -> QueryResult {
-        self.conn.query_drop("COMMIT;").await.unwrap();
-        test_helper_get_query_result_version_release()
-    }
-
-    async fn abort(&mut self) -> QueryResult {
-        self.conn.query_drop("ROLLBACK;").await.unwrap();
-        test_helper_get_query_result_version_release()
-    }
-}
-
 
 pub struct PostgreToCsvWriter {
     mode: Task,
