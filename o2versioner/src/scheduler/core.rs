@@ -26,11 +26,8 @@ impl ConnectionState {
         &self.cur_txvn
     }
 
-    /// Panics if there is no `TxVN` in the state.
-    pub fn take_current_txvn(&mut self) -> TxVN {
-        self.cur_txvn
-            .take()
-            .expect("Expecting there is a TxVN in the ConnectionState")
+    pub fn take_current_txvn(&mut self) -> Option<TxVN> {
+        self.cur_txvn.take()
     }
 
     /// Panics if there is already a `TxVN` in the state.
@@ -140,16 +137,10 @@ mod tests_connection_state {
     fn test_take_current_txvn() {
         let mut conn_state = ConnectionState::default();
         assert_eq!(*conn_state.current_txvn(), None);
+        assert_eq!(conn_state.take_current_txvn(), None);
         conn_state.insert_txvn(TxVN::default());
-        assert_eq!(conn_state.take_current_txvn(), TxVN::default());
+        assert_eq!(conn_state.take_current_txvn(), Some(TxVN::default()));
         assert_eq!(*conn_state.current_txvn(), None);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_take_current_txvn_panic() {
-        let mut conn_state = ConnectionState::default();
-        conn_state.take_current_txvn();
     }
 
     #[test]

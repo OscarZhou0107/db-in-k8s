@@ -9,6 +9,7 @@ use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
@@ -115,12 +116,14 @@ async fn process_connection(
             let conn_state_cloned = conn_state.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr.clone();
+            let client_addr_cloned = peer_addr.clone();
             async move {
                 debug!("<- [{}] Received {:?}", peer_addr, msg);
                 let response = match msg {
                     appserver_scheduler::Message::RequestMsql(msql) => {
                         process_msql(
                             msql,
+                            client_addr_cloned,
                             conn_state_cloned,
                             sequencer_socket_pool_cloned,
                             dispatcher_addr_cloned,
@@ -132,6 +135,7 @@ async fn process_connection(
                         Ok(msql) => {
                             process_msql(
                                 msql,
+                                client_addr_cloned,
                                 conn_state_cloned,
                                 sequencer_socket_pool_cloned,
                                 dispatcher_addr_cloned,
@@ -155,6 +159,7 @@ async fn process_connection(
 
 async fn process_msql(
     msql: Msql,
+    client_addr: SocketAddr,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
@@ -191,6 +196,32 @@ async fn process_msql(
                     .await
             }
         }
-        _ => unimplemented!(),
+        Msql::Query(_) => {
+            let txvn = conn_state.lock().await.current_txvn().clone();
+            assert!(txvn.is_some(), "Does not support single un-transactioned query for now");
+            dispatcher_addr
+                .request(client_addr, msql, txvn)
+                .map_ok_or_else(
+                    |e| appserver_scheduler::Message::Reply(MsqlResponse::Query(Err(e))),
+                    |res| appserver_scheduler::Message::Reply(res),
+                )
+                .await
+        }
+        Msql::EndTx(_) => {
+            let txvn = conn_state.lock().await.take_current_txvn();
+            if txvn.is_none() {
+                appserver_scheduler::Message::Reply(MsqlResponse::EndTx(Err(String::from(
+                    "There is not transaction to end",
+                ))))
+            } else {
+                dispatcher_addr
+                    .request(client_addr, msql, txvn)
+                    .map_ok_or_else(
+                        |e| appserver_scheduler::Message::Reply(MsqlResponse::EndTx(Err(e))),
+                        |res| appserver_scheduler::Message::Reply(res),
+                    )
+                    .await
+            }
+        }
     }
 }
