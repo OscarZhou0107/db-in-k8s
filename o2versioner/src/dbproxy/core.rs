@@ -395,6 +395,7 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 //     }
 
 #[test]
+#[ignore]
 fn postgres_write_test() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -442,6 +443,7 @@ fn postgres_write_test() {
 }
 
 #[test]
+#[ignore]
 fn postgres_read_test() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
 
