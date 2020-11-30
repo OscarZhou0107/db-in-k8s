@@ -131,16 +131,18 @@ async fn process_msql(
             );
 
             tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg, "Scheduler handler")
-                .await
                 .map_err(|e| e.to_string())
-                .and_then(|res| match res {
-                    scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
-                    _ => Err(String::from("Invalid response from Sequencer")),
+                .and_then(|res| async {
+                    match res {
+                        scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
+                        _ => Err(String::from("Invalid response from Sequencer")),
+                    }
                 })
-                .map_or_else(
+                .map_ok_or_else(
                     |e| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(e))),
                     |_txvn| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Ok(()))),
                 )
+                .await
         }
         _ => unimplemented!(),
     }
