@@ -116,7 +116,7 @@ mod tests_connection_state {
     }
 }
 
-/// Unit test for `ConnectionState`
+/// Unit test for `DbVNManager`
 #[cfg(test)]
 mod tests_dbvnmanager {
     use super::*;
