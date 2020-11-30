@@ -130,11 +130,8 @@ async fn process_msql(
                 msg
             );
 
-            tcp::send_and_receive_as_json(&mut sequencer_socket, std::iter::once(msg), "Scheduler handler")
+            tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg, "Scheduler handler")
                 .await
-                .into_iter()
-                .next()
-                .expect("Expecting one reply message from Sequencer")
                 .map_err(|e| e.to_string())
                 .and_then(|res| match res {
                     scheduler_sequencer::Message::ReplyTxVN(txvn) => Ok(txvn),
