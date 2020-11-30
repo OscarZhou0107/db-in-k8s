@@ -6,7 +6,7 @@ use o2versioner::util::config::*;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test]
 async fn test_scheduler() {
     let _guard = tests_helper::init_logger();
 
