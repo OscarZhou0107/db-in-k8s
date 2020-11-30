@@ -277,7 +277,7 @@ pub struct DispatcherAddr {
 impl DispatcherAddr {
     /// `Option<TxVN>` is to support single read query in the future
     pub async fn request(
-        &mut self,
+        &self,
         client_addr: SocketAddr,
         command: Msql,
         txvn: Option<TxVN>,
@@ -307,6 +307,12 @@ impl DispatcherAddr {
         } else {
             warn!("Failed to kill Scheduler dispatcher, it was already killed");
         }
+    }
+}
+
+impl Drop for DispatcherAddr {
+    fn drop(&mut self) {
+        info!("Dropping DispatcherAddr");
     }
 }
 

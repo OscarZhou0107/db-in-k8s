@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::debug;
+use tracing::{debug, info};
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -59,7 +59,10 @@ pub async fn main(conf: Config) {
         conf.scheduler.to_addr(),
         move |tcp_stream| {
             let sequencer_socket_pool = sequencer_socket_pool.clone();
-            let dispatcher_addr = dispatcher_addr.clone();
+            // Connection/session specific storage
+            // Note: this closure contains one copy of dispatcher_addr
+            // Then, for each connection, a new dispatcher_addr is cloned
+            let dispatcher_addr = Arc::new(dispatcher_addr.clone());
             async move {
                 process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
             }
@@ -79,9 +82,10 @@ pub async fn main(conf: Config) {
 async fn process_connection(
     mut socket: TcpStream,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    dispatcher_addr: DispatcherAddr,
+    dispatcher_addr: Arc<DispatcherAddr>,
 ) {
     let peer_addr = socket.peer_addr().unwrap();
+    let local_addr = socket.local_addr().unwrap();
     let (tcp_read, tcp_write) = socket.split();
 
     // Delimit frames from bytes using a length header
@@ -101,7 +105,7 @@ async fn process_connection(
     // Each individual connection communication is executed in blocking order,
     // the socket is dedicated for one session only, opposed to being shared for multiple sessions.
     // At any given point, there is at most one transaction.
-    // Connection specific storage
+    // Connection/session specific storage
     let conn_state = Arc::new(Mutex::new(ConnectionState::default()));
 
     // Process a stream of incoming messages from a single tcp connection
@@ -112,7 +116,6 @@ async fn process_connection(
             let dispatcher_addr_cloned = dispatcher_addr.clone();
             async move {
                 debug!("<- [{}] Received {:?}", peer_addr, msg);
-                // process_request(msg, conn_state_cloned, peer_addr, sequencer_socket_pool_cloned).await
                 let response = match msg {
                     appserver_scheduler::Message::RequestMsql(msql) => {
                         process_msql(
@@ -145,13 +148,15 @@ async fn process_connection(
         .forward(serded_write)
         .map(|_| ())
         .await;
+
+    info!("[{}] <- [{}] connection disconnected", local_addr, peer_addr);
 }
 
 async fn process_msql(
     msql: Msql,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    dispatcher_addr: DispatcherAddr,
+    _dispatcher_addr: Arc<DispatcherAddr>,
 ) -> appserver_scheduler::Message {
     match msql {
         Msql::BeginTx(msqlbegintx) => {
