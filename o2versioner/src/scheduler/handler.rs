@@ -35,12 +35,14 @@ pub async fn main(conf: Config) {
     // which is really depending on the incoming connections into Scheduler.
     // So the sequencer_socket_pool here does not require an explicit
     // max_lifetime being set.
+    // Prepare sequencer pool
     let sequencer_socket_pool = Pool::builder()
         .max_size(conf.scheduler.sequencer_pool_size)
         .build(tcp::TcpStreamConnectionManager::new(conf.sequencer.to_addr()).await)
         .await
         .unwrap();
 
+    // prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
         State::new(
@@ -49,20 +51,36 @@ pub async fn main(conf: Config) {
         ),
     );
 
-    tcp::start_tcplistener(
+    // Launch dispatcher as a new task
+    let dispatcher_handle = tokio::spawn(dispatcher.run());
+
+    // Launch main handler as a new task
+    let handler_handle = tokio::spawn(tcp::start_tcplistener(
         conf.scheduler.to_addr(),
-        |tcp_stream| process_connection(tcp_stream, sequencer_socket_pool.clone()),
+        move |tcp_stream| {
+            let sequencer_socket_pool = sequencer_socket_pool.clone();
+            let dispatcher_addr = dispatcher_addr.clone();
+            async move {
+                process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
+            }
+        },
         conf.scheduler.max_connection,
         "Scheduler",
-    )
-    .await;
+    ));
+
+    // Wait for tasks to join
+    tokio::try_join!(dispatcher_handle, handler_handle).unwrap();
 }
 
 /// Process the `tcp_stream` for a single connection
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>) {
+async fn process_connection(
+    mut socket: TcpStream,
+    sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
+    dispatcher_addr: DispatcherAddr,
+) {
     let peer_addr = socket.peer_addr().unwrap();
     let (tcp_read, tcp_write) = socket.split();
 
@@ -91,16 +109,31 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<t
         .and_then(move |msg| {
             let conn_state_cloned = conn_state.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
+            let dispatcher_addr_cloned = dispatcher_addr.clone();
             async move {
                 debug!("<- [{}] Received {:?}", peer_addr, msg);
                 // process_request(msg, conn_state_cloned, peer_addr, sequencer_socket_pool_cloned).await
                 let response = match msg {
                     appserver_scheduler::Message::RequestMsql(msql) => {
-                        process_msql(msql, conn_state_cloned, sequencer_socket_pool_cloned).await
+                        process_msql(
+                            msql,
+                            conn_state_cloned,
+                            sequencer_socket_pool_cloned,
+                            dispatcher_addr_cloned,
+                        )
+                        .await
                     }
                     appserver_scheduler::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
                         // Try to convert MsqlText to Msql first
-                        Ok(msql) => process_msql(msql, conn_state_cloned, sequencer_socket_pool_cloned).await,
+                        Ok(msql) => {
+                            process_msql(
+                                msql,
+                                conn_state_cloned,
+                                sequencer_socket_pool_cloned,
+                                dispatcher_addr_cloned,
+                            )
+                            .await
+                        }
                         Err(e) => appserver_scheduler::Message::InvalidMsqlText(e.to_owned()),
                     },
                     _ => appserver_scheduler::Message::InvalidRequest,
@@ -118,6 +151,7 @@ async fn process_msql(
     msql: Msql,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
+    dispatcher_addr: DispatcherAddr,
 ) -> appserver_scheduler::Message {
     match msql {
         Msql::BeginTx(msqlbegintx) => {
