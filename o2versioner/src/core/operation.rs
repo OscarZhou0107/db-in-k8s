@@ -20,7 +20,7 @@ pub enum AccessPattern {
 }
 
 /// Representing the access mode for `Self::table`, can be either `Operation::R` or `Operation::W`
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
     pub table: String,
     pub op: Operation,
@@ -59,7 +59,7 @@ impl TableOp {
 /// assert_eq!(tableops0, tableops1);
 /// assert_eq!(tableops1, tableops2);
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOps(Vec<TableOp>);
 
 impl Default for TableOps {

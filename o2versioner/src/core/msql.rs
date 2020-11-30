@@ -33,7 +33,7 @@ pub trait IntoMsqlFinalString {
 ///     .set_name(Some("tx0"))
 ///     .set_tableops(TableOps::from("READ table0 WRITE table1 table2 read table3"));
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlBeginTx {
     tx: Option<String>,
     tableops: TableOps,
@@ -105,7 +105,7 @@ impl MsqlBeginTx {
 /// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
 ///     .unwrap();
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlQuery {
     query: String,
     tableops: TableOps,
@@ -163,7 +163,7 @@ pub enum MsqlEndTxMode {
 /// MsqlEndTx::commit();
 /// MsqlEndTx::rollback().set_name(Some("tx1"));
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlEndTx {
     tx: Option<String>,
     mode: MsqlEndTxMode,
