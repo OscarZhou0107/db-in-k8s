@@ -1,5 +1,8 @@
 use super::core::{PendingQueue, QueueMessage, Task};
-use crate::{comm::scheduler_dbproxy::NewMessage, core::msql::{Msql, MsqlEndTxMode}};
+use crate::{
+    comm::scheduler_dbproxy::Message,
+    core::msql::{Msql, MsqlEndTxMode},
+};
 use std::sync::Arc;
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::stream::StreamExt;
@@ -13,13 +16,13 @@ impl Receiver {
     pub fn run(pending_queue: Arc<Mutex<PendingQueue>>, tcp_read: OwnedReadHalf) {
         let mut deserializer = SymmetricallyFramed::new(
             FramedRead::new(tcp_read, LengthDelimitedCodec::new()),
-            SymmetricalJson::<NewMessage>::default(),
+            SymmetricalJson::<Message>::default(),
         );
 
         tokio::spawn(async move {
             while let Some(msg) = deserializer.try_next().await.unwrap() {
                 match msg {
-                    NewMessage::MsqlRequest(request, addr, version_number) => {
+                    Message::MsqlRequest(addr, request, version_number) => {
                         let mut operation_type = Task::BEGIN;
                         let mut query = String::new();
 

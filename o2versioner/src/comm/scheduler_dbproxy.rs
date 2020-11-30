@@ -1,9 +1,9 @@
 use super::appserver_scheduler::MsqlResponse;
 use crate::core::msql::*;
 use crate::core::transaction_version::*;
-use crate::dbproxy::core::{QueryResult};
+use crate::dbproxy::core::QueryResult;
 use serde::{Deserialize, Serialize};
-
+use std::net::SocketAddr;
 
 pub enum EndTx {
     Commit,
@@ -16,12 +16,11 @@ pub enum Error {
     Invalid,
 }
 
-type Addr = String;
 /// Expecting every request will have a response replied back via the same tcp stream
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum NewMessage {
+pub enum Message {
     /// A `Msql` request to dbproxy. `Option<TxVN> == None` for single-read transaction
-    MsqlRequest(Msql, Addr, Option<TxVN>),
+    MsqlRequest(SocketAddr, Msql, Option<TxVN>),
     /// The repsone to the `MsqlRequest`
     MsqlResponse(MsqlResponse),
     /// Response to an invalid request, for exmample, sending `MsqlResponse(MsqlResponse)` to the dbproxy

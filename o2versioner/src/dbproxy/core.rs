@@ -12,6 +12,7 @@ use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use async_trait::async_trait;
 use csv::*;
+use std::net::SocketAddr;
 use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
 
 #[derive(Clone)]
@@ -34,7 +35,7 @@ impl PostgresSqlConnPool {
 
 #[derive(Clone)]
 pub struct QueueMessage {
-    pub identifier: String,
+    pub identifier: SocketAddr,
     pub operation_type: Task,
     pub query: String,
     pub versions: Option<TxVN>,
@@ -180,7 +181,6 @@ pub struct Row {
 
 impl PostgreToCsvWriter {
     pub fn new(mode: Task) -> Self {
-       
         let wrt = Writer::from_writer(vec![]);
         Self { mode: mode, wrt: wrt }
     }
@@ -196,7 +196,6 @@ impl PostgreToCsvWriter {
     }
 
     pub fn convert_result_to_csv_string(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
-
         message.iter().for_each(|q_message| match q_message {
             tokio_postgres::SimpleQueryMessage::Row(query_row) => {
                 let len = query_row.len();
@@ -363,26 +362,23 @@ fn postgres_write_test() {
 
         let conn = pool.get().await.unwrap();
         conn.simple_query("START TRANSACTION;").await.unwrap();
-        let result = conn.simple_query(
-            "INSERT INTO tbltest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999)",
-        )
-        .await
-        .unwrap();
+        let result = conn
+            .simple_query("INSERT INTO tbltest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999)")
+            .await
+            .unwrap();
         conn.simple_query("COMMIT;").await.unwrap();
 
-        result.iter().for_each(|q_message| {
-            match q_message {
-                tokio_postgres::SimpleQueryMessage::Row(query_row) => {
-                    let len = query_row.len();
-                    for index in 0..len {
-                        println!("value is : {}", query_row.get(index).unwrap().to_string());
-                    }
+        result.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                let len = query_row.len();
+                for index in 0..len {
+                    println!("value is : {}", query_row.get(index).unwrap().to_string());
                 }
-                tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
-                    println!("Command result is : {}", complete_status);
-                }
-                _ => {}
             }
+            tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                println!("Command result is : {}", complete_status);
+            }
+            _ => {}
         });
 
         let writer = PostgreToCsvWriter::new(Task::WRITE);
@@ -415,26 +411,23 @@ fn postgres_read_test() {
             .await
             .unwrap();
 
-        result.iter().for_each(|q_message| {
-            match q_message {
-                tokio_postgres::SimpleQueryMessage::Row(query_row) => {
-                    let len = query_row.len();
-                    for index in 0..len {
-                        println!("value is : {}", query_row.get(index).unwrap().to_string());
-                    }
+        result.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                let len = query_row.len();
+                for index in 0..len {
+                    println!("value is : {}", query_row.get(index).unwrap().to_string());
                 }
-                tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
-                    println!("Command result is : {}", complete_status);
-                }
-                _ => {}
             }
+            tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                println!("Command result is : {}", complete_status);
+            }
+            _ => {}
         });
 
         let writer = PostgreToCsvWriter::new(Task::READ);
         let csv = writer.to_csv(result);
 
         println!("Converted string is: {}", csv);
-
     });
 }
 

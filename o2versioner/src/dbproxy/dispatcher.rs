@@ -5,6 +5,7 @@ use crate::core::transaction_version::{TxTableVN, TxVN};
 use std::collections::HashMap;
 use std::sync::Arc;
 //use mysql_async::Pool;
+use std::net::SocketAddr;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio::{stream, sync::mpsc};
@@ -20,7 +21,7 @@ impl Dispatcher {
         sender: mpsc::Sender<QueryResult>,
         sql_addr: String,
         mut version: Arc<Mutex<DbVersion>>,
-        transactions: Arc<Mutex<HashMap<String, mpsc::Sender<QueueMessage>>>>,
+        transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
 
@@ -87,7 +88,6 @@ impl Dispatcher {
         mut sender: mpsc::Sender<QueryResult>,
     ) {
         tokio::spawn(async move {
-            
             let mut result: QueryResult;
             {
                 let mut finish = false;
@@ -134,8 +134,9 @@ impl Dispatcher {
                     }
 
                     let _ = sender.send(result.clone()).await;
-                    if finish {break;}
-                    
+                    if finish {
+                        break;
+                    }
                 }
             }
         });
