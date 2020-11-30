@@ -1,5 +1,5 @@
-use super::core::PendingQueue;
-use crate::comm::scheduler_dbproxy::Message;
+use super::core::{PendingQueue, QueueMessage, Task};
+use crate::{comm::scheduler_dbproxy::NewMessage, core::msql::{Msql, MsqlEndTxMode}};
 use std::sync::Arc;
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::stream::StreamExt;
@@ -13,18 +13,46 @@ impl Receiver {
     pub fn run(pending_queue: Arc<Mutex<PendingQueue>>, tcp_read: OwnedReadHalf) {
         let mut deserializer = SymmetricallyFramed::new(
             FramedRead::new(tcp_read, LengthDelimitedCodec::new()),
-            SymmetricalJson::<Message>::default(),
+            SymmetricalJson::<NewMessage>::default(),
         );
 
         tokio::spawn(async move {
             while let Some(msg) = deserializer.try_next().await.unwrap() {
                 match msg {
-                    Message::SqlRequest(op) => {
-                        pending_queue.lock().await.push(op);
+                    NewMessage::MsqlRequest(request, addr, version_number) => {
+                        let mut operation_type = Task::BEGIN;
+                        let mut query = String::new();
+
+                        match request {
+                            Msql::BeginTx(op) => {
+                                operation_type = Task::BEGIN;
+                            }
+
+                            Msql::Query(op) => {
+                                operation_type = Task::READ;
+                                query = op.query().to_string();
+                            }
+
+                            Msql::EndTx(op) => match op.mode() {
+                                MsqlEndTxMode::Commit => {
+                                    operation_type = Task::COMMIT;
+                                }
+                                MsqlEndTxMode::Rollback => {
+                                    operation_type = Task::ABORT;
+                                }
+                            },
+                        };
+
+                        let message = QueueMessage {
+                            identifier: addr,
+                            operation_type: operation_type,
+                            query: query,
+                            versions: version_number,
+                        };
+
+                        pending_queue.lock().await.push(message);
                     }
-                    _other => {
-                        println!("nope")
-                    }
+                    _ => println!("nope"),
                 }
             }
         });

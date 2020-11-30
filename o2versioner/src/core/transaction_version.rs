@@ -36,7 +36,7 @@ impl TxTableVN {
 /// Version numbers of tables declared by a transaction
 ///
 /// TODO: For table being early-released, remove them from `TxVN`
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub struct TxVN {
     pub tx: Option<String>,
     /// A single vec storing all W and R `TxTableVN` for now

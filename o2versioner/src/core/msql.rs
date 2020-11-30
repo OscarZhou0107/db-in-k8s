@@ -33,7 +33,7 @@ pub trait IntoMsqlFinalString {
 ///     .set_name(Some("tx0"))
 ///     .set_tableops(TableOps::from("READ table0 WRITE table1 table2 read table3"));
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub struct MsqlBeginTx {
     tx: Option<String>,
     tableops: TableOps,
@@ -105,7 +105,7 @@ impl MsqlBeginTx {
 /// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
 ///     .unwrap();
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub struct MsqlQuery {
     query: String,
     tableops: TableOps,
@@ -163,7 +163,7 @@ pub enum MsqlEndTxMode {
 /// MsqlEndTx::commit();
 /// MsqlEndTx::rollback().set_name(Some("tx1"));
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub struct MsqlEndTx {
     tx: Option<String>,
     mode: MsqlEndTxMode,
@@ -240,7 +240,7 @@ impl MsqlEndTx {
 /// The main user interface for Msql.
 ///
 /// `Msql` can be constructed directly, or converted from `MsqlText`
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Msql {
     BeginTx(MsqlBeginTx),
     Query(MsqlQuery),

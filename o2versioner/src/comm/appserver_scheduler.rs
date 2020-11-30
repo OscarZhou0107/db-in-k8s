@@ -1,7 +1,7 @@
 use crate::core::msql;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 pub enum MsqlResponse {
     BeginTx(Result<(), String>),
     Query(Result<String, String>),

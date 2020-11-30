@@ -1,5 +1,6 @@
-use super::core::{DbVersion, QueryResult};
-use crate::comm::scheduler_dbproxy::Message;
+use crate::comm::{appserver_scheduler::MsqlResponse, scheduler_dbproxy::NewMessage};
+
+use super::core::{DbVersion, QueryResult, QueryResultType};
 use futures::SinkExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -15,19 +16,42 @@ impl Responder {
         tokio::spawn(async move {
             let mut serializer = SymmetricallyFramed::new(
                 FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
-                SymmetricalJson::<Message>::default(),
+                SymmetricalJson::<NewMessage>::default(),
             );
 
             while let Some(result) = receiver.recv().await {
-                let version_release = result.version_release;
-                if version_release {
-                    version
+                match result.result_type {
+                    QueryResultType::END => {
+                        version
                         .lock()
                         .await
                         .release_on_tables(result.contained_newer_versions.clone());
+                    },
+                    _ => {}
                 }
 
-                serializer.send(Message::SqlResponse(result)).await.unwrap();
+                let response;
+                let message;
+                if result.succeed {
+                    response = Ok(result.result);
+                } else {
+                    response = Err(result.result);
+                }
+
+                match result.result_type {
+                    QueryResultType::BEGIN => { 
+                        let response = Ok(());
+                        message = MsqlResponse::BeginTx(response);
+                    }
+                    QueryResultType::QUERY => {
+                        message = MsqlResponse::Query(response);
+                    }
+                    QueryResultType::END => {
+                        message = MsqlResponse::EndTx(response);
+                    }
+                }
+
+                serializer.send(NewMessage::MsqlResponse(message)).await.unwrap();
             }
         });
     }

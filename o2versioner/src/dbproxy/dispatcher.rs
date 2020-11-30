@@ -1,11 +1,13 @@
-use super::core::{DbVersion, Operation, PendingQueue, QueryResult, Repository, Task};
-use futures::prelude::*;
-use mysql_async::Pool;
+use super::core::{DbVersion, PendingQueue, PostgresSqlConnPool, QueryResult, QueryResultType, QueueMessage, Task};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+//use mysql_async::Pool;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
+use tokio::{stream, sync::mpsc};
+
+use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
+use tokio_postgres::NoTls;
 
 pub struct Dispatcher {}
 
@@ -15,12 +17,21 @@ impl Dispatcher {
         sender: mpsc::Sender<QueryResult>,
         sql_addr: String,
         mut version: Arc<Mutex<DbVersion>>,
-        transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>>,
+        transactions: Arc<Mutex<HashMap<String, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
             let pool = mysql_async::Pool::new(sql_addr);
             let mut task_notify = pending_queue.lock().await.get_notify();
             let mut version_notify = version.lock().await.get_notify();
+
+            let mut config = tokio_postgres::Config::new();
+            config.user("postgres");
+            config.password("Rayh8768");
+            config.host("localhost");
+            config.port(5432);
+
+            let manager = PostgresConnectionManager::new(config, NoTls);
+            let pool = Pool::builder().max_size(50).build(manager).await.unwrap();
 
             loop {
                 Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
@@ -30,65 +41,79 @@ impl Dispatcher {
                     .await
                     .get_all_version_ready_task(&mut version)
                     .await;
-                stream::iter(operations.iter()).for_each(|op| {
-                    let op_cloned = op.clone();
-                    let transactions_cloned = transactions.clone();
-                    let pool_cloned = pool.clone();
-                    let sender_cloned = sender.clone();
-                    async move {
-                        let mut lock = transactions_cloned.lock().await;
-                        if !lock.contains_key(&op_cloned.transaction_id) {
-                            let (ts, tr): (mpsc::Sender<Operation>, mpsc::Receiver<Operation>) = mpsc::channel(1);
-                            lock.insert(op_cloned.transaction_id.clone(), ts);
-                            Self::spawn_transaction(pool_cloned, tr, sender_cloned);
-                        }
-                    }
-                }).await;
 
-                stream::iter(operations.iter()).for_each(|op| {
-                    let op_cloned = op.clone();
-                    let transactions_cloned = transactions.clone();
-                    async move {
-                        let sender = transactions_cloned
-                            .lock()
-                            .await
-                            .get(&op_cloned.transaction_id)
-                            .unwrap()
-                            .clone();
+                {
+                    let mut lock = transactions.lock().await;
 
-                        Self::spawn_unblock_send(sender, op_cloned);
-                    }
-                }).await;
+                    operations.iter().for_each(|op| {
+                        let op_cloned = op.clone();
+                        let pool_cloned = pool.clone();
+                        let sender_cloned = sender.clone();
+
+                        match op_cloned.operation_type {
+                            Task::BEGIN => {
+                                if !lock.contains_key(&op_cloned.identifier) {
+                                    let (ts, tr): (mpsc::Sender<QueueMessage>, mpsc::Receiver<QueueMessage>) =
+                                        mpsc::channel(1);
+                                    lock.insert(op_cloned.identifier.clone(), ts);
+                                    Self::spawn_transaction(pool_cloned, tr, sender_cloned);
+                                };
+                            }
+                            _ => {}
+                        };
+                    });
+                }
+                {
+                    let lock = transactions.lock().await;
+
+                    operations.iter().for_each(|op| {
+                        let op_cloned = op.clone();
+                        let sender_cloned = lock.get(&op_cloned.identifier).unwrap().clone();
+
+                        Self::spawn_unblock_send(sender_cloned, op_cloned);
+                    });
+                }
             }
         });
     }
 
-    fn spawn_transaction(pool: Pool, mut rec: mpsc::Receiver<Operation>, sender: mpsc::Sender<QueryResult>) {
+    fn spawn_transaction(
+        pool: Pool<PostgresConnectionManager<NoTls>>,
+        mut rec: mpsc::Receiver<QueueMessage>,
+        mut sender: mpsc::Sender<QueryResult>,
+    ) {
         tokio::spawn(async move {
-            let mut result: QueryResult = Default::default();
+            let conn = pool.get().await.unwrap();
+
+            let mut result: QueryResult = QueryResult {
+                result : " ".to_string(),
+                result_type : QueryResultType::BEGIN,
+                succeed : true,
+                contained_newer_versions : Vec::new(),
+            };
+
             let r_ref = &mut result;
             {
-                let mut repo = Repository::new(pool).await;
-                repo.start_transaction().await;
-
                 while let Some(operation) = rec.recv().await {
-                    let inner_result;
-                    match operation.task {
+                    match operation.operation_type {
                         Task::READ => {
-                            inner_result = repo.execute_read().await;
+                            let r = conn.simple_query("").await;
                         }
-                        Task::WRITE => {
-                            inner_result = repo.execute_write().await;
-                        }
+                        Task::WRITE => {}
                         Task::COMMIT => {
-                            *r_ref = repo.commit().await;
                             break;
                         }
                         Task::ABORT => {
-                            *r_ref = repo.abort().await;
                             break;
                         }
+                        Task::BEGIN => {}
                     }
+                    let inner_result: QueryResult = QueryResult {
+                        result : " ".to_string(),
+                        result_type : QueryResultType::BEGIN,
+                        succeed : true,
+                        contained_newer_versions : Vec::new(),
+                    };
                     let _ = sender.send(inner_result.clone()).await;
                 }
             }
@@ -96,7 +121,7 @@ impl Dispatcher {
         });
     }
 
-    fn spawn_unblock_send(sender: mpsc::Sender<Operation>, op: Operation) {
+    fn spawn_unblock_send(sender: mpsc::Sender<QueueMessage>, op: QueueMessage) {
         tokio::spawn(async move {
             let _ = sender.send(op).await;
         });
