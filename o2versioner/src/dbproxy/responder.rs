@@ -1,4 +1,4 @@
-use crate::comm::{appserver_scheduler::MsqlResponse, scheduler_dbproxy::Message};
+use crate::comm::{msql_response::MsqlResponse, scheduler_dbproxy::Message};
 
 use super::core::{DbVersion, QueryResult, QueryResultType};
 use futures::SinkExt;

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use super::core::{DbVNManager, DbproxyManager};
-use crate::comm::appserver_scheduler::MsqlResponse;
+use crate::comm::msql_response::MsqlResponse;
 use crate::comm::scheduler_dbproxy::*;
 use crate::core::msql::*;
 use crate::core::operation::*;

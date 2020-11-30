@@ -1,5 +1,6 @@
 use super::core::*;
 use super::dispatcher::*;
+use crate::comm::msql_response::MsqlResponse;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
 use crate::util::config::*;
@@ -156,12 +157,12 @@ async fn process_msql(
     msql: Msql,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    _dispatcher_addr: Arc<DispatcherAddr>,
+    dispatcher_addr: Arc<DispatcherAddr>,
 ) -> appserver_scheduler::Message {
     match msql {
         Msql::BeginTx(msqlbegintx) => {
             if conn_state.lock().await.current_txvn().is_some() {
-                appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(String::from(
+                appserver_scheduler::Message::Reply(MsqlResponse::BeginTx(Err(String::from(
                     "Previous transaction not finished yet",
                 ))))
             } else {
@@ -184,8 +185,8 @@ async fn process_msql(
                         }
                     })
                     .map_ok_or_else(
-                        |e| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(e))),
-                        |_| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Ok(()))),
+                        |e| appserver_scheduler::Message::Reply(MsqlResponse::BeginTx(Err(e))),
+                        |_| appserver_scheduler::Message::Reply(MsqlResponse::BeginTx(Ok(()))),
                     )
                     .await
             }
