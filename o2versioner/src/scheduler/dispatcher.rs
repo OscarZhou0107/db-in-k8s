@@ -42,19 +42,16 @@ impl State {
     }
 
     async fn execute(&self, request: Request) {
-        match &request.command {
+        // Check for allowed executions
+        let (is_endtx, op_str) = match &request.command {
             Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
-            Msql::Query(msqlquery) => {
-                match msqlquery.tableops().access_pattern() {
-                    AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
-                    _ => self.execute_query(request).await,
-                };
-            }
-            Msql::EndTx(_) => self.execute_query(request).await,
+            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
+                AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
+                _ => (false, "query"),
+            },
+            Msql::EndTx(_) => (true, "endtx"),
         };
-    }
 
-    async fn execute_query(&self, request: Request) {
         let dbproxy_tasks_stream = stream::iter(self.assign_dbproxy_for_execution(&request).await);
 
         let Request {
@@ -63,50 +60,63 @@ impl State {
             txvn,
             reply,
         } = request;
-        let msg = NewMessage::MsqlRequest(command, txvn);
+        let msg = NewMessage::MsqlRequest(command, txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply));
 
         // Each communication with dbproxy is spawned as a separate task
         dbproxy_tasks_stream
             .for_each_concurrent(None, move |(dbproxy_addr, dbproxy_pool)| {
                 let msg_cloned = msg.clone();
+                let txvn_cloned = txvn.clone();
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
                 async move {
                     let msqlresponse = send_and_receive_single_as_json(
                         &mut dbproxy_pool.get().await.unwrap(),
                         msg_cloned,
-                        "Scheduler dispatcher-query",
+                        format!("Scheduler dispatcher-{}", op_str),
                     )
                     .map_err(|e| e.to_string())
                     .and_then(|res| match res {
                         NewMessage::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
                         _ => future::err(String::from("Invalid response from Dbproxy")),
                     })
-                    .map_ok_or_else(|e| MsqlResponse::Query(Err(e)), |msqlresponse| msqlresponse)
+                    .map_ok_or_else(
+                        |e| {
+                            if is_endtx {
+                                MsqlResponse::EndTx(Err(e))
+                            } else {
+                                MsqlResponse::Query(Err(e))
+                            }
+                        },
+                        |msqlresponse| msqlresponse,
+                    )
                     .await;
+
+                    // if this is a EndTx, need to release the version and notifier other queries waiting on versions
+                    if is_endtx {
+                        self.release_version(&dbproxy_addr, &txvn_cloned.expect("EndTx must include Some(TxVN)"))
+                            .await;
+                    }
 
                     // If the oneshot channel is not consumed, consume it to send the reply back to handler
                     if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
                         debug!(
-                            "<- [{}] Scheduler dispatcher-query reply response to handler: {:?}",
-                            dbproxy_addr, msqlresponse
+                            "<- [{}] Scheduler dispatcher-{} reply response to handler: {:?}",
+                            dbproxy_addr, op_str, msqlresponse
                         );
-                        reply
-                            .send(msqlresponse)
-                            .expect("Scheduler dispatcher-query cannot reply response to handler");
+                        reply.send(msqlresponse).expect(&format!(
+                            "Scheduler dispatcher-{} cannot reply response to handler",
+                            op_str
+                        ));
                     } else {
                         debug!(
-                            "<- [{}] Scheduler dispatcher-query ignore response: {:?}",
-                            dbproxy_addr, msqlresponse
+                            "<- [{}] Scheduler dispatcher-{} ignore response: {:?}",
+                            dbproxy_addr, op_str, msqlresponse
                         );
                     }
                 }
             })
             .await;
-    }
-
-    async fn execute_endtx(&self, _request: Request) {
-        todo!()
     }
 
     async fn assign_dbproxy_for_execution(
@@ -186,6 +196,8 @@ impl State {
     /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`
     async fn release_version(&self, dbproxy_addr: &SocketAddr, txvn: &TxVN) {
         self.dbvn_manager.write().await.release_version(dbproxy_addr, txvn);
+
+        debug!("Released version for {} with {:?}", dbproxy_addr, txvn);
 
         // Notify all others on any DbVN changes
         self.dbvn_manager_notify.notify_waiters();
