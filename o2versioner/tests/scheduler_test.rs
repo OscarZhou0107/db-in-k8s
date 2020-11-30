@@ -5,6 +5,7 @@ use o2versioner::scheduler;
 use o2versioner::util::config::*;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
+use tokio::time::{sleep, Duration};
 
 #[tokio::test]
 async fn test_scheduler() {
@@ -35,6 +36,8 @@ async fn test_scheduler() {
         conf_clone.sequencer.max_connection,
         "Mock Sequencer",
     ));
+
+    sleep(Duration::from_millis(200)).await;
 
     let conf_clone = conf.clone();
     let tester_handle_0 = tokio::spawn(async move {
