@@ -9,10 +9,11 @@ use crate::core::transaction_version::*;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;
+use futures::{pin_mut, select};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
-use tracing::debug;
+use tracing::{debug, info};
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
@@ -23,6 +24,10 @@ struct Request {
     /// A single use reply channel
     reply: Option<oneshot::Sender<MsqlResponse>>,
 }
+
+/// Sent from `DispatcherAddr` to `Dispatcher` to kill it
+#[derive(Debug)]
+struct Kill;
 
 /// A state containing shareed variables
 #[derive(Clone)]
@@ -206,31 +211,53 @@ impl State {
 
 pub struct Dispatcher {
     state: State,
-    rx: mpsc::Receiver<Request>,
+    request_rx: mpsc::Receiver<Request>,
+    kill_rx: oneshot::Receiver<Kill>,
 }
 
 impl Dispatcher {
     pub fn new(queue_size: usize, state: State) -> (DispatcherAddr, Dispatcher) {
-        let (tx, rx) = mpsc::channel(queue_size);
-        (DispatcherAddr { tx }, Dispatcher { state, rx })
+        let (request_tx, request_rx) = mpsc::channel(queue_size);
+        let (kill_tx, kill_rx) = oneshot::channel();
+        (
+            DispatcherAddr {
+                request_tx,
+                kill_tx: Arc::new(kill_tx),
+            },
+            Dispatcher {
+                state,
+                request_rx,
+                kill_rx,
+            },
+        )
     }
 
     pub async fn run(self) {
         // Handle each Request concurrently
-        let Dispatcher { state, rx } = self;
-        rx.for_each_concurrent(None, |dispatch_request| async {
+        let Dispatcher {
+            state,
+            request_rx,
+            kill_rx,
+        } = self;
+        let request_handler = request_rx.for_each_concurrent(None, |dispatch_request| async {
             state.clone().execute(dispatch_request).await
-        })
-        .await;
+        });
+
+        let kill_handler = kill_rx.fuse();
+
+        pin_mut!(request_handler, kill_handler);
+        select! {
+            () = request_handler => info!("Dispatcher terminated after finishing all requests"),
+            _ = kill_handler => info!("Dispatcher terminated by kill")
+        }
     }
 }
 
 /// Encloses a way to talk to the Dispatcher
-///
-/// TODO: provide a way to shutdown the `Dispatcher`
 #[derive(Debug, Clone)]
 pub struct DispatcherAddr {
-    tx: mpsc::Sender<Request>,
+    request_tx: mpsc::Sender<Request>,
+    kill_tx: Arc<oneshot::Sender<Kill>>,
 }
 
 impl DispatcherAddr {
@@ -253,9 +280,15 @@ impl DispatcherAddr {
         };
 
         // Send the request
-        self.tx.send(request).await.map_err(|e| e.to_string())?;
+        self.request_tx.send(request).await.map_err(|e| e.to_string())?;
 
         // Wait for the reply
         rx.await.map_err(|e| e.to_string())
+    }
+
+    pub fn kill(self) {
+        if let Ok(kill_tx) = Arc::try_unwrap(self.kill_tx) {
+            kill_tx.send(Kill).unwrap();
+        }
     }
 }
