@@ -1,4 +1,4 @@
-use crate::comm::{appserver_scheduler::MsqlResponse, scheduler_dbproxy::NewMessage};
+use crate::comm::{appserver_scheduler::MsqlResponse, scheduler_dbproxy::Message};
 
 use super::core::{DbVersion, QueryResult, QueryResultType};
 use futures::SinkExt;
@@ -16,7 +16,7 @@ impl Responder {
         tokio::spawn(async move {
             let mut serializer = SymmetricallyFramed::new(
                 FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
-                SymmetricalJson::<NewMessage>::default(),
+                SymmetricalJson::<Message>::default(),
             );
 
             while let Some(result) = receiver.recv().await {
@@ -51,7 +51,7 @@ impl Responder {
                     }
                 }
 
-                serializer.send(NewMessage::MsqlResponse(message)).await.unwrap();
+                serializer.send(Message::MsqlResponse(message)).await.unwrap();
             }
         });
     }

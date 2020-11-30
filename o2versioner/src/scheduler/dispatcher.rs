@@ -16,7 +16,6 @@ use tracing::{debug, info, warn};
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
-    /// For debugging
     client_addr: SocketAddr,
     command: Msql,
     txvn: Option<TxVN>,
@@ -59,15 +58,13 @@ impl State {
         let dbproxy_tasks_stream = stream::iter(self.assign_dbproxy_for_execution(&request).await);
 
         let Request {
-            client_addr: _,
+            client_addr,
             command,
             txvn,
             reply,
         } = request;
 
-        let mock_addr = "this_is_a_fake_addr".to_string();
-
-        let msg = NewMessage::MsqlRequest(command, mock_addr ,txvn.clone());
+        let msg = Message::MsqlRequest(client_addr, command, txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply));
 
         // Each communication with dbproxy is spawned as a separate task
@@ -84,7 +81,7 @@ impl State {
                     )
                     .map_err(|e| e.to_string())
                     .and_then(|res| match res {
-                        NewMessage::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
+                        Message::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
                         _ => future::err(String::from("Invalid response from Dbproxy")),
                     })
                     .map_ok_or_else(

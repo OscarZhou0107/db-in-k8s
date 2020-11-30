@@ -1,17 +1,17 @@
-use super::core::{DbVersion, PendingQueue , QueueMessage ,QueryResult};
+use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-
 pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     //=====================================Continue an ongoing transaction=======================================//
     //Map that holds all ongoing transactions
-    let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let transactions = Arc::new(Mutex::new(HashMap::new()));
 
     //Global version//
     let mut mock_db = HashMap::new();
