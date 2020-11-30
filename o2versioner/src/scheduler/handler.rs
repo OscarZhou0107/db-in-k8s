@@ -15,9 +15,6 @@ use tracing::debug;
 
 /// Main entrance for the Scheduler from appserver
 ///
-/// 1. `addr` is the tcp port to bind to
-/// 2. `max_connection` can be specified to limit the max number of connections allowed
-///
 /// The incoming packet is checked:
 /// 1. Connection Phase, SSL off, compression off. Bypassed
 /// 2. Command Phase, Text Protocol. Deserialized and handled
@@ -30,28 +27,28 @@ use tracing::debug;
 /// `[]` - Optional
 ///
 pub async fn main<A>(
-    scheduler_addr: A,
-    sceduler_max_connection: Option<u32>,
+    addr: A,
+    max_conn_till_dropped: Option<u32>,
     sequencer_addr: A,
-    sequencer_max_connection: u32,
+    sequencer_conn_pool_size: u32,
 ) where
     A: ToSocketAddrs,
 {
     // The current task completes as soon as start_tcplistener finishes,
-    // which happens when it reaches the sceduler_max_connection if not None,
+    // which happens when it reaches the max_conn_till_dropped if not None,
     // which is really depending on the incoming connections into Scheduler.
     // So the sequencer_socket_pool here does not require an explicit
     // max_lifetime being set.
     let sequencer_socket_pool = Pool::builder()
-        .max_size(sequencer_max_connection)
+        .max_size(sequencer_conn_pool_size)
         .build(tcp::TcpStreamConnectionManager::new(sequencer_addr).await)
         .await
         .unwrap();
 
     tcp::start_tcplistener(
-        scheduler_addr,
+        addr,
         |tcp_stream| process_connection(tcp_stream, sequencer_socket_pool.clone()),
-        sceduler_max_connection,
+        max_conn_till_dropped,
         "Scheduler",
     )
     .await;
