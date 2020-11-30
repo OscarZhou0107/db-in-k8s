@@ -24,6 +24,7 @@ pub enum Error {
 }
 
 /// Expecting every request will have a response replied back via the same tcp stream
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NewMessage {
     /// A `Msql` request to dbproxy. `Option<TxVN> == None` for single-read transaction
     MsqlRequest(Msql, Option<TxVN>),

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub type VN = u64;
 
 /// Version number of a table of the transaction
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxTableVN {
     pub table: String,
     pub vn: VN,
@@ -36,7 +36,7 @@ impl TxTableVN {
 /// Version numbers of tables declared by a transaction
 ///
 /// TODO: For table being early-released, remove them from `TxVN`
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
     pub tx: Option<String>,
     /// A single vec storing all W and R `TxTableVN` for now
