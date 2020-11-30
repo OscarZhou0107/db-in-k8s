@@ -247,12 +247,35 @@ pub enum Msql {
     EndTx(MsqlEndTx),
 }
 
+impl Msql {
+    pub fn is_begintx(&self) -> bool {
+        match self {
+            Self::BeginTx(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_query(&self) -> bool {
+        match self {
+            Self::Query(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_endtx(&self) -> bool {
+        match self {
+            Self::EndTx(_) => true,
+            _ => false,
+        }
+    }
+}
+
 impl IntoMsqlFinalString for Msql {
     fn into_msqlfinalstring(self) -> MsqlFinalString {
         match self {
-            Msql::BeginTx(msqlbegintx) => msqlbegintx.into_msqlfinalstring(),
-            Msql::Query(msqlquery) => msqlquery.into_msqlfinalstring(),
-            Msql::EndTx(msqlendtx) => msqlendtx.into_msqlfinalstring(),
+            Self::BeginTx(msqlbegintx) => msqlbegintx.into_msqlfinalstring(),
+            Self::Query(msqlquery) => msqlquery.into_msqlfinalstring(),
+            Self::EndTx(msqlendtx) => msqlendtx.into_msqlfinalstring(),
         }
     }
 }
@@ -261,15 +284,15 @@ impl TryFrom<MsqlText> for Msql {
     type Error = &'static str;
     fn try_from(msqltext: MsqlText) -> Result<Self, Self::Error> {
         match msqltext {
-            MsqlText::BeginTx { tx, tableops } => Ok(Msql::BeginTx(
+            MsqlText::BeginTx { tx, tableops } => Ok(Self::BeginTx(
                 MsqlBeginTx::default()
                     .set_name(tx)
                     .set_tableops(TableOps::from(tableops)),
             )),
             MsqlText::Query { query, tableops } => {
-                MsqlQuery::new(query, TableOps::from(tableops)).map(|mq| Msql::Query(mq))
+                MsqlQuery::new(query, TableOps::from(tableops)).map(|mq| Self::Query(mq))
             }
-            MsqlText::EndTx { tx, mode } => Ok(Msql::EndTx(MsqlEndTx::from(mode).set_name(tx))),
+            MsqlText::EndTx { tx, mode } => Ok(Self::EndTx(MsqlEndTx::from(mode).set_name(tx))),
         }
     }
 }
@@ -525,6 +548,27 @@ mod tests_msql {
             }),
             Ok(Msql::EndTx(MsqlEndTx::rollback().set_name(Some("t3"))))
         )
+    }
+
+    #[test]
+    fn test_is_begintx() {
+        assert!(Msql::BeginTx(MsqlBeginTx::default()).is_begintx());
+        assert!(!Msql::Query(MsqlQuery::new("selet * from ray;", TableOps::default()).unwrap()).is_begintx());
+        assert!(!Msql::EndTx(MsqlEndTx::rollback()).is_begintx());
+    }
+
+    #[test]
+    fn test_is_query() {
+        assert!(!Msql::BeginTx(MsqlBeginTx::default()).is_query());
+        assert!(Msql::Query(MsqlQuery::new("selet * from ray;", TableOps::default()).unwrap()).is_query());
+        assert!(!Msql::EndTx(MsqlEndTx::rollback()).is_query());
+    }
+
+    #[test]
+    fn test_is_endtx() {
+        assert!(!Msql::BeginTx(MsqlBeginTx::default()).is_endtx());
+        assert!(!Msql::Query(MsqlQuery::new("selet * from ray;", TableOps::default()).unwrap()).is_endtx());
+        assert!(Msql::EndTx(MsqlEndTx::rollback()).is_endtx());
     }
 }
 
