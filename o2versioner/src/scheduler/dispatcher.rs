@@ -52,7 +52,6 @@ impl State {
             },
             Msql::EndTx(_) => self.execute_endtx(request).await,
         };
-        todo!()
     }
 
     async fn execute_query(&self, _request: Request) {
@@ -178,7 +177,7 @@ pub struct DispatcherAddr {
 
 impl DispatcherAddr {
     /// `Option<TxVN>` is to support single read query in the future
-    async fn request(
+    pub async fn request(
         &mut self,
         client_addr: SocketAddr,
         command: Msql,
