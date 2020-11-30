@@ -9,7 +9,8 @@ urlSql = {
         # a sequence: createEmptyCart
         "createEmptyCart", # execute only if client.shopping_id == null
         "createEmptyCartInsertV2",
-        # a sequence: doCart
+        
+        # another sequence: doCart
         # inner sequence: addItem
         "addItem", 
         "addItemUpdate",
@@ -24,8 +25,9 @@ urlSql = {
         "getRelated1",
 
         "resetCartTime",
-        # sequence end
         "getCart",
+        # sequence end
+
         # promo
         "getRelated"
         ],

@@ -3,6 +3,8 @@
 
 
 def replaceVars(s, num, vars):
+    if num == 0:
+        return s
     sl = list(s)
     if num != len(vars):
         print("wrong number of vars - Check!")

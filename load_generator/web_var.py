@@ -127,31 +127,6 @@ sqlRes = {
     'verifyDBConsistencyAddrId': []
 }
 
-def populateSqlVar(sqlVar):
-    pass
-    #sqlVar["init"]["home"]["sql"] = 
-    #sqlVar["init"]["home"]["var"] = 
-
-
-def init():
-    sqlVar = {}
-    for i in range(len(trans)):
-        probMix1[trans[i]] = {}
-        probMix2[trans[i]] = {}
-        probMix3[trans[i]] = {}
-        sqlVar[trans[i]] = {}
-        for j in range(len(tras)):
-            probMix1[trans[i]][trans[j]] = 0
-            probMix2[trans[i]][trans[j]] = 0
-            probMix3[trans[i]][trans[j]] = 0
-            sqlVar[trans[i]][trans[j]] = {"sql":[], "var": []}
-    return probMix1, probMix2, probMix3, sqlVar
-
-def popProbMix(probMix, data):
-    pass
-
 
 if __name__ == "__main__":
-    probMix1, probMix2, probMix3, sqlVar = init()
-
-    sqlVar = populateSqlVar(sqlVar)
+    return 1
