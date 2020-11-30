@@ -1,12 +1,15 @@
 use super::core::*;
+use super::dispatcher::*;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
+use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
+use std::iter::FromIterator;
 use std::sync::Arc;
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
@@ -26,29 +29,30 @@ use tracing::debug;
 /// `|`  - Or;
 /// `[]` - Optional
 ///
-pub async fn main<A>(
-    addr: A,
-    max_conn_till_dropped: Option<u32>,
-    sequencer_addr: A,
-    sequencer_conn_pool_size: u32,
-) where
-    A: ToSocketAddrs,
-{
+pub async fn main(conf: Config) {
     // The current task completes as soon as start_tcplistener finishes,
     // which happens when it reaches the max_conn_till_dropped if not None,
     // which is really depending on the incoming connections into Scheduler.
     // So the sequencer_socket_pool here does not require an explicit
     // max_lifetime being set.
     let sequencer_socket_pool = Pool::builder()
-        .max_size(sequencer_conn_pool_size)
-        .build(tcp::TcpStreamConnectionManager::new(sequencer_addr).await)
+        .max_size(conf.scheduler.sequencer_pool_size)
+        .build(tcp::TcpStreamConnectionManager::new(conf.sequencer.to_addr()).await)
         .await
         .unwrap();
 
+    let (dispatcher_addr, dispatcher) = Dispatcher::new(
+        conf.scheduler.dispatcher_queue_size,
+        State::new(
+            DbVNManager::from_iter(conf.to_dbproxy_addrs()),
+            DbproxyManager::from_iter(conf.to_dbproxy_addrs(), conf.scheduler.dbproxy_pool_size).await,
+        ),
+    );
+
     tcp::start_tcplistener(
-        addr,
+        conf.scheduler.to_addr(),
         |tcp_stream| process_connection(tcp_stream, sequencer_socket_pool.clone()),
-        max_conn_till_dropped,
+        conf.scheduler.max_connection,
         "Scheduler",
     )
     .await;
