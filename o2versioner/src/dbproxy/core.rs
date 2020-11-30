@@ -1,7 +1,10 @@
-use crate::core::{msql::Msql, operation::Operation as OperationType};
 use crate::core::transaction_version::{TxTableVN, TxVN};
+use crate::core::{msql::Msql, operation::Operation as OperationType};
+use bb8_postgres::{
+    bb8::{ManageConnection, Pool, PooledConnection},
+    PostgresConnectionManager,
+};
 use futures::prelude::*;
-use bb8_postgres::{PostgresConnectionManager, bb8::{ManageConnection, Pool, PooledConnection}};
 use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,26 +13,21 @@ use tokio::sync::Mutex;
 use tokio::sync::Notify;
 //extern crate csv;
 //use csv::Writer;
-use tokio_postgres::{Client, Config, Connection, Error, NoTls, Socket, tls::NoTlsStream};
 use async_trait::async_trait;
-
+use csv::*;
+use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
-    pool : Pool<PostgresConnectionManager<NoTls>>,
+    pool: Pool<PostgresConnectionManager<NoTls>>,
 }
 
 impl PostgresSqlConnPool {
-    pub async fn new(url : Config, max_conn : u32) ->Self {
-        
+    pub async fn new(url: Config, max_conn: u32) -> Self {
         let manager = PostgresConnectionManager::new(url, NoTls);
-        let pool = Pool::builder()
-        .max_size(max_conn)
-        .build(manager)
-        .await
-        .unwrap();
+        let pool = Pool::builder().max_size(max_conn).build(manager).await.unwrap();
 
-        Self {pool : pool}
+        Self { pool: pool }
     }
 
     pub async fn get_conn(&self) -> PooledConnection<'_, PostgresConnectionManager<NoTls>> {
@@ -37,43 +35,12 @@ impl PostgresSqlConnPool {
     }
 }
 
-// pub struct ConnectionManager {
-//     url : String
-// }
-
-// impl ConnectionManager {
-//     pub fn new(url : String) -> Self {
-//         Self {url : url}
-//     }
-// }
-
-// #[async_trait]
-// impl ManageConnection for ConnectionManager {
-//     type Connection = (Client, Connection<Socket, NoTlsStream>);
-//     type Error = Error;
-
-//     async fn connect(&self) -> Result<Self::Connection, Self::Error> {
-//         tokio_postgres::connect().await
-//     }
-
-//     async fn is_valid(&self, conn: &mut bb8_postgres::bb8::PooledConnection<'_, Self>) -> Result<(), Self::Error> {
-//         match conn.0.simple_query("SELECT 1").await {
-//             Ok(_) => Ok(()),
-//             Err(err) => Err(err)
-//         }
-//     }
-
-//     fn has_broken(&self, conn: &mut Self::Connection) -> bool {
-//         conn.0.is_closed()
-//     }
-// }
-
 #[derive(Clone)]
 pub struct QueueMessage {
-    pub identifier : String,
-    pub operation_type : Task,
-    pub query : String,
-    pub versions : Option<TxVN>,
+    pub identifier: String,
+    pub operation_type: Task,
+    pub query: String,
+    pub versions: Option<TxVN>,
 }
 
 pub struct PendingQueue {
@@ -184,7 +151,6 @@ trait Repository {
 // #[async_trait]
 // impl Repository for PostgresSqlRepository {
 //     async fn start_transaction(&mut self) {
-        
 //     }
 
 //     async fn execute_read(&mut self) -> QueryResult {
@@ -204,7 +170,6 @@ trait Repository {
 //     }
 // }
 
-
 pub struct MySqlRepository {
     conn: mysql_async::Conn,
 }
@@ -218,7 +183,6 @@ impl MySqlRepository {
 
 #[async_trait]
 impl Repository for MySqlRepository {
-
     async fn start_transaction(&mut self) {
         self.conn.query_drop("START TRANSACTION;").await.unwrap();
     }
@@ -252,15 +216,71 @@ impl Repository for MySqlRepository {
     }
 }
 
-// pub struct MySqlToCsvWriter {    
-//     w : Writer<Vec>,
-// }
 
-// impl MySqlToCsvWriter {
-//     pub fn new() -> Self {
-//         Self {w : Writer::from_writer(vec![])}
-//     }
-// }
+pub struct PostgreToCsvWriter {
+    mode: Task,
+    wrt: Writer<Vec<u8>>,
+}
+
+#[derive(Serialize)]
+pub struct Row {
+    label: String,
+    value: String,
+}
+
+impl PostgreToCsvWriter {
+    pub fn new(mode: Task) -> Self {
+       
+        let wrt = Writer::from_writer(vec![]);
+        Self { mode: mode, wrt: wrt }
+    }
+
+    pub fn to_csv(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
+        match self.mode {
+            Task::BEGIN => return "".to_string(),
+            Task::READ => return self.convert_result_to_csv_string(message),
+            Task::WRITE => return self.generate_csv_string_with_header(message, "Affected rows".to_string()),
+            Task::COMMIT => return self.generate_csv_string_with_header(message, "Status".to_string()),
+            Task::ABORT => return self.generate_csv_string_with_header(message, "Status".to_string()),
+        }
+    }
+
+    pub fn convert_result_to_csv_string(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
+
+        message.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                let len = query_row.len();
+                let mut row: Vec<&str> = Vec::new();
+                row.reserve(len);
+
+                for index in 0..len {
+                    row.push(query_row.get(index).unwrap());
+                }
+                self.wrt.write_record(&row).unwrap();
+            }
+            _ => {}
+        });
+
+        String::from_utf8(self.wrt.into_inner().unwrap()).unwrap()
+    }
+
+    pub fn generate_csv_string_with_header(
+        mut self,
+        message: Vec<tokio_postgres::SimpleQueryMessage>,
+        header: String,
+    ) -> String {
+        self.wrt.write_record(vec![header]).unwrap();
+
+        message.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::CommandComplete(status) => {
+                self.wrt.write_record(vec![status.clone().to_string()]).unwrap();
+            }
+            _ => {}
+        });
+
+        String::from_utf8(self.wrt.into_inner().unwrap()).unwrap()
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum QueryResultType {
@@ -271,9 +291,9 @@ pub enum QueryResultType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct QueryResult {
-    pub result : String,
-    pub succeed : bool,
-    pub result_type : QueryResultType,
+    pub result: String,
+    pub succeed: bool,
+    pub result_type: QueryResultType,
     pub contained_newer_versions: Vec<TxTableVN>,
 }
 
@@ -288,19 +308,19 @@ pub enum Task {
 
 fn test_helper_get_query_result_version_release() -> QueryResult {
     QueryResult {
-        result : " ".to_string(),
-        result_type : QueryResultType::BEGIN,
-        succeed : true,
-        contained_newer_versions : Vec::new(),
+        result: " ".to_string(),
+        result_type: QueryResultType::BEGIN,
+        succeed: true,
+        contained_newer_versions: Vec::new(),
     }
 }
 
 fn test_helper_get_query_result_non_release() -> QueryResult {
     QueryResult {
-        result : " ".to_string(),
-        result_type : QueryResultType::END,
-        succeed : true,
-        contained_newer_versions : Vec::new(),
+        result: " ".to_string(),
+        result_type: QueryResultType::END,
+        succeed: true,
+        contained_newer_versions: Vec::new(),
     }
 }
 //================================Test================================//
@@ -374,69 +394,96 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 //         assert!(!db_version.violate_version(operation));
 //     }
 
-//     #[ignore]
-//     #[tokio::test]
-//     async fn test_sql_connection() {
-//         let url = "mysql://root:Rayh8768@localhost:3306/test";
-//         let pool = mysql_async::Pool::new(url);
-//         match pool.get_conn().await {
-//             Ok(_) => {
-//                 println!("OK");
-//             }
-//             Err(e) => {
-//                 println!("error is =============================== : {}", e);
-//             }
-//         }
-//     }
+#[test]
+fn postgres_write_test() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-//     #[ignore]
-//     #[tokio::test]
-//     async fn run_sql_query() {
-//         let url = "mysql://root:Rayh8768@localhost:3306/test";
-//         let pool = mysql_async::Pool::new(url);
-//         //let mut wtr = csv::Writer::from_writer(io::stdout());
+    rt.block_on(async move {
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
 
-//         let mut conn = pool.get_conn().await.unwrap();
+        let size: u32 = 50;
+        let manager = PostgresConnectionManager::new(config, NoTls);
+        let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
 
-//         let mut raw = conn.query_iter("select * from cats").await.unwrap();
-        
-//         let mut results: Vec<mysql_async::Row> = raw.collect().await.unwrap();
-//         results.iter_mut().for_each(|r| {
-//             let len = r.len();
-//             r.columns().iter().for_each(|c| {
-//                 println!("col {}", c.name_str());
-                
-//             });
+        let conn = pool.get().await.unwrap();
+        conn.simple_query("START TRANSACTION;").await.unwrap();
+        let result = conn.simple_query(
+            "INSERT INTO tbltest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999)",
+        )
+        .await
+        .unwrap();
+        conn.simple_query("COMMIT;").await.unwrap();
 
-//             for i in 0..len {
-//                 let val : String = r.take(i).unwrap();
-//                 println!("len {}", val);
-//             }
-//         });
-//     }
+        result.iter().for_each(|q_message| {
+            match q_message {
+                tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                    let len = query_row.len();
+                    for index in 0..len {
+                        println!("value is : {}", query_row.get(index).unwrap().to_string());
+                    }
+                }
+                tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                    println!("Command result is : {}", complete_status);
+                }
+                _ => {}
+            }
+        });
 
-//     #[test]
-//     fn postgres_test() {
+        let writer = PostgreToCsvWriter::new(Task::WRITE);
+        let csv = writer.to_csv(result);
 
-//         let mut rt = tokio::runtime::Runtime::new().unwrap();
+        println!("Converted string is: {}", csv);
+    });
+}
 
-//         rt.block_on(async move {
-//             let mut config = tokio_postgres::Config::new();
-//             config.user("postgres");
-//             config.password("Rayh8768");
-//             config.host("localhost");
-//             config.port(5432);
+#[test]
+fn postgres_read_test() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
 
-//             let manager = PostgresConnectionManager::new(config, NoTls);
-//             let pool = Pool::builder()
-//             .build(manager)
-//             .await
-//             .unwrap();
+    rt.block_on(async move {
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
 
-//             let conn = pool.get().await.unwrap();
-//             conn.simple_query("INSERT INTO tblTest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999").await;
-//             });
-//     }
+        let size: u32 = 50;
+        let manager = PostgresConnectionManager::new(config, NoTls);
+        let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
 
+        let conn = pool.get().await.unwrap();
+        let result = conn
+            .simple_query("SELECT name, age, designation, salary FROM public.tbltest;")
+            .await
+            .unwrap();
 
-// }
+        result.iter().for_each(|q_message| {
+            match q_message {
+                tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                    let len = query_row.len();
+                    for index in 0..len {
+                        println!("value is : {}", query_row.get(index).unwrap().to_string());
+                    }
+                }
+                tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                    println!("Command result is : {}", complete_status);
+                }
+                _ => {}
+            }
+        });
+
+        let writer = PostgreToCsvWriter::new(Task::READ);
+        let csv = writer.to_csv(result);
+
+        println!("Converted string is: {}", csv);
+
+    });
+}
+
+//}

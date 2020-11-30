@@ -1,4 +1,7 @@
-use super::core::{DbVersion, PendingQueue, PostgresSqlConnPool, QueryResult, QueryResultType, QueueMessage, Task};
+use super::core::{
+    DbVersion, PendingQueue, PostgreToCsvWriter, PostgresSqlConnPool, QueryResult, QueryResultType, QueueMessage, Task,
+};
+use crate::core::transaction_version::{TxTableVN, TxVN};
 use std::collections::HashMap;
 use std::sync::Arc;
 //use mysql_async::Pool;
@@ -29,6 +32,7 @@ impl Dispatcher {
             config.password("Rayh8768");
             config.host("localhost");
             config.port(5432);
+            config.dbname("Test");
 
             let manager = PostgresConnectionManager::new(config, NoTls);
             let pool = Pool::builder().max_size(50).build(manager).await.unwrap();
@@ -63,7 +67,6 @@ impl Dispatcher {
                         };
                     });
                 }
-                
                 {
                     let lock = transactions.lock().await;
 
@@ -84,41 +87,57 @@ impl Dispatcher {
         mut sender: mpsc::Sender<QueryResult>,
     ) {
         tokio::spawn(async move {
-            let conn = pool.get().await.unwrap();
-
-            let mut result: QueryResult = QueryResult {
-                result : " ".to_string(),
-                result_type : QueryResultType::BEGIN,
-                succeed : true,
-                contained_newer_versions : Vec::new(),
-            };
-
-            let r_ref = &mut result;
+            
+            let mut result: QueryResult;
             {
+                let mut finish = false;
+                let conn = pool.get().await.unwrap();
                 while let Some(operation) = rec.recv().await {
                     match operation.operation_type {
-                        Task::READ => {
-                            let r = conn.simple_query("").await;
+                        Task::BEGIN => {
+                            result = prepare_query_result(
+                                operation.operation_type,
+                                operation.versions,
+                                conn.simple_query("START TRANSACTION;").await,
+                            );
                         }
-                        Task::WRITE => {}
+                        Task::READ => {
+                            result = prepare_query_result(
+                                operation.operation_type,
+                                operation.versions,
+                                conn.simple_query(&operation.query).await,
+                            );
+                        }
+                        Task::WRITE => {
+                            result = prepare_query_result(
+                                operation.operation_type,
+                                operation.versions,
+                                conn.simple_query(&operation.query).await,
+                            );
+                        }
                         Task::COMMIT => {
-                            break;
+                            result = prepare_query_result(
+                                operation.operation_type,
+                                operation.versions,
+                                conn.simple_query("COMMIT;").await,
+                            );
+                            finish = true;
                         }
                         Task::ABORT => {
-                            break;
+                            result = prepare_query_result(
+                                operation.operation_type,
+                                operation.versions,
+                                conn.simple_query("ROLLBACK;").await,
+                            );
+                            finish = true;
                         }
-                        Task::BEGIN => {}
                     }
-                    let inner_result: QueryResult = QueryResult {
-                        result : " ".to_string(),
-                        result_type : QueryResultType::BEGIN,
-                        succeed : true,
-                        contained_newer_versions : Vec::new(),
-                    };
-                    let _ = sender.send(inner_result.clone()).await;
+
+                    let _ = sender.send(result.clone()).await;
+                    if finish {break;}
+                    
                 }
             }
-            let _ = sender.send(result).await;
         });
     }
 
@@ -135,6 +154,59 @@ impl Dispatcher {
            _ = n1 => {}
            _ = n2 => {}
         };
+    }
+}
+
+fn prepare_query_result(
+    mode: Task,
+    transaction_version: Option<TxVN>,
+    raw: Result<Vec<tokio_postgres::SimpleQueryMessage>, tokio_postgres::error::Error>,
+) -> QueryResult {
+    let mut result_type;
+    let mut contained_newer_versions = Vec::new();
+    match mode {
+        Task::BEGIN => {
+            result_type = QueryResultType::BEGIN;
+            match transaction_version {
+                Some(versions) => {
+                    contained_newer_versions = versions.txtablevns;
+                }
+                None => {}
+            }
+        }
+        Task::READ => {
+            result_type = QueryResultType::QUERY;
+        }
+        Task::WRITE => {
+            result_type = QueryResultType::QUERY;
+        }
+        Task::COMMIT => {
+            result_type = QueryResultType::END;
+        }
+        Task::ABORT => {
+            result_type = QueryResultType::END;
+        }
+    };
+
+    let result;
+    let succeed;
+    let writer = PostgreToCsvWriter::new(mode);
+    match raw {
+        Ok(message) => {
+            result = writer.to_csv(message);
+            succeed = true;
+        }
+        Err(err) => {
+            result = "There was an error".to_string();
+            succeed = false;
+        }
+    }
+
+    QueryResult {
+        result: result,
+        result_type: QueryResultType::BEGIN,
+        succeed: succeed,
+        contained_newer_versions: contained_newer_versions,
     }
 }
 

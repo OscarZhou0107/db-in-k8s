@@ -26,5 +26,6 @@ tracing-subscriber = "0.2"
 unicase = "2.6"
 tokio-postgres = "0.6.0"
 bb8-postgres = "0.6.0"
+csv = "1.1.5"
 
 
