@@ -1,8 +1,13 @@
 [scheduler]
 addr = "127.0.0.1:1077"
+dbproxy_pool_size = 10
+dispatcher_queue_size = 500
+max_connection = 50
+sequencer_pool_size = 20
 
 [sequencer]
 addr = "127.0.0.1:9876"
+max_connection = 50
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
@@ -11,10 +16,3 @@ sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
 [[dbproxy]]
 addr = "127.0.0.1:8877"
 sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
-
-[[dbschemas]]
-table_name = "table1"
-
-[[dbschemas]]
-table_name = "table2"
-

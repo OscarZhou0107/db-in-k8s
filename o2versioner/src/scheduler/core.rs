@@ -2,6 +2,10 @@
 use crate::core::database_version::*;
 use crate::core::operation::*;
 use crate::core::transaction_version::*;
+use crate::util::tcp::TcpStreamConnectionManager;
+use bb8::Pool;
+use futures::prelude::*;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
@@ -39,7 +43,6 @@ impl ConnectionState {
     }
 }
 
-/// TODO: need unit testing
 pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
 
 impl FromIterator<SocketAddr> for DbVNManager {
@@ -57,21 +60,74 @@ impl DbVNManager {
         tableops: &TableOps,
         txvn: &TxVN,
     ) -> Vec<(SocketAddr, Vec<DbTableVN>)> {
+        assert_eq!(
+            tableops.access_pattern(),
+            AccessPattern::ReadOnly,
+            "Expecting ReadOnly access pattern for the query"
+        );
+
         self.0
             .iter()
             .filter(|(_, dbvn)| dbvn.can_execute_query(tableops, txvn))
             .map(|(addr, dbvn)| (addr.clone(), dbvn.get_from_tableops(tableops)))
+            .sorted_by_key(|(addr, _)| *addr)
             .collect()
     }
 
-    pub fn release_version(&mut self, dbproxy_addr: SocketAddr, txvn: &TxVN) {
-        if !self.0.contains_key(&dbproxy_addr) {
+    pub fn release_version(&mut self, dbproxy_addr: &SocketAddr, txvn: &TxVN) {
+        if !self.0.contains_key(dbproxy_addr) {
             warn!(
                 "DbVNManager does not have a DbVN for {} yet, is this a newly added dbproxy?",
                 dbproxy_addr
             );
         }
-        self.0.entry(dbproxy_addr).or_default().release_version(txvn);
+        self.0.entry(dbproxy_addr.clone()).or_default().release_version(txvn);
+    }
+
+    pub fn inner(&self) -> &HashMap<SocketAddr, DbVN> {
+        &self.0
+    }
+}
+
+#[derive(Clone)]
+pub struct DbproxyManager(HashMap<SocketAddr, Pool<TcpStreamConnectionManager>>);
+
+impl DbproxyManager {
+    /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` with `max_conn: u32` 'into `DbproxyManager`
+    pub async fn from_iter<I>(iter: I, max_conn: u32) -> Self
+    where
+        I: IntoIterator<Item = SocketAddr>,
+    {
+        Self(
+            stream::iter(iter)
+                .then(|dbproxy_port| async move {
+                    (
+                        dbproxy_port.clone(),
+                        Pool::builder()
+                            .max_size(max_conn)
+                            .build(TcpStreamConnectionManager::new(dbproxy_port).await)
+                            .await
+                            .unwrap(),
+                    )
+                })
+                .collect()
+                .await,
+        )
+    }
+
+    pub fn inner(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
+        &self.0
+    }
+
+    pub fn get(&self, dbproxy_addr: &SocketAddr) -> Pool<TcpStreamConnectionManager> {
+        self.0
+            .get(dbproxy_addr)
+            .expect(&format!("{} is not in the DbproxyManager", dbproxy_addr))
+            .clone()
+    }
+
+    pub fn to_vec(&self) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
+        self.0.iter().map(|(addr, pool)| (addr.clone(), pool.clone())).collect()
     }
 }
 
@@ -102,5 +158,198 @@ mod tests_connection_state {
         let mut conn_state = ConnectionState::default();
         conn_state.insert_txvn(TxVN::default());
         conn_state.insert_txvn(TxVN::default());
+    }
+}
+
+/// Unit test for `DbVNManager`
+#[cfg(test)]
+mod tests_dbvnmanager {
+    use super::*;
+
+    #[test]
+    fn test_from_iter() {
+        let dbvnmanager = DbVNManager::from_iter(vec![
+            "127.0.0.1:10000".parse().unwrap(),
+            "127.0.0.1:10001".parse().unwrap(),
+            "127.0.0.1:10002".parse().unwrap(),
+        ]);
+
+        assert!(dbvnmanager.inner().contains_key(&"127.0.0.1:10000".parse().unwrap()));
+        assert!(dbvnmanager.inner().contains_key(&"127.0.0.1:10001".parse().unwrap()));
+        assert!(dbvnmanager.inner().contains_key(&"127.0.0.1:10002".parse().unwrap()));
+        assert!(!dbvnmanager.inner().contains_key(&"127.0.0.1:10003".parse().unwrap()));
+    }
+
+    #[test]
+    fn test_get_all_that_can_execute_read_query() {
+        let dbvnmanager = DbVNManager::from_iter(vec![
+            "127.0.0.1:10000".parse().unwrap(),
+            "127.0.0.1:10001".parse().unwrap(),
+        ]);
+
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &TxVN {
+                    tx: None,
+                    txtablevns: vec![
+                        TxTableVN::new("t0", 0, Operation::R),
+                        TxTableVN::new("t1", 0, Operation::R),
+                    ],
+                }
+            ),
+            vec![
+                (
+                    "127.0.0.1:10000".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 0), DbTableVN::new("t1", 0)]
+                ),
+                (
+                    "127.0.0.1:10001".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 0), DbTableVN::new("t1", 0)]
+                )
+            ]
+        );
+
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &TxVN {
+                    tx: None,
+                    txtablevns: vec![
+                        TxTableVN::new("t0", 0, Operation::R),
+                        TxTableVN::new("t1", 1, Operation::R),
+                    ],
+                }
+            ),
+            vec![]
+        );
+
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R)]),
+                &TxVN {
+                    tx: None,
+                    txtablevns: vec![
+                        TxTableVN::new("t0", 0, Operation::R),
+                        TxTableVN::new("t1", 1, Operation::R),
+                    ],
+                }
+            ),
+            vec![
+                ("127.0.0.1:10000".parse().unwrap(), vec![DbTableVN::new("t0", 0)]),
+                ("127.0.0.1:10001".parse().unwrap(), vec![DbTableVN::new("t0", 0)])
+            ]
+        );
+
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t1", Operation::R)]),
+                &TxVN {
+                    tx: None,
+                    txtablevns: vec![
+                        TxTableVN::new("t0", 0, Operation::R),
+                        TxTableVN::new("t1", 1, Operation::R),
+                    ],
+                }
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_all_that_can_execute_read_query_panic() {
+        let dbvnmanager = DbVNManager::from_iter(vec![
+            "127.0.0.1:10000".parse().unwrap(),
+            "127.0.0.1:10001".parse().unwrap(),
+        ]);
+
+        dbvnmanager.get_all_that_can_execute_read_query(
+            &TableOps::from_iter(vec![TableOp::new("t0", Operation::W)]),
+            &TxVN {
+                tx: None,
+                txtablevns: vec![
+                    TxTableVN::new("t0", 0, Operation::W),
+                    TxTableVN::new("t1", 0, Operation::W),
+                ],
+            },
+        );
+    }
+
+    #[test]
+    fn test_release_version() {
+        let mut dbvnmanager = DbVNManager::from_iter(vec![
+            "127.0.0.1:10000".parse().unwrap(),
+            "127.0.0.1:10001".parse().unwrap(),
+        ]);
+
+        let txvn0 = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 0, Operation::R),
+            ],
+        };
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn0
+            ),
+            vec![
+                (
+                    "127.0.0.1:10000".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 0), DbTableVN::new("t1", 0)]
+                ),
+                (
+                    "127.0.0.1:10001".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 0), DbTableVN::new("t1", 0)]
+                )
+            ]
+        );
+
+        let txvn1 = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 1, Operation::R),
+            ],
+        };
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn1
+            ),
+            vec![]
+        );
+
+        dbvnmanager.release_version(&"127.0.0.1:10000".parse().unwrap(), &txvn0);
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn1
+            ),
+            vec![(
+                "127.0.0.1:10000".parse().unwrap(),
+                vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+            )]
+        );
+
+        dbvnmanager.release_version(&"127.0.0.1:10001".parse().unwrap(), &txvn0);
+        assert_eq!(
+            dbvnmanager.get_all_that_can_execute_read_query(
+                &TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]),
+                &txvn1
+            ),
+            vec![
+                (
+                    "127.0.0.1:10000".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+                ),
+                (
+                    "127.0.0.1:10001".parse().unwrap(),
+                    vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+                )
+            ]
+        );
     }
 }

@@ -54,7 +54,7 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] Scheduler
 - [x] Sequencer
 - [x] DbProxy
-- [ ] ~~MySQL protocol~~ Aborted, use msql interface instead
+- [x] Msql interface
 
 ### Features
 - [x] msql: simple sql
@@ -62,8 +62,8 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] msql: annotation-based
 - [ ] msql: query auto annotation
 - [x] Begin tx stmt
-- [ ] Query stmt
-- [ ] Commit&Abort tx stmt
+- [x] Query stmt
+- [x] Commit&Abort tx stmt
 - [ ] Single read
 - [ ] Early release
 - [ ] Multiple Schedulers

@@ -1,12 +1,12 @@
 use config;
 use serde::Deserialize;
+use std::net::SocketAddr;
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct Config {
     pub scheduler: SchedulerConfig,
     pub sequencer: SequencerConfig,
     pub dbproxy: Vec<DbProxyConfig>,
-    pub dbschemas: Vec<DbSchemaConfig>,
 }
 
 impl Config {
@@ -15,33 +15,57 @@ impl Config {
         source.merge(config::File::with_name(path)).expect("Error");
         source.try_into().expect("Invalid Configuration format!")
     }
+
+    pub fn to_dbproxy_addrs(&self) -> Vec<SocketAddr> {
+        self.dbproxy.iter().map(|dbproxyconf| dbproxyconf.to_addr()).collect()
+    }
 }
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct SchedulerConfig {
     pub addr: String,
+    #[serde(default)]
+    pub max_connection: Option<u32>,
+    pub sequencer_pool_size: u32,
+    pub dbproxy_pool_size: u32,
+    pub dispatcher_queue_size: usize,
 }
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
+impl SchedulerConfig {
+    pub fn to_addr(&self) -> SocketAddr {
+        self.addr.parse().expect("Invalid scheduler addr")
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct SequencerConfig {
     pub addr: String,
+    #[serde(default)]
+    pub max_connection: Option<u32>,
 }
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
+impl SequencerConfig {
+    pub fn to_addr(&self) -> SocketAddr {
+        self.addr.parse().expect("Invalid sequencer addr")
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct DbProxyConfig {
     pub addr: String,
     pub sql_addr: String,
 }
 
-#[derive(Debug, Eq, PartialEq, Deserialize, Clone)]
-pub struct DbSchemaConfig {
-    pub table_name: String,
+impl DbProxyConfig {
+    pub fn to_addr(&self) -> SocketAddr {
+        self.addr.parse().expect("Invalid dbproxy addr")
+    }
 }
 
 /// Unit test for `Config`
 #[cfg(test)]
 mod tests_config {
-    use super::{Config, DbProxyConfig, DbSchemaConfig, SchedulerConfig, SequencerConfig};
+    use super::{Config, DbProxyConfig, SchedulerConfig, SequencerConfig};
 
     #[test]
     fn test_from_file() {
@@ -51,10 +75,15 @@ mod tests_config {
             conf,
             Config {
                 scheduler: SchedulerConfig {
-                    addr: String::from("127.0.0.1:1077")
+                    addr: String::from("127.0.0.1:1077"),
+                    max_connection: Some(50),
+                    sequencer_pool_size: 20,
+                    dbproxy_pool_size: 10,
+                    dispatcher_queue_size: 500
                 },
                 sequencer: SequencerConfig {
-                    addr: String::from("127.0.0.1:9876")
+                    addr: String::from("127.0.0.1:9876"),
+                    max_connection: Some(50),
                 },
                 dbproxy: vec![
                     DbProxyConfig {
@@ -64,14 +93,6 @@ mod tests_config {
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8877"),
                         sql_addr: String::from("mysql://root:Rayh8768@localhost:3306/test")
-                    }
-                ],
-                dbschemas: vec![
-                    DbSchemaConfig {
-                        table_name: String::from("table1")
-                    },
-                    DbSchemaConfig {
-                        table_name: String::from("table2")
                     }
                 ]
             }

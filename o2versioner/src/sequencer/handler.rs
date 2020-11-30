@@ -10,10 +10,8 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, warn};
 
-type ArcState = Arc<Mutex<State>>;
-
 /// Main entrance for Sequencer
-pub async fn main<A>(addr: A, max_connection: Option<u32>)
+pub async fn main<A>(addr: A, max_conn_till_dropped: Option<u32>)
 where
     A: ToSocketAddrs,
 {
@@ -25,7 +23,7 @@ where
             let state_cloned = state.clone();
             process_connection(tcp_stream, state_cloned)
         },
-        max_connection,
+        max_conn_till_dropped,
         "Sequencer",
     )
     .await;
@@ -35,7 +33,7 @@ where
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
+async fn process_connection(tcp_stream: TcpStream, state: Arc<Mutex<State>>) {
     let peer_addr = tcp_stream.peer_addr().unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
@@ -61,8 +59,7 @@ async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
                 match msg {
                     scheduler_sequencer::Message::RequestTxVN(sqlbegintx) => {
                         debug!("<- [{}] RequestTxVN on {:?}", peer_addr, sqlbegintx);
-                        let mut state = state_cloned.lock().await;
-                        let txvn = state.assign_vn(sqlbegintx);
+                        let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
                         debug!("-> [{}] Reply {:?}", peer_addr, txvn);
                         Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
                     }

@@ -63,6 +63,7 @@ impl Dispatcher {
                         };
                     });
                 }
+                
                 {
                     let lock = transactions.lock().await;
 
