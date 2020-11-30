@@ -258,7 +258,11 @@ impl Dispatcher {
         pin_mut!(request_handler, kill_handler);
         tokio::select! {
             () = request_handler => info!("Scheduler dispatcher terminated after finishing all requests"),
-            _ = kill_handler => warn!("Scheduler dispatcher terminated by kill"),
+            kill_res = kill_handler =>
+                match kill_res {
+                    Err(_) => info!("Scheduler dispatcher terminated after finishing all requests"),
+                    Ok(_) => warn!("Scheduler dispatcher terminated by kill"),
+                }
         }
     }
 }
@@ -337,5 +341,24 @@ mod tests_dispatcher {
         });
 
         tokio::try_join!(dispatcher_handler, killer0_handler, killer1_handler).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_drop_dispatcher_addr() {
+        let _guard = init_logger();
+        let (dispatcher_addr, dispatcher) = Dispatcher::new(
+            10,
+            State::new(
+                DbVNManager::from_iter(vec![]),
+                DbproxyManager::from_iter(vec![], 1).await,
+            ),
+        );
+
+        let dispatcher_handler = tokio::spawn(dispatcher.run());
+
+        fn drop_dispatcher_addr(_: DispatcherAddr) {}
+        drop_dispatcher_addr(dispatcher_addr);
+
+        tokio::try_join!(dispatcher_handler).unwrap();
     }
 }
