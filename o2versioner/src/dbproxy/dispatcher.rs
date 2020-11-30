@@ -84,7 +84,7 @@ impl Dispatcher {
     fn spawn_transaction(
         pool: Pool<PostgresConnectionManager<NoTls>>,
         mut rec: mpsc::Receiver<QueueMessage>,
-        mut sender: mpsc::Sender<QueryResult>,
+        sender: mpsc::Sender<QueryResult>,
     ) {
         tokio::spawn(async move {
             let mut result: QueryResult;
