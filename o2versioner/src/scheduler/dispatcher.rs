@@ -1,6 +1,5 @@
 #![allow(dead_code)]
-use super::core::DbVNManager;
-use super::dbproxy_manager::DbproxyManager;
+use super::core::{DbVNManager, DbproxyManager};
 use crate::comm::appserver_scheduler::MsqlResponse;
 use crate::comm::scheduler_dbproxy::*;
 use crate::core::msql::*;
@@ -292,3 +291,14 @@ impl DispatcherAddr {
         }
     }
 }
+
+// /// Unit test for `Dispatcher`
+// #[cfg(test)]
+// mod tests_dispatcher {
+//     use super::*;
+
+//     #[test]
+//     fn test_kill() {
+//         Dispatcher::new(10, State::new(DbVNManager::, dbproxy_manager: DbproxyManager))
+//     }
+// }
