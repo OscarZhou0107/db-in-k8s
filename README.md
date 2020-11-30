@@ -43,6 +43,10 @@ cargo build
 cargo check
 ```
 
+### To check number of lines for Rust
+```sh
+find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
+```
 
 ## Progress
 

@@ -1,16 +1,18 @@
 #![allow(dead_code)]
-use super::core::DbVNManager;
-use super::dbproxy_manager::DbproxyManager;
+use super::core::{DbVNManager, DbproxyManager};
 use crate::comm::appserver_scheduler::MsqlResponse;
+use crate::comm::scheduler_dbproxy::*;
 use crate::core::msql::*;
-use crate::core::version_number::*;
+use crate::core::operation::*;
+use crate::core::transaction_version::*;
+use crate::util::tcp::*;
+use bb8::Pool;
+use futures::pin_mut;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tokio::sync::Notify;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
+use tracing::{debug, info, warn};
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
@@ -19,28 +21,12 @@ struct Request {
     command: Msql,
     txvn: Option<TxVN>,
     /// A single use reply channel
-    reply: oneshot::Sender<MsqlResponse>,
+    reply: Option<oneshot::Sender<MsqlResponse>>,
 }
 
-impl Request {
-    async fn work(self, state: State) {
-        match &self.command {
-            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
-            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
-                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
-                AccessPattern::ReadOnly => self.work_readonly_query(state).await,
-                AccessPattern::WriteOnly => self.work_writeonly_query(state).await,
-            },
-            Msql::EndTx(_) => self.work_endtx(state).await,
-        };
-    }
-
-    async fn work_readonly_query(&self, _state: State) {}
-
-    async fn work_writeonly_query(&self, _state: State) {}
-
-    async fn work_endtx(&self, _state: State) {}
-}
+/// Sent from `DispatcherAddr` to `Dispatcher` to kill it
+#[derive(Debug)]
+struct Kill;
 
 /// A state containing shareed variables
 #[derive(Clone)]
@@ -59,41 +45,238 @@ impl State {
         }
     }
 
-    // pub fn can_
+    async fn execute(&self, request: Request) {
+        // Check for allowed executions
+        let (is_endtx, op_str) = match &request.command {
+            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
+            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
+                AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
+                _ => (false, "query"),
+            },
+            Msql::EndTx(_) => (true, "endtx"),
+        };
+
+        let dbproxy_tasks_stream = stream::iter(self.assign_dbproxy_for_execution(&request).await);
+
+        let Request {
+            client_addr: _,
+            command,
+            txvn,
+            reply,
+        } = request;
+        let msg = NewMessage::MsqlRequest(command, txvn.clone());
+        let shared_reply_channel = Arc::new(Mutex::new(reply));
+
+        // Each communication with dbproxy is spawned as a separate task
+        dbproxy_tasks_stream
+            .for_each_concurrent(None, move |(dbproxy_addr, dbproxy_pool)| {
+                let msg_cloned = msg.clone();
+                let txvn_cloned = txvn.clone();
+                let shared_reply_channel_cloned = shared_reply_channel.clone();
+                async move {
+                    let msqlresponse = send_and_receive_single_as_json(
+                        &mut dbproxy_pool.get().await.unwrap(),
+                        msg_cloned,
+                        format!("Scheduler dispatcher-{}", op_str),
+                    )
+                    .map_err(|e| e.to_string())
+                    .and_then(|res| match res {
+                        NewMessage::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
+                        _ => future::err(String::from("Invalid response from Dbproxy")),
+                    })
+                    .map_ok_or_else(
+                        |e| {
+                            if is_endtx {
+                                MsqlResponse::EndTx(Err(e))
+                            } else {
+                                MsqlResponse::Query(Err(e))
+                            }
+                        },
+                        |msqlresponse| msqlresponse,
+                    )
+                    .await;
+
+                    // if this is a EndTx, need to release the version and notifier other queries waiting on versions
+                    if is_endtx {
+                        self.release_version(&dbproxy_addr, &txvn_cloned.expect("EndTx must include Some(TxVN)"))
+                            .await;
+                    }
+
+                    // If the oneshot channel is not consumed, consume it to send the reply back to handler
+                    if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
+                        debug!(
+                            "<- [{}] Scheduler dispatcher-{} reply response to handler: {:?}",
+                            dbproxy_addr, op_str, msqlresponse
+                        );
+                        reply.send(msqlresponse).expect(&format!(
+                            "Scheduler dispatcher-{} cannot reply response to handler",
+                            op_str
+                        ));
+                    } else {
+                        debug!(
+                            "<- [{}] Scheduler dispatcher-{} ignore response: {:?}",
+                            dbproxy_addr, op_str, msqlresponse
+                        );
+                    }
+                }
+            })
+            .await;
+    }
+
+    async fn assign_dbproxy_for_execution(
+        &self,
+        request: &Request,
+    ) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
+        match &request.command {
+            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
+            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
+                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
+                AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, &request.txvn).await],
+                AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
+            },
+            Msql::EndTx(_) => self.dbproxy_manager.to_vec(),
+        }
+    }
+
+    async fn wait_on_version(
+        &self,
+        msqlquery: &MsqlQuery,
+        txvn: &Option<TxVN>,
+    ) -> (SocketAddr, Pool<TcpStreamConnectionManager>) {
+        assert_eq!(msqlquery.tableops().access_pattern(), AccessPattern::ReadOnly);
+
+        if let Some(txvn) = txvn {
+            // The scheduler blocks read queries until at least one database has, for all tables in the query,
+            // version numbers that are greater than or equal to the version numbers assigned to the transaction
+            // for these tables. If there are several such replicas, the least loaded replica is chosen
+
+            let mut avail_dbproxy;
+            // Need to wait on version
+            loop {
+                avail_dbproxy = self
+                    .dbvn_manager
+                    .read()
+                    .await
+                    .get_all_that_can_execute_read_query(msqlquery.tableops(), txvn);
+
+                // Found a dbproxy that can execute the read query
+                if avail_dbproxy.len() > 0 {
+                    break;
+                } else {
+                    // Did not find any dbproxy that can execute the read quer, need to wait on version
+                    // Wait for any updates on dbvn_manager
+                    self.dbvn_manager_notify.notified().await;
+                }
+            }
+
+            // For now, pick the first dbproxy from all available
+            let dbproxy_addr = avail_dbproxy[0].0;
+            debug!(
+                "Found {} for executing the ReadOnly {:?} with {:?}",
+                dbproxy_addr, msqlquery, txvn
+            );
+            (dbproxy_addr, self.dbproxy_manager.get(&dbproxy_addr))
+        } else {
+            // Single read operation that does not have a TxVN
+            // Since a single-read transaction executes only at one replica,
+            // there is no need to assign cluster-wide version numbers to such a transaction. Instead,
+            // the scheduler forwards the transaction to the chosen replica, without assigning version
+            // numbers.
+            // Because the order of execution for a single-read transaction is ultimately decided
+            // by the database proxy, the scheduler does not block such queries.
+
+            // Find the replica that has the highest version number for the query
+            unimplemented!()
+
+            // TODO:
+            // The scheduler attempts to reduce this wait by
+            // selecting a replica that has an up-to-date version of each table needed by the query. In
+            // this case, up-to-date version means that the table has a version number greater than or
+            // equal to the highest version number assigned to any previous transaction on that table.
+            // Such a replica may not necessarily exist.
+        }
+    }
+
+    /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`
+    async fn release_version(&self, dbproxy_addr: &SocketAddr, txvn: &TxVN) {
+        self.dbvn_manager.write().await.release_version(dbproxy_addr, txvn);
+
+        debug!("Released version for {} with {:?}", dbproxy_addr, txvn);
+
+        // Notify all others on any DbVN changes
+        self.dbvn_manager_notify.notify_waiters();
+    }
 }
 
 pub struct Dispatcher {
     state: State,
-    rx: mpsc::Receiver<Request>,
+    request_rx: mpsc::Receiver<Request>,
+    kill_rx: oneshot::Receiver<Kill>,
 }
 
 impl Dispatcher {
     pub fn new(queue_size: usize, state: State) -> (DispatcherAddr, Dispatcher) {
-        let (tx, rx) = mpsc::channel(queue_size);
-        (DispatcherAddr { tx }, Dispatcher { state, rx })
+        let (request_tx, request_rx) = mpsc::channel(queue_size);
+        let (kill_tx, kill_rx) = oneshot::channel();
+        (
+            DispatcherAddr {
+                request_tx,
+                kill_tx: Arc::new(Mutex::new(Some(kill_tx))),
+            },
+            Dispatcher {
+                state,
+                request_rx,
+                kill_rx,
+            },
+        )
     }
 
-    pub async fn run(self) {
+    pub async fn run(mut self) {
+        info!(
+            "Scheduler dispatcher running with {} DbVNManager and {} DbproxyManager dbproxy targets!",
+            Arc::get_mut(&mut self.state.dbvn_manager)
+                .unwrap()
+                .get_mut()
+                .inner()
+                .len(),
+            self.state.dbproxy_manager.inner().len()
+        );
+
         // Handle each Request concurrently
-        let Dispatcher { state, rx } = self;
-        rx.for_each_concurrent(None, |dispatch_request| async {
-            dispatch_request.work(state.clone()).await
-        })
-        .await;
+        let Dispatcher {
+            state,
+            request_rx,
+            kill_rx,
+        } = self;
+
+        let request_handler = request_rx.for_each_concurrent(None, |dispatch_request| async {
+            state.clone().execute(dispatch_request).await
+        });
+
+        let kill_handler = kill_rx.fuse();
+
+        pin_mut!(request_handler, kill_handler);
+        tokio::select! {
+            () = request_handler => info!("Scheduler dispatcher terminated after finishing all requests"),
+            kill_res = kill_handler =>
+                match kill_res {
+                    Err(_) => info!("Scheduler dispatcher terminated after finishing all requests"),
+                    Ok(_) => warn!("Scheduler dispatcher terminated by kill"),
+                }
+        }
     }
 }
 
 /// Encloses a way to talk to the Dispatcher
-///
-/// TODO: provide a way to shutdown the `Dispatcher`
 #[derive(Debug, Clone)]
 pub struct DispatcherAddr {
-    tx: mpsc::Sender<Request>,
+    request_tx: mpsc::Sender<Request>,
+    kill_tx: Arc<Mutex<Option<oneshot::Sender<Kill>>>>,
 }
 
 impl DispatcherAddr {
     /// `Option<TxVN>` is to support single read query in the future
-    async fn request(
+    pub async fn request(
         &mut self,
         client_addr: SocketAddr,
         command: Msql,
@@ -107,13 +290,75 @@ impl DispatcherAddr {
             client_addr,
             command,
             txvn,
-            reply: tx,
+            reply: Some(tx),
         };
 
         // Send the request
-        self.tx.send(request).await.map_err(|e| e.to_string())?;
+        self.request_tx.send(request).await.map_err(|e| e.to_string())?;
 
         // Wait for the reply
         rx.await.map_err(|e| e.to_string())
+    }
+
+    pub async fn kill(self) {
+        if let Some(kill_tx) = self.kill_tx.lock().await.take() {
+            warn!("Killing Scheduler dispatcher");
+            kill_tx.send(Kill).unwrap();
+        } else {
+            warn!("Failed to kill Scheduler dispatcher, it was already killed");
+        }
+    }
+}
+
+/// Unit test for `Dispatcher`
+#[cfg(test)]
+mod tests_dispatcher {
+    use super::*;
+    use crate::util::tests_helper::init_logger;
+    use std::iter::FromIterator;
+
+    #[tokio::test]
+    async fn test_kill() {
+        let _guard = init_logger();
+        let (dispatcher_addr, dispatcher) = Dispatcher::new(
+            10,
+            State::new(
+                DbVNManager::from_iter(vec![]),
+                DbproxyManager::from_iter(vec![], 1).await,
+            ),
+        );
+
+        let dispatcher_handler = tokio::spawn(dispatcher.run());
+
+        let killer0 = dispatcher_addr.clone();
+        let killer0_handler = tokio::spawn(async {
+            killer0.kill().await;
+        });
+
+        let killer1 = dispatcher_addr.clone();
+        let killer1_handler = tokio::spawn(async {
+            killer1.kill().await;
+        });
+
+        tokio::try_join!(dispatcher_handler, killer0_handler, killer1_handler).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_drop_dispatcher_addr() {
+        let _guard = init_logger();
+        let (dispatcher_addr, dispatcher) = Dispatcher::new(
+            10,
+            State::new(
+                DbVNManager::from_iter(vec![]),
+                DbproxyManager::from_iter(vec![], 1).await,
+            ),
+        );
+
+        let dispatcher_handler = tokio::spawn(dispatcher.run());
+
+        fn drop_dispatcher_addr(_: DispatcherAddr) {}
+        drop_dispatcher_addr(dispatcher_addr);
+
+        tokio::try_join!(dispatcher_handler).unwrap();
     }
 }

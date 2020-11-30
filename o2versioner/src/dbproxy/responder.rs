@@ -2,7 +2,7 @@ use super::core::{DbVersion, QueryResult};
 use crate::comm::scheduler_dbproxy::Message;
 use futures::SinkExt;
 use std::sync::Arc;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 use tokio::{net::tcp::OwnedWriteHalf, sync::mpsc};
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
@@ -23,7 +23,7 @@ impl Responder {
                 if version_release {
                     version
                         .lock()
-                        .unwrap()
+                        .await
                         .release_on_tables(result.contained_newer_versions.clone());
                 }
 

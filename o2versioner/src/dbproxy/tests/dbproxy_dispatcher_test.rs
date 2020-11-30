@@ -1,12 +1,12 @@
 use super::Dispatcher;
-use crate::core::msql::Operation as OperationType;
-use crate::core::version_number::TableVN;
+use crate::core::operation::Operation as OperationType;
+use crate::core::transaction_version::TxTableVN;
 use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
-use std::sync::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_receive_response_from_new_transactions() {
     //Prepare - Network
@@ -34,12 +34,12 @@ async fn test_receive_response_from_new_transactions() {
     );
 
     let mut mock_vs = Vec::new();
-    mock_vs.push(TableVN {
+    mock_vs.push(TxTableVN {
         table: "table2".to_string(),
         vn: 0,
         op: OperationType::R,
     });
-    mock_vs.push(TableVN {
+    mock_vs.push(TxTableVN {
         table: "table1".to_string(),
         vn: 0,
         op: OperationType::R,
@@ -49,26 +49,26 @@ async fn test_receive_response_from_new_transactions() {
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t2".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t3".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t4".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
 
     while !mock_ops.is_empty() {
-        pending_queue_2.lock().unwrap().push(mock_ops.pop().unwrap());
+        pending_queue_2.lock().await.push(mock_ops.pop().unwrap());
     }
 
     let mut task_num: u64 = 0;
@@ -78,10 +78,10 @@ async fn test_receive_response_from_new_transactions() {
             break;
         }
     }
-    assert!(transactions_2.lock().unwrap().len() == 4);
+    assert!(transactions_2.lock().await.len() == 4);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 #[ignore]
 async fn test_receive_response_from_same_transactions() {
     //Prepare - Network
@@ -110,12 +110,12 @@ async fn test_receive_response_from_same_transactions() {
     );
 
     let mut mock_vs = Vec::new();
-    mock_vs.push(TableVN {
+    mock_vs.push(TxTableVN {
         table: "table2".to_string(),
         vn: 0,
         op: OperationType::R,
     });
-    mock_vs.push(TableVN {
+    mock_vs.push(TxTableVN {
         table: "table1".to_string(),
         vn: 0,
         op: OperationType::R,
@@ -125,26 +125,26 @@ async fn test_receive_response_from_same_transactions() {
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t2".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t3".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
     mock_ops.push(Operation {
         transaction_id: "t1".to_string(),
         task: Task::READ,
-        tablevns: mock_vs.clone(),
+        txtablevns: mock_vs.clone(),
     });
 
     while !mock_ops.is_empty() {
-        pending_queue_2.lock().unwrap().push(mock_ops.pop().unwrap());
+        pending_queue_2.lock().await.push(mock_ops.pop().unwrap());
     }
 
     let mut task_num: u64 = 0;
@@ -154,5 +154,5 @@ async fn test_receive_response_from_same_transactions() {
             break;
         }
     }
-    assert!(transactions_2.lock().unwrap().len() == 3);
+    assert!(transactions_2.lock().await.len() == 3);
 }

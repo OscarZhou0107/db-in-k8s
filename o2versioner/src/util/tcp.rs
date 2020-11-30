@@ -5,6 +5,7 @@ use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::future::Future;
+use std::iter;
 use std::net::SocketAddr;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::string::ToString;
@@ -32,7 +33,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     Fut: Future<Output = ()> + Send + 'static,
     S: ToString,
 {
-    let mut listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.to_string();
@@ -66,6 +67,22 @@ pub async fn start_tcplistener<A, C, Fut, S>(
         "[{}] {} TcpListener says service terminated, have a good night",
         local_addr, server_name
     );
+}
+
+pub async fn send_and_receive_single_as_json<Msg, S>(
+    tcp_stream: &mut TcpStream,
+    msg: Msg,
+    client_name: S,
+) -> std::io::Result<Msg>
+where
+    for<'a> Msg: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
+    S: Into<String>,
+{
+    send_and_receive_as_json(tcp_stream, iter::once(msg), client_name)
+        .await
+        .into_iter()
+        .next()
+        .expect("Expecting one reply message")
 }
 
 /// Send a collection of msg through the argument `TcpStream`, and expecting a reply for each of the msg sent.
