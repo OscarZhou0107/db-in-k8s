@@ -2,6 +2,7 @@
 use super::core::DbVNManager;
 use super::dbproxy_manager::DbproxyManager;
 use crate::comm::appserver_scheduler::MsqlResponse;
+use crate::comm::scheduler_dbproxy::*;
 use crate::core::msql::*;
 use crate::core::operation::*;
 use crate::core::transaction_version::*;
@@ -10,10 +11,7 @@ use bb8::Pool;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tokio::sync::Notify;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
 use tracing::debug;
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
@@ -43,19 +41,68 @@ impl State {
         }
     }
 
-    async fn process(&self, request: Request) {
+    async fn execute(&self, request: Request) {
         match &request.command {
             Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
-            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
-                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
-                _ => self.execute_query(request).await,
-            },
-            Msql::EndTx(_) => self.execute_endtx(request).await,
+            Msql::Query(msqlquery) => {
+                match msqlquery.tableops().access_pattern() {
+                    AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
+                    _ => self.execute_query(request).await,
+                };
+            }
+            Msql::EndTx(_) => self.execute_query(request).await,
         };
     }
 
-    async fn execute_query(&self, _request: Request) {
-        todo!()
+    async fn execute_query(&self, request: Request) {
+        let dbproxy_tasks_stream = stream::iter(self.assign_dbproxy_for_execution(&request).await);
+
+        let Request {
+            client_addr: _,
+            command,
+            txvn,
+            reply,
+        } = request;
+        let msg = NewMessage::MsqlRequest(command, txvn);
+        let shared_reply_channel = Arc::new(Mutex::new(reply));
+
+        // Each communication with dbproxy is spawned as a separate task
+        dbproxy_tasks_stream
+            .for_each_concurrent(None, move |(dbproxy_addr, dbproxy_pool)| {
+                let msg_cloned = msg.clone();
+                let shared_reply_channel_cloned = shared_reply_channel.clone();
+                async move {
+                    let msqlresponse = send_and_receive_single_as_json(
+                        &mut dbproxy_pool.get().await.unwrap(),
+                        msg_cloned,
+                        "Scheduler dispatcher-query",
+                    )
+                    .map_err(|e| e.to_string())
+                    .and_then(|res| match res {
+                        NewMessage::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
+                        _ => future::err(String::from("Invalid response from Dbproxy")),
+                    })
+                    .map_ok_or_else(|e| MsqlResponse::Query(Err(e)), |msqlresponse| msqlresponse)
+                    .await;
+
+                    // If the oneshot channel is not consumed, consume it to send the reply back to handler
+                    if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
+                        debug!(
+                            "<- [{}] Scheduler dispatcher-query reply response to handler: {:?}",
+                            dbproxy_addr, msqlresponse
+                        );
+                        reply
+                            .send(msqlresponse)
+                            .expect("Scheduler dispatcher-query cannot reply response to handler");
+                    } else {
+                        debug!(
+                            "<- [{}] Scheduler dispatcher-query ignore response: {:?}",
+                            dbproxy_addr, msqlresponse
+                        );
+                    }
+                }
+            })
+            .await;
     }
 
     async fn execute_endtx(&self, _request: Request) {
@@ -64,14 +111,13 @@ impl State {
 
     async fn assign_dbproxy_for_execution(
         &self,
-        msql: &Msql,
-        txvn: &Option<TxVN>,
+        request: &Request,
     ) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
-        match msql {
+        match &request.command {
             Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
             Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
                 AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
-                AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, txvn).await],
+                AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, &request.txvn).await],
                 AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
             },
             Msql::EndTx(_) => self.dbproxy_manager.to_vec(),
@@ -161,7 +207,7 @@ impl Dispatcher {
         // Handle each Request concurrently
         let Dispatcher { state, rx } = self;
         rx.for_each_concurrent(None, |dispatch_request| async {
-            state.clone().process(dispatch_request).await
+            state.clone().execute(dispatch_request).await
         })
         .await;
     }
