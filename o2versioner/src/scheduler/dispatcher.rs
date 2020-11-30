@@ -7,12 +7,12 @@ use crate::core::operation::*;
 use crate::core::transaction_version::*;
 use crate::util::tcp::*;
 use bb8::Pool;
+use futures::pin_mut;
 use futures::prelude::*;
-use futures::{pin_mut, select};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
@@ -221,7 +221,7 @@ impl Dispatcher {
         (
             DispatcherAddr {
                 request_tx,
-                kill_tx: Arc::new(kill_tx),
+                kill_tx: Arc::new(Mutex::new(Some(kill_tx))),
             },
             Dispatcher {
                 state,
@@ -231,13 +231,24 @@ impl Dispatcher {
         )
     }
 
-    pub async fn run(self) {
+    pub async fn run(mut self) {
+        info!(
+            "Scheduler dispatcher running with {} DbVNManager and {} DbproxyManager dbproxy targets!",
+            Arc::get_mut(&mut self.state.dbvn_manager)
+                .unwrap()
+                .get_mut()
+                .inner()
+                .len(),
+            self.state.dbproxy_manager.inner().len()
+        );
+
         // Handle each Request concurrently
         let Dispatcher {
             state,
             request_rx,
             kill_rx,
         } = self;
+
         let request_handler = request_rx.for_each_concurrent(None, |dispatch_request| async {
             state.clone().execute(dispatch_request).await
         });
@@ -245,9 +256,9 @@ impl Dispatcher {
         let kill_handler = kill_rx.fuse();
 
         pin_mut!(request_handler, kill_handler);
-        select! {
-            () = request_handler => info!("Dispatcher terminated after finishing all requests"),
-            _ = kill_handler => info!("Dispatcher terminated by kill")
+        tokio::select! {
+            () = request_handler => info!("Scheduler dispatcher terminated after finishing all requests"),
+            _ = kill_handler => warn!("Scheduler dispatcher terminated by kill"),
         }
     }
 }
@@ -256,7 +267,7 @@ impl Dispatcher {
 #[derive(Debug, Clone)]
 pub struct DispatcherAddr {
     request_tx: mpsc::Sender<Request>,
-    kill_tx: Arc<oneshot::Sender<Kill>>,
+    kill_tx: Arc<Mutex<Option<oneshot::Sender<Kill>>>>,
 }
 
 impl DispatcherAddr {
@@ -285,20 +296,46 @@ impl DispatcherAddr {
         rx.await.map_err(|e| e.to_string())
     }
 
-    pub fn kill(self) {
-        if let Ok(kill_tx) = Arc::try_unwrap(self.kill_tx) {
+    pub async fn kill(self) {
+        if let Some(kill_tx) = self.kill_tx.lock().await.take() {
+            warn!("Killing Scheduler dispatcher");
             kill_tx.send(Kill).unwrap();
+        } else {
+            warn!("Failed to kill Scheduler dispatcher, it was already killed");
         }
     }
 }
 
-// /// Unit test for `Dispatcher`
-// #[cfg(test)]
-// mod tests_dispatcher {
-//     use super::*;
+/// Unit test for `Dispatcher`
+#[cfg(test)]
+mod tests_dispatcher {
+    use super::*;
+    use crate::util::tests_helper::init_logger;
+    use std::iter::FromIterator;
 
-//     #[test]
-//     fn test_kill() {
-//         Dispatcher::new(10, State::new(DbVNManager::, dbproxy_manager: DbproxyManager))
-//     }
-// }
+    #[tokio::test]
+    async fn test_kill() {
+        let _guard = init_logger();
+        let (dispatcher_addr, dispatcher) = Dispatcher::new(
+            10,
+            State::new(
+                DbVNManager::from_iter(vec![]),
+                DbproxyManager::from_iter(vec![], 1).await,
+            ),
+        );
+
+        let dispatcher_handler = tokio::spawn(dispatcher.run());
+
+        let killer0 = dispatcher_addr.clone();
+        let killer0_handler = tokio::spawn(async {
+            killer0.kill().await;
+        });
+
+        let killer1 = dispatcher_addr.clone();
+        let killer1_handler = tokio::spawn(async {
+            killer1.kill().await;
+        });
+
+        tokio::try_join!(dispatcher_handler, killer0_handler, killer1_handler).unwrap();
+    }
+}

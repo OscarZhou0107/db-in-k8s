@@ -84,7 +84,7 @@ impl DbVNManager {
         self.0.entry(dbproxy_addr.clone()).or_default().release_version(txvn);
     }
 
-    pub fn get(&self) -> &HashMap<SocketAddr, DbVN> {
+    pub fn inner(&self) -> &HashMap<SocketAddr, DbVN> {
         &self.0
     }
 }
@@ -115,7 +115,7 @@ impl DbproxyManager {
         )
     }
 
-    pub fn all(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
+    pub fn inner(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
         &self.0
     }
 
@@ -174,10 +174,10 @@ mod tests_dbvnmanager {
             "127.0.0.1:10002".parse().unwrap(),
         ]);
 
-        assert!(dbvnmanager.get().contains_key(&"127.0.0.1:10000".parse().unwrap()));
-        assert!(dbvnmanager.get().contains_key(&"127.0.0.1:10001".parse().unwrap()));
-        assert!(dbvnmanager.get().contains_key(&"127.0.0.1:10002".parse().unwrap()));
-        assert!(!dbvnmanager.get().contains_key(&"127.0.0.1:10003".parse().unwrap()));
+        assert!(dbvnmanager.inner().contains_key(&"127.0.0.1:10000".parse().unwrap()));
+        assert!(dbvnmanager.inner().contains_key(&"127.0.0.1:10001".parse().unwrap()));
+        assert!(dbvnmanager.inner().contains_key(&"127.0.0.1:10002".parse().unwrap()));
+        assert!(!dbvnmanager.inner().contains_key(&"127.0.0.1:10003".parse().unwrap()));
     }
 
     #[test]
