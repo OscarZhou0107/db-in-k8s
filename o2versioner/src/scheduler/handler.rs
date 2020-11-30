@@ -167,9 +167,7 @@ async fn process_msql(
     match msql {
         Msql::BeginTx(msqlbegintx) => {
             if conn_state.lock().await.current_txvn().is_some() {
-                appserver_scheduler::Message::Reply(MsqlResponse::BeginTx(Err(String::from(
-                    "Previous transaction not finished yet",
-                ))))
+                appserver_scheduler::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
             } else {
                 let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
                 let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
@@ -190,8 +188,8 @@ async fn process_msql(
                         }
                     })
                     .map_ok_or_else(
-                        |e| appserver_scheduler::Message::Reply(MsqlResponse::BeginTx(Err(e))),
-                        |_| appserver_scheduler::Message::Reply(MsqlResponse::BeginTx(Ok(()))),
+                        |e| appserver_scheduler::Message::Reply(MsqlResponse::begintx_err(e)),
+                        |_| appserver_scheduler::Message::Reply(MsqlResponse::begintx_ok()),
                     )
                     .await
             }
@@ -202,7 +200,7 @@ async fn process_msql(
             dispatcher_addr
                 .request(client_addr, msql, txvn)
                 .map_ok_or_else(
-                    |e| appserver_scheduler::Message::Reply(MsqlResponse::Query(Err(e))),
+                    |e| appserver_scheduler::Message::Reply(MsqlResponse::query_err(e)),
                     |res| appserver_scheduler::Message::Reply(res),
                 )
                 .await
@@ -210,14 +208,12 @@ async fn process_msql(
         Msql::EndTx(_) => {
             let txvn = conn_state.lock().await.take_current_txvn();
             if txvn.is_none() {
-                appserver_scheduler::Message::Reply(MsqlResponse::EndTx(Err(String::from(
-                    "There is not transaction to end",
-                ))))
+                appserver_scheduler::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
             } else {
                 dispatcher_addr
                     .request(client_addr, msql, txvn)
                     .map_ok_or_else(
-                        |e| appserver_scheduler::Message::Reply(MsqlResponse::EndTx(Err(e))),
+                        |e| appserver_scheduler::Message::Reply(MsqlResponse::endtx_err(e)),
                         |res| appserver_scheduler::Message::Reply(res),
                     )
                     .await
