@@ -5,7 +5,6 @@ use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio::sync::Mutex;
@@ -84,48 +83,34 @@ async fn process_connection(mut socket: TcpStream, sequencer_socket_pool: Pool<t
     // the socket is dedicated for one session only, opposed to being shared for multiple sessions.
     // At any given point, there is at most one transaction.
     // Connection specific storage
+    let conn_state = Arc::new(Mutex::new(ConnectionState::default()));
 
     // Process a stream of incoming messages from a single tcp connection
     serded_read
-        .scan(
-            Arc::new(Mutex::new(ConnectionState::default())),
-            move |conn_state, msg_res| {
-                let conn_state_cloned = conn_state.clone();
-                let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
-                async move {
-                    if let Ok(msg) = msg_res {
-                        debug!("<- [{}] Received {:?}", peer_addr, msg);
-                        Some(process_request(msg, conn_state_cloned, peer_addr, sequencer_socket_pool_cloned).await)
-                    } else {
-                        Some(msg_res)
+        .and_then(move |msg| {
+            let conn_state_cloned = conn_state.clone();
+            let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
+            async move {
+                debug!("<- [{}] Received {:?}", peer_addr, msg);
+                // process_request(msg, conn_state_cloned, peer_addr, sequencer_socket_pool_cloned).await
+                let response = match msg {
+                    appserver_scheduler::Message::RequestMsql(msql) => {
+                        process_msql(msql, conn_state_cloned, sequencer_socket_pool_cloned).await
                     }
-                }
-            },
-        )
+                    appserver_scheduler::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
+                        // Try to convert MsqlText to Msql first
+                        Ok(msql) => process_msql(msql, conn_state_cloned, sequencer_socket_pool_cloned).await,
+                        Err(e) => appserver_scheduler::Message::InvalidMsqlText(e.to_owned()),
+                    },
+                    _ => appserver_scheduler::Message::InvalidRequest,
+                };
+                debug!("-> [{}] Reply {:?}", peer_addr, response);
+                Ok(response)
+            }
+        })
         .forward(serded_write)
         .map(|_| ())
         .await;
-}
-
-/// Process the argument `request` and return a `Result` of response
-async fn process_request(
-    request: appserver_scheduler::Message,
-    conn_state: Arc<Mutex<ConnectionState>>,
-    peer_addr: SocketAddr,
-    sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-) -> std::io::Result<appserver_scheduler::Message> {
-    let response = match request {
-        appserver_scheduler::Message::RequestMsql(msql) => process_msql(msql, conn_state, sequencer_socket_pool).await,
-        appserver_scheduler::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
-            // Try to convert MsqlText to Msql first
-            Ok(msql) => process_msql(msql, conn_state, sequencer_socket_pool).await,
-            Err(e) => appserver_scheduler::Message::InvalidMsqlText(e.to_owned()),
-        },
-        _ => appserver_scheduler::Message::InvalidRequest,
-    };
-
-    debug!("-> [{}] Reply {:?}", peer_addr, response);
-    Ok(response)
 }
 
 async fn process_msql(
