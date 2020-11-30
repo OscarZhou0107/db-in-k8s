@@ -139,9 +139,11 @@ impl State {
     }
 
     /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`
-    async fn release_version(&mut self, _msqlendtx: &MsqlEndTx) {
+    async fn release_version(&self, dbproxy_addr: &SocketAddr, txvn: &TxVN) {
+        self.dbvn_manager.write().await.release_version(dbproxy_addr, txvn);
+
         // Notify all others on any DbVN changes
-        todo!()
+        self.dbvn_manager_notify.notify_waiters();
     }
 }
 
