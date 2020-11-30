@@ -23,8 +23,13 @@ urlSql = {
         # another inner sequnce: addRandomItemToCartIfNecessary
         "addRandomItemToCartIfNecessary",
         "getRelated1",
+        # inner inner sequence: addItem
+        "addItem", 
+        "addItemUpdate",
+        "addItemPut",
 
         "resetCartTime",
+        # here
         "getCart",
         # sequence end
 

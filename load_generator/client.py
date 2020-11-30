@@ -20,6 +20,8 @@ MAX_PROB = 9999
 seed(1)
 OK = "Ok"
 NUM_ITEM = 1000
+NUM_QTY = 10
+NUM_PAIR = 10
 DEBUG = 1
 
 def determineNext(curr, prob):
@@ -58,6 +60,7 @@ class Client:
                 print("Response contains error, terminating...")
                 return 0
             # TODO: actually send the sql commands in order
+            
             if curr_url == 'adminConf':
                 ok = self.doAdminConf(s)
             elif curr_url == 'adminReq':
@@ -100,29 +103,34 @@ class Client:
     # just use response["var_name"] to read back
 
     # Note: each function will take whatever retrieved by req.getParameter(varname) as argument 
+    # sql response types:
+    #   - DispOnly
+    #   - UpdateOnly
+    #   - ReadResponse -> need to read data from response
+    
 
     def doAdminConf(self):
-        pass
+        return True
 
     def doAdminReq(self):
-        pass
+        return True
 
     def doBestSell(self):
-        pass
+        return True
 
     def doBuyConf(self):
-        pass
+        return True
 
     def doBuyReq(self):
-        pass
+        return True
 
     def doCustReg(self):
-        pass
+        return True
 
     def doHome(self):
         # say hello - getName - c_id, shopping_id
         if self.new_session: # only getName when it is a new_session
-            query = sql.replaceVars(sql.sqlNameToCommand["getName"], 1, self.c_id)
+            query = sql.replaceVars(sql.sqlNameToCommand["getName"], 1, [self.c_id])
             response = self.send_query_and_receive_response(query)
             # DispOnly: TODO add c_fname and c_lname as class variables if needed else where
             if self.isErr(response):
@@ -133,24 +141,26 @@ class Client:
         response = self.getRelated()
         if self.isErr(response):
             return False
+        
+        return True
 
     def doNewProd(self):
-        pass
+        return True
 
     def doOrderDisp(self):
-        pass
+        return True
 
     def doOrderInq(self):
-        pass
+        return True
 
     def doProdDet(self):
-        pass
+        return True
 
     def doSearchReq(self):
-        pass
+        return True
 
     def doSearchResult(self):
-        pass
+        return True
 
     def doShopCart(self):
         # createEmptyCart (sequence)
@@ -161,10 +171,10 @@ class Client:
             # ReadResponse - read COUNT
             if self.isErr(response):
                 return False
-            self.shopping_id = int(response)
+            self.shopping_id = int(response[0])
 
             # 2. createEmptyCartInsertV2
-            query = sql.replaceVars(sql.sqlNameToCommand["createEmptyCartInsertV2"], 1, self.shopping_id)
+            query = sql.replaceVars(sql.sqlNameToCommand["createEmptyCartInsertV2"], 1, [self.shopping_id])
             response = self.send_query_and_receive_response(query)
             # UpdateOnly:
             if self.isErr(response):
@@ -178,28 +188,61 @@ class Client:
         #       b. addItemUpdate (if result not empty) or addItemPut (if result empty)
         flag = randint(0, 1)
         if flag:
-            i_id = randint(0, NUM_ITEM-1)
-            query = sql.replaceVars(sql.sqlNameToCommand["addItem"], 2, self.shopping_id, i_id)
-            response = self.send_query_and_receive_response(query)
-            # ReadResponse - read SELECT table
+            response = addItem(-1)
             if self.isErr(response):
                 return False
-            if self.isEmpty(response):
-                # addItemPut
-            else:
-                # addItemUpdate
-                response[0]["scl_qty"] = response[0]["scl_qty"] + 1
 
         # 2. refreshCart (sequnce)
-        #       a. refreshCartRemove
-        #       b. refreshCartUpdate
-
+        #       - happens only when no user flag is set, and number of (Qty, i_id) > 0
+        #       a. refreshCartRemove - if Qty is 0
+        #       b. refreshCartUpdate - if Qty  > 0
+        else:
+            # generate a random number of pairs (Qty, i_id), each element a random number 
+            numPair = randint(0, NUM_PAIR)
+            for i in range(numPair):
+                qty = randint(0, NUM_QTY)
+                iid = randint(0, NUM_ITEM)
+                if qty == 0:
+                    query = sql.replaceVars(sql.sqlNameToCommand["refreshCartRemove"], 2, [self.shopping_id, iid])
+                    response = self.send_query_and_receive_response(query)
+                    # UpdateOnly
+                    if self.isErr(response):
+                        return False
+                else:
+                    query = sql.replaceVars(sql.sqlNameToCommand["refreshCartUpdate"], 3, [qty, self.shopping_id, iid])
+                    response = self.send_query_and_receive_response(query)
+                    # UpdateOnly
+                    if self.isErr(response):
+                        return False
 
         # 3. addRandomItemToCartIfNecessary (sequence)
         #       a. addRandomItemToCartIfNecessary
-        #       b. getRelated1
+        #       b. getRelated1 - b.c. only if a. returned 0
+        #       c. addItem
+        query = sql.replaceVars(sql.sqlNameToCommand["addRandomItemToCartIfNecessary"], 1, [self.shopping_id])
+        response = self.send_query_and_receive_response(query)
+        # ReadResponse - read COUNT
+        if self.isErr(response):
+            return False
+        count = int(response[0])
 
+        if count == 0:
+            i_id = randint(0, NUM_ITEM-1)
+            query = sql.replaceVars(sql.sqlNameToCommand["getRelated1"], 1, [i_id])
+            response = self.send_query_and_receive_response(query)
+            # ReadResponse - read SELECT Table
+            r_id = int(response[0]["i_related1"])
+
+            response = addItem(r_id)
+            if self.isErr(response):
+                return False
+        
         # 4. resetCartTime
+        query = sql.replaceVars(sql.sqlNameToCommand["resetCartTime"], 1, [self.shopping_id])
+        response = self.send_query_and_receive_response(query)
+        # UpdateOnly:
+        if self.isErr(response):
+            return False
 
         # 5. getCart
         # TODO: function
@@ -211,6 +254,8 @@ class Client:
         response = self.getRelated()
         if self.isErr(response):
             return False
+
+        return True
 
     def send_query_and_receive_response(self, query):
         # take raw query, return json result
@@ -240,12 +285,45 @@ class Client:
         else:
             return False
 
+    def Err():
+        return "Err"
+
+
+    # All sql handler return the last response
+    # if error happened, return Err()
     def getRelated(self):
         # getRelated - generate a random i_id (item id) as argument
         i_id = randint(0, NUM_ITEM-1)
-        query = sql.replaceVars(sql.sqlNameToCommand["getRelated"], 1, i_id)
+        query = sql.replaceVars(sql.sqlNameToCommand["getRelated"], 1, [i_id])
         response = self.send_query_and_receive_response(query)
         # DispOnly
+        return response
+
+    def addItem(self, i_id):
+        # if no valid i_id given, generate a random value
+        if i_id == -1:
+            i_id = randint(0, NUM_ITEM-1)
+        query = sql.replaceVars(sql.sqlNameToCommand["addItem"], 2, [self.shopping_id, i_id])
+        response = self.send_query_and_receive_response(query)
+        # ReadResponse - read SELECT table
+        if self.isErr(response):
+            return Err()
+        if self.isEmpty(response):
+            # addItemPut
+            query = sql.replaceVars(sql.sqlNameToCommand["addItemPut"], 3, [self.shopping_id, 1, i_id])
+            response = self.send_query_and_receive_response(query)
+            # UpdateOnly
+            if self.isErr(response):
+                return Err()
+        else:
+            # addItemUpdate
+            newQty = response[0]["scl_qty"] + 1
+            query = sql.replaceVars(sql.sqlNameToCommand["addItemUpdate"], 3, [newQty, self.shopping_id, i_id])
+            response = self.send_query_and_receive_response(query)
+            # UpdateOnly
+            if self.isErr(response):
+                return Err()
+        
         return response
 
     def getCart(self):
