@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use super::core::{DbVNManager, DbproxyManager};
 use crate::comm::msql_response::MsqlResponse;
 use crate::comm::scheduler_dbproxy::*;
@@ -300,6 +299,7 @@ impl DispatcherAddr {
         rx.await.map_err(|e| e.to_string())
     }
 
+    #[allow(dead_code)]
     pub async fn kill(self) {
         if let Some(kill_tx) = self.kill_tx.lock().await.take() {
             warn!("Killing Scheduler dispatcher");
