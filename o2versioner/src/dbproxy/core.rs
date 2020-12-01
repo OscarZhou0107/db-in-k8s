@@ -1,5 +1,5 @@
-use crate::comm::msql_response::MsqlResponse;
 use crate::comm::scheduler_dbproxy::Message;
+use crate::comm::MsqlResponse;
 use crate::core::msql::IntoMsqlFinalString;
 use crate::core::msql::MsqlEndTxMode;
 use crate::core::transaction_version::{TxTableVN, TxVN};

@@ -1,6 +1,6 @@
-use crate::comm::{msql_response::MsqlResponse, scheduler_dbproxy::Message};
-
 use super::core::{DbVersion, QueryResult, QueryResultType};
+use crate::comm::scheduler_dbproxy::Message;
+use crate::comm::MsqlResponse;
 use futures::SinkExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -43,7 +43,7 @@ impl Responder {
 mod tests_test {
     use super::Responder;
     use crate::comm::scheduler_dbproxy::Message;
-    use crate::comm::msql_response::MsqlResponse;
+    use crate::comm::MsqlResponse;
     use crate::core::operation::Operation as OperationType;
     use crate::core::transaction_version::TxTableVN;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
@@ -58,7 +58,6 @@ mod tests_test {
 
     #[tokio::test]
     async fn test_send_items_to_from_multiple_channel() {
-
         //Prepare - Mock db related context
         let mut mock_db = HashMap::new();
         mock_db.insert("table1".to_string(), 0);
@@ -76,23 +75,21 @@ mod tests_test {
             },
         ];
         let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
-        
         //Prepare - Network
         let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
             mpsc::channel(100);
 
         //Prepare - Verifying queue
-        let verifying_queue : Arc<Mutex<Vec<MsqlResponse>>> = Arc::new(Mutex::new(Vec::new()));
+        let verifying_queue: Arc<Mutex<Vec<MsqlResponse>>> = Arc::new(Mutex::new(Vec::new()));
         let verifying_queue_2 = Arc::clone(&verifying_queue);
 
-        //Prepare - Data 
+        //Prepare - Data
         let r = QueryResult {
             result: "r".to_string(),
-            succeed : true,
+            succeed: true,
             result_type: QueryResultType::BEGIN,
             contained_newer_versions: mock_table_vs.clone(),
         };
-        
 
         //Prepare - Responder
         helper_spawn_responder(version.clone(), responder_receiver);
@@ -109,7 +106,7 @@ mod tests_test {
         assert!(true);
     }
 
-    fn helper_spawn_responder(version : Arc<Mutex<DbVersion>>, receiver :  mpsc::Receiver<QueryResult>) {
+    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>) {
         tokio::spawn(async move {
             let addr = "127.0.0.1:2345";
             let listener = TcpListener::bind(addr).await.unwrap();
@@ -120,8 +117,7 @@ mod tests_test {
         });
     }
 
-    fn helper_spawn_mock_client(vertifying_queue : Arc<Mutex<Vec<MsqlResponse>>>) {
-
+    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>) {
         tokio::spawn(async move {
             let addr = "127.0.0.1:2345";
             let socket = TcpStream::connect(addr).await.unwrap();
@@ -140,10 +136,9 @@ mod tests_test {
                 }
             }
         });
-
     }
 
-    fn helper_spawn_mock_workers(worker_num : u32, query_result : QueryResult, sender : mpsc::Sender<QueryResult>) {
+    fn helper_spawn_mock_workers(worker_num: u32, query_result: QueryResult, sender: mpsc::Sender<QueryResult>) {
         let _ = tokio::spawn(async move {
             for _ in 0..worker_num {
                 let s = sender.clone();

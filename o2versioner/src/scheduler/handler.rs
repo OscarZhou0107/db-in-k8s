@@ -1,6 +1,6 @@
 use super::core::*;
 use super::dispatcher::*;
-use crate::comm::msql_response::MsqlResponse;
+use crate::comm::MsqlResponse;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
 use crate::util::admin_handler::*;

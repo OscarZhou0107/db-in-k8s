@@ -1,6 +1,6 @@
 use super::core::{DbVNManager, DbproxyManager};
-use crate::comm::msql_response::MsqlResponse;
 use crate::comm::scheduler_dbproxy::*;
+use crate::comm::MsqlResponse;
 use crate::core::msql::*;
 use crate::core::operation::*;
 use crate::core::transaction_version::*;
