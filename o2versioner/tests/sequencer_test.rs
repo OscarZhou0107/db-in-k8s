@@ -3,16 +3,21 @@ use o2versioner::core::msql::*;
 use o2versioner::core::operation::*;
 use o2versioner::core::transaction_version::*;
 use o2versioner::sequencer;
+use o2versioner::util::config::SequencerConfig;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 
 #[tokio::test]
 async fn test_sequencer() {
     let _guard = tests_helper::init_logger();
-    let port = "127.0.0.1:6389";
+    let conf = SequencerConfig {
+        addr: String::from("127.0.0.1:6389"),
+        max_connection: Some(2),
+    };
 
-    let sequencer_handle = tokio::spawn(sequencer::main(port, Some(2)));
+    let sequencer_handle = tokio::spawn(sequencer::main(conf.clone()));
 
+    let conf_cloned = conf.clone();
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
             scheduler_sequencer::Message::RequestTxVN(
@@ -44,10 +49,11 @@ async fn test_sequencer() {
             scheduler_sequencer::Message::Invalid,
         ];
 
-        let mut tcp_stream = TcpStream::connect(port).await.unwrap();
+        let mut tcp_stream = TcpStream::connect(conf_cloned.to_addr()).await.unwrap();
         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 0").await
     });
 
+    let conf_cloned = conf.clone();
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
             scheduler_sequencer::Message::RequestTxVN(
@@ -79,7 +85,7 @@ async fn test_sequencer() {
             scheduler_sequencer::Message::Invalid,
         ];
 
-        let mut tcp_stream = TcpStream::connect(port).await.unwrap();
+        let mut tcp_stream = TcpStream::connect(conf_cloned.to_addr()).await.unwrap();
         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await
     });
 

@@ -6,7 +6,28 @@ use std::convert::TryFrom;
 ///
 /// The process of converting into `MsqlFinalString` is not reversible.
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct MsqlFinalString(pub String);
+pub struct MsqlFinalString(String);
+
+impl MsqlFinalString {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        Self(s.into())
+    }
+
+    pub fn inner(&self) -> &str {
+        &self.0[..]
+    }
+
+    pub fn into_inner(self) -> String {
+        self.0
+    }
+}
+
+/// For conversion into `String`
+impl From<MsqlFinalString> for String {
+    fn from(m: MsqlFinalString) -> Self {
+        m.into_inner()
+    }
+}
 
 impl<M> From<M> for MsqlFinalString
 where
@@ -406,7 +427,7 @@ mod tests_into_msqlfinalstring {
                 TableOp::new("table0", Operation::R),
                 TableOp::new("table0", Operation::W),
             ]))),
-            MsqlFinalString(String::from("BEGIN TRAN;"))
+            MsqlFinalString::new("BEGIN TRAN;")
         );
 
         let mfs: MsqlFinalString = MsqlBeginTx::from(TableOps::from_iter(vec![
@@ -415,7 +436,7 @@ mod tests_into_msqlfinalstring {
         ]))
         .set_name(Some("tx0"))
         .into();
-        assert_eq!(mfs, MsqlFinalString(String::from("BEGIN TRAN tx0;")));
+        assert_eq!(mfs, MsqlFinalString::new("BEGIN TRAN tx0;"));
     }
 
     #[test]
@@ -428,7 +449,7 @@ mod tests_into_msqlfinalstring {
                 )
                 .unwrap()
             ),
-            MsqlFinalString(String::from("select * from table0 where true;"))
+            MsqlFinalString::new("select * from table0 where true;")
         );
 
         let mfs: MsqlFinalString = MsqlQuery::new(
@@ -439,7 +460,7 @@ mod tests_into_msqlfinalstring {
         .into();
         assert_eq!(
             mfs,
-            MsqlFinalString(String::from("update table1 set name=\"ray\" where id = 20;"))
+            MsqlFinalString::new("update table1 set name=\"ray\" where id = 20;")
         );
     }
 
@@ -447,11 +468,11 @@ mod tests_into_msqlfinalstring {
     fn test_from_msqlendtx() {
         assert_eq!(
             MsqlFinalString::from(MsqlEndTx::commit()),
-            MsqlFinalString(String::from("COMMIT TRAN;"))
+            MsqlFinalString::new("COMMIT TRAN;")
         );
 
         let mfs: MsqlFinalString = MsqlEndTx::rollback().set_name(Some("tx1")).into();
-        assert_eq!(mfs, MsqlFinalString(String::from("ROLLBACK TRAN tx1;")));
+        assert_eq!(mfs, MsqlFinalString::new("ROLLBACK TRAN tx1;"));
     }
 
     #[test]
@@ -461,7 +482,7 @@ mod tests_into_msqlfinalstring {
                 TableOp::new("table0", Operation::R),
                 TableOp::new("table0", Operation::W),
             ])))),
-            MsqlFinalString(String::from("BEGIN TRAN;"))
+            MsqlFinalString::new("BEGIN TRAN;")
         );
 
         assert_eq!(
@@ -472,11 +493,11 @@ mod tests_into_msqlfinalstring {
                 )
                 .unwrap()
             )),
-            MsqlFinalString(String::from("select * from table0 where true;"))
+            MsqlFinalString::new("select * from table0 where true;")
         );
 
         let mfs: MsqlFinalString = Msql::EndTx(MsqlEndTx::rollback().set_name(Some("tx1"))).into();
-        assert_eq!(mfs, MsqlFinalString(String::from("ROLLBACK TRAN tx1;")));
+        assert_eq!(mfs, MsqlFinalString::new("ROLLBACK TRAN tx1;"));
     }
 }
 

@@ -1,23 +1,23 @@
+use crate::comm::msql_response::MsqlResponse;
+use crate::comm::scheduler_dbproxy::Message;
+use crate::core::msql::IntoMsqlFinalString;
+use crate::core::msql::MsqlEndTxMode;
 use crate::core::transaction_version::{TxTableVN, TxVN};
 use crate::core::{msql::Msql, operation::Operation as OperationType};
+use async_trait::async_trait;
 use bb8_postgres::{
     bb8::{ManageConnection, Pool, PooledConnection},
     PostgresConnectionManager,
 };
+use csv::*;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use async_trait::async_trait;
-use csv::*;
-use std::net::SocketAddr;
 use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
-use crate::core::msql::IntoMsqlFinalString;
-use crate::core::msql::MsqlEndTxMode;
-use crate::comm::msql_response::MsqlResponse;
-use crate::comm::scheduler_dbproxy::Message;
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -46,19 +46,18 @@ pub struct QueueMessage {
 }
 
 impl QueueMessage {
-    pub fn new(identifier : SocketAddr, request : Msql, versions : Option<TxVN>) -> Self {
-
+    pub fn new(identifier: SocketAddr, request: Msql, versions: Option<TxVN>) -> Self {
         let operation_type;
         let mut query_string = String::new();
 
         match request {
             Msql::BeginTx(_) => {
-                operation_type  = Task::BEGIN;
+                operation_type = Task::BEGIN;
             }
 
             Msql::Query(op) => {
                 operation_type = Task::READ;
-                query_string = op.into_msqlfinalstring().0;
+                query_string = op.into_msqlfinalstring().into_inner();
             }
 
             Msql::EndTx(op) => match op.mode() {
@@ -68,7 +67,7 @@ impl QueueMessage {
                 MsqlEndTxMode::Rollback => {
                     operation_type = Task::ABORT;
                 }
-            }
+            },
         }
 
         QueueMessage {
@@ -287,11 +286,10 @@ pub struct QueryResult {
 
 impl QueryResult {
     pub fn into_msql_response(self) -> MsqlResponse {
-
         let message;
 
         match self.result_type {
-            QueryResultType::BEGIN => { 
+            QueryResultType::BEGIN => {
                 if self.succeed {
                     message = MsqlResponse::BeginTx(Ok(()));
                 } else {
