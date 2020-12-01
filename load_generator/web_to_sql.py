@@ -29,7 +29,6 @@ urlSql = {
         "addItemPut",
 
         "resetCartTime",
-        # here
         "getCart",
         # sequence end
 
@@ -84,22 +83,28 @@ urlSql = {
         "enterAddressInsert", 
         "enterAddressMaxId", 
         "createNewCustomerMaxId",
+
         "getCart"
         ],
     "buyConf": [
-        # a sequence: doBuyConfirm
+        # a sequence: doBuyConfirm 
+        #    -> two versions: customer input new data vs. use address on file
         "getCDiscount",
         "getCart",
-        "getCAddr",
-        # inner sequence: enterAddress
+
+        # Option 1 - inner sequence: enterAddress
         "enterAddressId", 
         "enterAddressMatch", 
         "enterAddressInsert", 
         "enterAddressMaxId", 
+        # or Option 2
+        "getCAddr",
+
         # another inner sequnce: enterOrder
-        "enterOrderInsert",
         "getCAddrId",
         "enterOrderMaxId",
+        "enterOrderInsert",
+        # loop based on how many lines there are in cart (returned by getCart)
         "addOrderLine",
         "getStock",
         "setStock",
@@ -153,5 +158,12 @@ if __name__ == "__main__":
         if i not in ls:
             print(i)
     '''
+    '''
     print(getBegin("home"))
     print(getBegin("bestSell"))
+    '''
+    l = []
+    for i in urlSql:
+        for j in urlSql[i]:
+            l.append(j)
+    print(len(set(l)))
