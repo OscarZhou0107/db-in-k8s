@@ -1,6 +1,6 @@
 use super::msql_response::MsqlResponse;
 use crate::core::msql::*;
-use crate::core::transaction_version::*;
+use crate::core::TxVN;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 

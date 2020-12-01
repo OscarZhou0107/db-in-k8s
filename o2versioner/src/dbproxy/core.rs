@@ -2,8 +2,8 @@ use crate::comm::scheduler_dbproxy::Message;
 use crate::comm::MsqlResponse;
 use crate::core::msql::IntoMsqlFinalString;
 use crate::core::msql::MsqlEndTxMode;
-use crate::core::transaction_version::{TxTableVN, TxVN};
 use crate::core::{msql::Msql, operation::Operation as OperationType};
+use crate::core::{TxTableVN, TxVN};
 use async_trait::async_trait;
 use bb8_postgres::{
     bb8::{ManageConnection, Pool, PooledConnection},

@@ -45,7 +45,7 @@ mod tests_test {
     use crate::comm::scheduler_dbproxy::Message;
     use crate::comm::MsqlResponse;
     use crate::core::operation::Operation as OperationType;
-    use crate::core::transaction_version::TxTableVN;
+    use crate::core::TxTableVN;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
     use std::{collections::HashMap, sync::Arc};

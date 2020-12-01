@@ -1,7 +1,7 @@
 use super::core::{
     DbVersion, PendingQueue, PostgreToCsvWriter, PostgresSqlConnPool, QueryResult, QueryResultType, QueueMessage, Task,
 };
-use crate::core::transaction_version::{TxTableVN, TxVN};
+use crate::core::{TxTableVN, TxVN};
 use std::collections::HashMap;
 use std::sync::Arc;
 //use mysql_async::Pool;
@@ -105,7 +105,9 @@ impl Dispatcher {
                         }
                     }
 
-                    let _ = sender.send(prepare_query_result(operation.operation_type, operation.versions, raw)).await;
+                    let _ = sender
+                        .send(prepare_query_result(operation.operation_type, operation.versions, raw))
+                        .await;
                     if finish {
                         break;
                     }

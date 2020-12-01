@@ -1,6 +1,6 @@
 use crate::core::msql::MsqlBeginTx;
 use crate::core::operation::Operation;
-use crate::core::transaction_version::{TxTableVN, TxVN, VN};
+use crate::core::{TxTableVN, TxVN, VN};
 use std::collections::HashMap;
 
 /// Version number info for a single table
@@ -204,7 +204,7 @@ mod tests_state {
     use super::State;
     use crate::core::msql::MsqlBeginTx;
     use crate::core::operation::*;
-    use crate::core::transaction_version::{TxTableVN, TxVN};
+    use crate::core::{TxTableVN, TxVN};
     use std::iter::FromIterator;
 
     #[test]
