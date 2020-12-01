@@ -3,6 +3,7 @@ use super::dispatcher::*;
 use crate::comm::msql_response::MsqlResponse;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
+use crate::util::admin_handler::*;
 use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
@@ -73,8 +74,25 @@ pub async fn main(conf: Config) {
         "Scheduler",
     ));
 
-    // Wait for tasks to join
-    tokio::try_join!(dispatcher_handle, handler_handle).unwrap();
+    // Combine the dispatcher handle and main handler handle into a main_handle
+    let main_handle = future::try_join(dispatcher_handle, handler_handle);
+
+    // Allow scheduler to be terminated by admin
+    if let Some(admin_addr) = &conf.scheduler.admin_addr {
+        let admin_addr = admin_addr.clone();
+        let admin_handle = tokio::spawn(start_admin_tcplistener(
+            admin_addr,
+            basic_admin_command_handler,
+            "Scheduler",
+        ));
+
+        tokio::select!(
+            res = main_handle => res.map(|_|()).unwrap(),
+            _ = admin_handle => info!("Scheduler terminated by admin")
+        );
+    } else {
+        main_handle.await.unwrap();
+    }
 }
 
 /// Process the `tcp_stream` for a single connection

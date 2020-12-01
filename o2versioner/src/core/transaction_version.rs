@@ -35,7 +35,8 @@ impl TxTableVN {
 
 /// Version numbers of tables declared by a transaction
 ///
-/// TODO: For table being early-released, remove them from `TxVN`
+/// TODO: For table being early-released, pop them from `TxVN`
+/// into `DbVNReleaseRequest`.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
     pub tx: Option<String>,
@@ -76,6 +77,41 @@ impl TxVN {
         } else {
             Ok(res)
         }
+    }
+
+    /// Translate `TxVN` into multiple `DbVNReleaseRequest`
+    pub fn into_dbvn_release_request(self) -> DbVNReleaseRequest {
+        DbVNReleaseRequest(
+            self.txtablevns
+                .iter()
+                .cloned()
+                .map(|txtablevn| txtablevn.table)
+                .collect(),
+        )
+    }
+}
+
+/// A single-use request for releasing version on `DbVN`
+///
+/// Do not derive `Clone`, acquire it through `TxVN::into_dbvn_release_request`
+#[derive(Debug, Eq, PartialEq)]
+pub struct DbVNReleaseRequest(Vec<String>);
+
+impl IntoIterator for DbVNReleaseRequest {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl DbVNReleaseRequest {
+    pub fn into_inner(self) -> Vec<String> {
+        self.0
+    }
+
+    pub fn inner(&self) -> &[String] {
+        &self.0
     }
 }
 
@@ -197,5 +233,21 @@ mod tests_txvn {
                 TableOp::new("t0", Operation::R)
             ]))
             .is_err());
+    }
+
+    #[test]
+    fn test_into_dbvn_release_request() {
+        let txvn = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 2, Operation::W),
+            ],
+        };
+
+        assert_eq!(
+            txvn.into_dbvn_release_request(),
+            DbVNReleaseRequest(vec![String::from("t0"), String::from("t1")]),
+        );
     }
 }

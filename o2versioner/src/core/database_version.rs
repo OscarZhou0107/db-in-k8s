@@ -51,8 +51,38 @@ impl DbVN {
     /// is allowed to execute
     ///
     /// # Important:
-    /// You must check the original `TableOps` that is used to yield `txtablevns`
+    /// 1. You must check the original `TableOps` that is used to yield `txtablevns`
     /// for any potential mixing of R and W.
+    /// 2. Use `TxVN::get_from_tableops(&self, tableops: &TableOps)` to get a list of `TxTableVN`
+    /// for checking
+    ///
+    /// # Examples:
+    /// ```
+    /// use o2versioner::core::database_version::DbVN;
+    /// use o2versioner::core::operation::{Operation, TableOp, TableOps};
+    /// use o2versioner::core::transaction_version::{TxTableVN, TxVN};
+    /// use std::iter::FromIterator;
+    ///
+    /// let dbvn = DbVN::default();
+    ///
+    /// let txvn = TxVN {
+    ///     tx: None,
+    ///     txtablevns: vec![
+    ///         TxTableVN::new("t0", 0, Operation::W),
+    ///         TxTableVN::new("t1", 0, Operation::W),
+    ///         TxTableVN::new("t2", 6, Operation::R),
+    ///     ],
+    /// };
+    ///
+    /// let can_execute_list = txvn
+    ///     .get_from_tableops(&TableOps::from_iter(vec![
+    ///         TableOp::new("t0", Operation::R),
+    ///         TableOp::new("t1", Operation::R),
+    ///     ]))
+    ///     .unwrap();
+    ///
+    /// assert!(dbvn.can_execute_query(&can_execute_list));
+    /// ```
     ///
     /// # Notes:
     /// 1. A write query is executed only when the version numbers for each table at the
@@ -76,10 +106,28 @@ impl DbVN {
             .all(|txtablevn| self.can_execute_query_on_table(txtablevn))
     }
 
-    /// Increment all database versions by 1 for tables listed in `TxVN`
-    pub fn release_version(&mut self, txvn: &TxVN) {
-        txvn.txtablevns.iter().for_each(|txtablevn| {
-            *self.0.entry(txtablevn.table.to_owned()).or_default() += 1;
+    /// Increment all database versions by 1 for tables listed in `DbVNReleaseRequest`
+    ///
+    /// # Examples
+    /// You can acquire `DbVNReleaseRequest` by:
+    /// ```
+    /// use o2versioner::core::database_version::DbVN;
+    /// use o2versioner::core::operation::Operation;
+    /// use o2versioner::core::transaction_version::{TxTableVN, TxVN};
+    /// let mut dbvn = DbVN::default();
+    /// let txvn = TxVN {
+    ///     tx: None,
+    ///     txtablevns: vec![
+    ///         TxTableVN::new("t0", 5, Operation::W),
+    ///         TxTableVN::new("t1", 6, Operation::W),
+    ///         TxTableVN::new("t2", 6, Operation::R),
+    ///     ],
+    /// };
+    /// dbvn.release_version(txvn.into_dbvn_release_request());
+    /// ```
+    pub fn release_version(&mut self, release_request: DbVNReleaseRequest) {
+        release_request.into_iter().for_each(|table| {
+            *self.0.entry(table).or_default() += 1;
         });
     }
 }
@@ -271,7 +319,7 @@ mod tests_dbvn {
 
         assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops,).unwrap()));
         assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
-        dbvn.release_version(&txvn0);
+        dbvn.release_version(txvn0.into_dbvn_release_request());
         assert!(dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
     }
 }

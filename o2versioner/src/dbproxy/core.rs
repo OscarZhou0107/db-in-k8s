@@ -286,28 +286,26 @@ pub struct QueryResult {
 
 impl QueryResult {
     pub fn into_msql_response(self) -> MsqlResponse {
-        let message;
-
-        match self.result_type {
+        let message = match self.result_type {
             QueryResultType::BEGIN => {
                 if self.succeed {
-                    message = MsqlResponse::BeginTx(Ok(()));
+                    MsqlResponse::begintx_ok()
                 } else {
-                    message = MsqlResponse::BeginTx(Err(self.result));
+                    MsqlResponse::begintx_err(self.result)
                 }
             }
             QueryResultType::QUERY => {
                 if self.succeed {
-                    message = MsqlResponse::Query(Ok(self.result));
+                    MsqlResponse::query_ok(self.result)
                 } else {
-                    message = MsqlResponse::Query(Err(self.result));
+                    MsqlResponse::query_err(self.result)
                 }
             }
             QueryResultType::END => {
                 if self.succeed {
-                    message = MsqlResponse::EndTx(Ok(self.result));
+                    MsqlResponse::endtx_ok(self.result)
                 } else {
-                    message = MsqlResponse::EndTx(Err(self.result));
+                    MsqlResponse::endtx_err(self.result)
                 }
             }
         };
