@@ -109,7 +109,12 @@ mod tests_start_admin_tcplistener {
         let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, basic_admin_command_handler, "test"));
         let client_handle = tokio::spawn(async move {
             let mut tcp_stream = TcpStream::connect(admin_addr).await.unwrap();
-            let res = mock_ascii_client(&mut tcp_stream, vec!["help", "exit"], "admin tcplistener tester").await;
+            let res = mock_ascii_client(
+                &mut tcp_stream,
+                vec!["help", "exit", "help"],
+                "admin tcplistener tester",
+            )
+            .await;
             info!("All responses received: {:?}", res);
         });
 
