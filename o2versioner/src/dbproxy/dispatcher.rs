@@ -80,7 +80,6 @@ impl Dispatcher {
         sender: Sender<QueryResult>,
     ) {
         tokio::spawn(async move {
-            let mut result: QueryResult;
             {
                 let mut finish = false;
                 let conn = pool.get().await.unwrap();
@@ -106,9 +105,7 @@ impl Dispatcher {
                         }
                     }
 
-                    result = prepare_query_result(operation.operation_type, operation.versions, raw);
-
-                    let _ = sender.send(result.clone()).await;
+                    let _ = sender.send(prepare_query_result(operation.operation_type, operation.versions, raw)).await;
                     if finish {
                         break;
                     }
