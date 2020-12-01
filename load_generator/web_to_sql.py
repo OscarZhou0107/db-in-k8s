@@ -101,7 +101,7 @@ urlSql = {
         "getCAddr",
 
         # another inner sequnce: enterOrder
-        "getCAddrId",
+        "getCAddrId", # same sql as getCAddr
         "enterOrderMaxId",
         "enterOrderInsert",
         # loop based on how many lines there are in cart (returned by getCart)

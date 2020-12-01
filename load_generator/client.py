@@ -3,6 +3,7 @@ import datetime
 import time
 from random import seed
 from random import randint
+from random import uniform
 import argparse
 import json
 
@@ -156,9 +157,59 @@ class Client:
     
 
     def doAdminConf(self):
+        # getBook
+        i_id = randint(1, NUM_ITEM)
+        response = self.getBook(i_id)
+        # ReadResponse - SELECT * FROM item,author
+        if self.isErr(response):
+            return False
+        
+        # adminUpdate (sequence)
+        #   a. adminUpdate
+        image = generateRandomString()
+        thumbnail = generateRandomString()
+        cost = round(uniform(1, 1500), 2)
+        item_info = [cost, image, thumbnail, i_id]
+        query = sql.replaceVars(sql.sqlNameToCommand["adminUpdate"], 4, item_info)
+        response = self.send_query_and_receive_response(query)
+        # UpdateOnly
+        if self.isErr(response):
+            return False
+
+        #   b. adminUpdateRelated
+        query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated"], 2, i_id, i_id)
+        response = self.send_query_and_receive_response(query)
+        # ReadResponse - SELECT ol_i_id FROM orders, order_line
+        if self.isErr(response):
+            return False
+        # add exactly 5 items into related
+        num = len(response)
+        related = []
+        if num >= 5:
+            num = 5
+        else: # if there are under 5 items in response, add the first item multiple times
+            for i in range(5-num):
+                related.append(response[0][0])
+        for i in range(num):
+            related.append(response[i][0])
+        # then add i_id
+        related.append(i_id)
+
+        #   c. adminUpdateRelated1
+        query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated1"], 6, related)
+        response = self.send_query_and_receive_response(query)
+        # UpdateOnly
+        if self.isErr(response):
+            return False
+
         return True
 
     def doAdminReq(self):
+        # getBook
+        response = self.getBook(-1)
+        # DispOnly
+        if self.isErr(response):
+            return False
         return True
 
     def doBestSell(self):
@@ -181,18 +232,19 @@ class Client:
         # getCDiscount
         query = sql.replaceVars(sql.sqlNameToCommand["getCDiscount"], 1, [self.c_id])
         response = self.send_query_and_receive_response(query)
-        # DispOnly
+        # ReadResponse - SELECT c_discount
         if self.isErr(response):
             return False
+        discount = int(response[0][0])
 
         # getCart
         if self.shopping_id:
             response = self.getCart()
             if self.isErr(response):
                 return False
-            processed = self.processCart(response) # handle all index and return a dictionary
+            processed = self.processCart(response, discount) # handle all index and return a dictionary
 
-            addr_id = 0
+            ship_addr_id = 0
             # choose between 2 options by random
             if randint(0, 1):
                 # enterAddress
@@ -208,7 +260,7 @@ class Client:
                     return False
                 if self.isEmpty(response):
                     return False
-                addr_id = response[0][0]
+                ship_addr_id = response[0][0]
             else:
                 # getCAddr
                 query = sql.replaceVars(sql.sqlNameToCommand["getCAddr"], 1, [self.c_id])
@@ -216,21 +268,86 @@ class Client:
                 # ReadResponse - SELECT c_addr_id
                 if self.isErr(response):
                     return False
-                addr_id = response[0][0]
+                ship_addr_id = response[0][0]
 
             # enterOrder (sequence)
-            #   a. getCAddrId
-            #   b. enterOrderMaxId
-            #   c. enterOrderInsert
+            #   a. getCAddrId - same as getCAddr
+            query = sql.replaceVars(sql.sqlNameToCommand["getCAddrId"], 1, [self.c_id])
+            response = self.send_query_and_receive_response(query)
+            # ReadResponse - SELECT c_addr_id
+            if self.isErr(response):
+                return False
+            c_addr_id = response[0][0]
 
+            #   b. enterOrderMaxId
+            query = sql.sqlNameToCommand["enterOrderMaxId"]
+            response = self.send_query_and_receive_response(query)
+            # ReadResponse - SELECT count(o_id)
+            if self.isErr(response):
+                return False
+            o_id = response[0][0] + 1
+
+            #   c. enterOrderInsert
+            o_sub_total = processed["sc_sub_total"]
+            o_total = processed["sc_total"]
+            ship_type = ['FEDEX', 'SHIP', 'AIR', 'COURIER', 'UPS', 'MAIL']
+            o_ship_type = randint(0, len(ship_type)-1)
+            interval = randint(1, 7)
+            order_info = [o_id, self.c_id, o_sub_total, o_total, o_ship_type, interval, c_addr_id, ship_addr_id]
+            query = sql.replaceVars(sql.sqlNameToCommand["enterOrderInsert"], 8, order_info)
+            response = self.send_query_and_receive_response(query)
+            # UpdateOnly
+            if self.isErr(response):
+                return False
             # loop
-            for row in processed:
+            for i in range(len(processed["lines"])):
                 # addOrderLine
+                orderline_info = [i, o_id, processed["lines"][i]["scl_i_id"], 
+                                  processed["lines"][i]["scl_qty"], discount, 
+                                  generateRandomString()]
+                query = sql.replaceVars(sql.sqlNameToCommand["addOrderLine"], 6, orderline_info)
+                response = self.send_query_and_receive_response(query)
+                # UpdateOnly
+                if self.isErr(response):
+                    return False
+
                 # getStock
+                query = sql.replaceVars(sql.sqlNameToCommand["getStock"], 1, [processed["lines"][i]["scl_i_id"]])
+                response = self.send_query_and_receive_response(query)
+                # ReadResponse - SELECT i_stock
+                if self.isErr(response):
+                    return False
+                stock = response[0][0]
+
                 # setStock
+                if stock - processed["lines"][i]["scl_qty"] < 10:
+                    stock = stock - processed["lines"][i]["scl_qty"] + 21
+                else:
+                    stock = stock - processed["lines"][i]["scl_qty"]
+                query = sql.replaceVars(sql.sqlNameToCommand["setStock"], 2, [stock, processed["lines"][i]["scl_i_id"]])
+                # UpdateOnly
+                if self.isErr(response):
+                    return False
 
             # enterCCXact
+            allType = ['DISCOVER', 'DINERS', 'VISA', 'AMEX', 'MASTERCARD']
+            cc_type = allType(randint(0, len(allType)-1))
+            cc_num = generateRandomNum()
+            cc_name = generateRandomString()
+            cc_expiry = (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
+            cc_info = [o_id, cc_type, cc_num, cc_name, cc_expiry, o_total, ship_addr_id]
+            query = sql.replaceVars(sql.sqlNameToCommand["enterCCXact"], 7, cc_info)
+            response = self.send_query_and_receive_response(query)
+            # UpdateOnly
+            if self.isErr(response):
+                return False
+
             # clearCart
+            query = sql.replaceVars(sql.sqlNameToCommand["clearCart"], 1, [self.shopping_id])
+            response = self.send_query_and_receive_response(query)
+            # UpdateOnly
+            if self.isErr(response):
+                return False
 
         return True
 
@@ -409,10 +526,7 @@ class Client:
         return True
 
     def doProdDet(self):
-        # getBook - generate random i_id
-        i_id = randint(0, NUM_ITEM-1)
-        query = sql.replaceVars(sql.sqlNameToCommand["getBook"], 1, [i_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.getBook(-1)
         # DispOnly
         if self.isErr(response):
             return False
@@ -499,7 +613,7 @@ class Client:
             numPair = randint(0, NUM_PAIR)
             for i in range(numPair):
                 qty = randint(0, NUM_QTY)
-                iid = randint(0, NUM_ITEM)
+                iid = randint(1, NUM_ITEM)
                 if qty == 0:
                     query = sql.replaceVars(sql.sqlNameToCommand["refreshCartRemove"], 2, [self.shopping_id, iid])
                     response = self.send_query_and_receive_response(query)
@@ -525,7 +639,7 @@ class Client:
         count = int(response[0][0])
 
         if count == 0:
-            i_id = randint(0, NUM_ITEM-1)
+            i_id = randint(1, NUM_ITEM)
             query = sql.replaceVars(sql.sqlNameToCommand["getRelated1"], 1, [i_id])
             response = self.send_query_and_receive_response(query)
             # ReadResponse - read SELECT i_related1
@@ -586,6 +700,26 @@ class Client:
             return True
         else:
             return False
+    
+    def processCart(self, response, discount):
+        cart = {"lines":[], "sc_sub_total":0, "sc_total":0, "total_items":0}
+        # process each cart line
+        for i in range(len(response)):
+            cart["lines"].append({})
+            cart["lines"][i]["scl_i_id"] = row[2] 
+            cart["lines"][i]["scl_qty"] = int(row[1])
+            cart["lines"][i]["i_cost"] = float(row[19])
+            cart["total_items"] = cart["total_items"] + cart["lines"][i]["scl_qty"]
+            cart["sc_sub_total"] = cart["sc_sub_total"] + cart["lines"][i]["scl_qty"] * cart["lines"][i]["i_cost"]
+
+        # apply discount
+        # subtotal is after discount, but before tax and shipping
+        # total is total
+        cart["sc_sub_total"] = cart["sc_sub_total"] * (100 - discount)*0.01
+        tax = cart["sc_sub_total"] * 0.0825
+        shipping = 3.00 + 1.00 * cart["total_items"]
+        cart["sc_total"] = cart["sc_sub_total"] + tax + shipping 
+        return cart
 
 '''
 ==================================================================================================================
@@ -597,7 +731,7 @@ class Client:
 
     def getRelated(self):
         # getRelated - generate a random i_id (item id) as argument
-        i_id = randint(0, NUM_ITEM-1)
+        i_id = randint(1, NUM_ITEM)
         query = sql.replaceVars(sql.sqlNameToCommand["getRelated"], 1, [i_id])
         response = self.send_query_and_receive_response(query)
         # DispOnly
@@ -610,7 +744,7 @@ class Client:
 
         # if no valid i_id given, generate a random value
         if i_id == -1:
-            i_id = randint(0, NUM_ITEM-1)
+            i_id = randint(1, NUM_ITEM)
         query = sql.replaceVars(sql.sqlNameToCommand["addItem"], 2, [self.shopping_id, i_id])
         response = self.send_query_and_receive_response(query)
         # ReadResponse - read SELECT scl_qty
@@ -641,6 +775,16 @@ class Client:
         # DispOnly
         return response
 
+    def getBook(self, i_id):
+        # getBook
+        if i_id == -1:
+            # If invalid i_id, generate a random one
+            i_id = randint(1, NUM_ITEM)
+        query = sql.replaceVars(sql.sqlNameToCommand["getBook"], 1, [i_id])
+        response = self.send_query_and_receive_response(query)
+        # DispOnly
+        return response
+
     def enterAddress(self, street1, street2, city, state, zzip, country):
         addr_id = 0
         # enterAddress (sequence)
@@ -665,7 +809,7 @@ class Client:
                 # ReadResponse - SELECT max(addr_id)
                 if self.isErr(response):
                     return response
-                addr_id = response[0][0]
+                addr_id = response[0][0] + 1
 
                 #   d. enterAddressInsert
                 query = sql.replaceVars(sql.sqlNameToCommand["enterAddressInsert"], 7, [addr_id, street1, street2, city, state, zzip, co_id])
