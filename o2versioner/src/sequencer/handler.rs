@@ -31,9 +31,9 @@ pub async fn main(conf: SequencerConfig) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(tcp_stream: TcpStream, state: Arc<Mutex<State>>) {
+async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>) {
     let peer_addr = tcp_stream.peer_addr().unwrap();
-    let (tcp_read, tcp_write) = tcp_stream.into_split();
+    let (tcp_read, tcp_write) = tcp_stream.split();
 
     // Delimit frames from bytes using a length header
     let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
