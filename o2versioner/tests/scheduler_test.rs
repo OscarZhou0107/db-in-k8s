@@ -15,6 +15,7 @@ async fn test_scheduler() {
     let conf = Config {
         scheduler: SchedulerConfig {
             addr: String::from("127.0.0.1:16379"),
+            admin_addr: None,
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
             dbproxy_pool_size: 1,

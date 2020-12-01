@@ -25,6 +25,8 @@ impl Config {
 pub struct SchedulerConfig {
     pub addr: String,
     #[serde(default)]
+    pub admin_addr: Option<String>,
+    #[serde(default)]
     pub max_connection: Option<u32>,
     pub sequencer_pool_size: u32,
     pub dbproxy_pool_size: u32,
@@ -76,6 +78,7 @@ mod tests_config {
             Config {
                 scheduler: SchedulerConfig {
                     addr: String::from("127.0.0.1:1077"),
+                    admin_addr: None,
                     max_connection: Some(50),
                     sequencer_pool_size: 20,
                     dbproxy_pool_size: 10,
