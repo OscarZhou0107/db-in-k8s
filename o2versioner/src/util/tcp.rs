@@ -13,7 +13,7 @@ use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -33,7 +33,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     Fut: Future<Output = ()> + Send + 'static,
     S: ToString,
 {
-    let listener = TcpListener::bind(addr).await.unwrap();
+    let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.to_string();
@@ -41,18 +41,29 @@ pub async fn start_tcplistener<A, C, Fut, S>(
 
     let mut cur_num_connection = 0;
     let mut spawned_tasks = Vec::new();
-    loop {
-        let (tcp_stream, peer_addr) = listener.accept().await.unwrap();
 
-        info!(
-            "[{}] <- [{}] Incomming connection [{}] established",
-            local_addr, peer_addr, cur_num_connection
-        );
+    while let Some(tcp_stream) = listener.next().await {
+        match tcp_stream {
+            Ok(tcp_stream) => {
+                info!(
+                    "[{}] <- [{}] Incomming connection [{}] established",
+                    local_addr,
+                    tcp_stream.peer_addr().unwrap(),
+                    cur_num_connection
+                );
+
+                // Spawn a new thread for each tcp connection
+                spawned_tasks.push(tokio::spawn(connection_handler(tcp_stream)));
+            }
+            Err(e) => {
+                warn!(
+                    "[{}] {} TcpListener cannot get client: {:?}",
+                    local_addr, server_name, e
+                );
+            }
+        }
+
         cur_num_connection += 1;
-
-        // Spawn a new thread for each tcp connection
-        spawned_tasks.push(tokio::spawn(connection_handler(tcp_stream)));
-
         // An optional max number of connections allowed
         if let Some(nmax) = max_connection {
             if cur_num_connection >= nmax {
