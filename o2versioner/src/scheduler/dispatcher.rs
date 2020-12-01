@@ -142,7 +142,11 @@ impl State {
         msqlquery: &MsqlQuery,
         txvn: &Option<TxVN>,
     ) -> (SocketAddr, Pool<TcpStreamConnectionManager>) {
-        assert_eq!(msqlquery.tableops().access_pattern(), AccessPattern::ReadOnly);
+        assert_eq!(
+            msqlquery.tableops().access_pattern(),
+            AccessPattern::ReadOnly,
+            "Expecting ReadOnly access pattern for the query"
+        );
 
         if let Some(txvn) = txvn {
             // The scheduler blocks read queries until at least one database has, for all tables in the query,

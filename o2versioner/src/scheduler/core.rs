@@ -62,9 +62,13 @@ impl DbVNManager {
             "Expecting ReadOnly access pattern for the query"
         );
 
+        let txtablevns = txvn
+            .get_from_tableops(tableops)
+            .expect("Mismatching between TableOps and TxVN");
+
         self.0
             .iter()
-            .filter(|(_, dbvn)| dbvn.can_execute_query(tableops, txvn))
+            .filter(|(_, dbvn)| dbvn.can_execute_query(&txtablevns))
             .map(|(addr, dbvn)| (addr.clone(), dbvn.get_from_tableops(tableops)))
             .sorted_by_key(|(addr, _)| *addr)
             .collect()

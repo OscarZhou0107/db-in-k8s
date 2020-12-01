@@ -57,16 +57,19 @@ impl TxVN {
     ///
     /// If `TableOp` is of `Operation::R`, then only need to match the name with `TxTableVN`;
     /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TxTableVN`
-    pub fn find_from_tableop(&self, tableop: &TableOp) -> Option<&TxTableVN> {
-        self.txtablevns.iter().find(|txtablevn| txtablevn.match_with(tableop))
+    pub fn get_from_tableop(&self, tableop: &TableOp) -> Option<TxTableVN> {
+        self.txtablevns
+            .iter()
+            .find(|txtablevn| txtablevn.match_with(tableop))
+            .cloned()
     }
 
     /// Find a Vec<&TxTableVN> of the argument `TableOps` from the `TxVN` if they *ALL* match
-    pub fn find_from_tableops(&self, tableops: &TableOps) -> Result<Vec<&TxTableVN>, &'static str> {
+    pub fn get_from_tableops(&self, tableops: &TableOps) -> Result<Vec<TxTableVN>, &'static str> {
         let res: Vec<_> = tableops
             .get()
             .iter()
-            .filter_map(|tableop| self.find_from_tableop(tableop))
+            .filter_map(|tableop| self.get_from_tableop(tableop))
             .collect();
         if res.len() != tableops.get().len() {
             Err("Some tables in the TableOps are not assigned a VN in TxVN")
@@ -82,7 +85,7 @@ mod tests_txvn {
     use std::iter::FromIterator;
 
     #[test]
-    fn test_find_tableop() {
+    fn test_get_tableop() {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
@@ -92,22 +95,22 @@ mod tests_txvn {
         };
 
         assert_eq!(
-            txvn.find_from_tableop(&TableOp::new("t0", Operation::R)),
-            Some(&TxTableVN::new("t0", 0, Operation::R))
+            txvn.get_from_tableop(&TableOp::new("t0", Operation::R)),
+            Some(TxTableVN::new("t0", 0, Operation::R))
         );
-        assert_eq!(txvn.find_from_tableop(&TableOp::new("t0", Operation::W)), None);
+        assert_eq!(txvn.get_from_tableop(&TableOp::new("t0", Operation::W)), None);
         assert_eq!(
-            txvn.find_from_tableop(&TableOp::new("t1", Operation::R)),
-            Some(&TxTableVN::new("t1", 2, Operation::W))
+            txvn.get_from_tableop(&TableOp::new("t1", Operation::R)),
+            Some(TxTableVN::new("t1", 2, Operation::W))
         );
         assert_eq!(
-            txvn.find_from_tableop(&TableOp::new("t1", Operation::W)),
-            Some(&TxTableVN::new("t1", 2, Operation::W))
+            txvn.get_from_tableop(&TableOp::new("t1", Operation::W)),
+            Some(TxTableVN::new("t1", 2, Operation::W))
         );
     }
 
     #[test]
-    fn test_find_tableops() {
+    fn test_get_tableops() {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
@@ -117,79 +120,79 @@ mod tests_txvn {
         };
 
         assert_eq!(
-            txvn.find_from_tableops(&TableOps::from_iter(vec![
+            txvn.get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t0", Operation::R),
                 TableOp::new("t1", Operation::R)
             ])),
             Ok(vec![
-                &TxTableVN::new("t0", 0, Operation::R),
-                &TxTableVN::new("t1", 2, Operation::W)
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 2, Operation::W)
             ])
         );
 
         assert_eq!(
-            txvn.find_from_tableops(&TableOps::from_iter(vec![
+            txvn.get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t1", Operation::R),
                 TableOp::new("t0", Operation::R),
             ])),
             Ok(vec![
-                &TxTableVN::new("t0", 0, Operation::R),
-                &TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 2, Operation::W),
             ])
         );
 
         assert_eq!(
-            txvn.find_from_tableops(&TableOps::from_iter(vec![
+            txvn.get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t0", Operation::R),
                 TableOp::new("t1", Operation::W)
             ])),
             Ok(vec![
-                &TxTableVN::new("t0", 0, Operation::R),
-                &TxTableVN::new("t1", 2, Operation::W)
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 2, Operation::W)
             ])
         );
 
         assert_eq!(
-            txvn.find_from_tableops(&TableOps::from_iter(vec![
+            txvn.get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t1", Operation::W),
                 TableOp::new("t0", Operation::R),
             ])),
             Ok(vec![
-                &TxTableVN::new("t0", 0, Operation::R),
-                &TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, Operation::R),
+                TxTableVN::new("t1", 2, Operation::W),
             ])
         );
 
         assert!(txvn
-            .find_from_tableops(&TableOps::from_iter(vec![
+            .get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t0", Operation::W),
                 TableOp::new("t1", Operation::R)
             ]))
             .is_err());
 
         assert!(txvn
-            .find_from_tableops(&TableOps::from_iter(vec![
+            .get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t0", Operation::W),
                 TableOp::new("t1", Operation::W)
             ]))
             .is_err());
 
         assert_eq!(
-            txvn.find_from_tableops(&TableOps::from_iter(vec![TableOp::new("t0", Operation::R),])),
-            Ok(vec![&TxTableVN::new("t0", 0, Operation::R),])
+            txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t0", Operation::R),])),
+            Ok(vec![TxTableVN::new("t0", 0, Operation::R),])
         );
 
         assert_eq!(
-            txvn.find_from_tableops(&TableOps::from_iter(vec![TableOp::new("t1", Operation::R)])),
-            Ok(vec![&TxTableVN::new("t1", 2, Operation::W)])
+            txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t1", Operation::R)])),
+            Ok(vec![TxTableVN::new("t1", 2, Operation::W)])
         );
 
         assert!(txvn
-            .find_from_tableops(&TableOps::from_iter(vec![TableOp::new("t2", Operation::R)]))
+            .get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t2", Operation::R)]))
             .is_err());
 
         assert!(txvn
-            .find_from_tableops(&TableOps::from_iter(vec![
+            .get_from_tableops(&TableOps::from_iter(vec![
                 TableOp::new("t2", Operation::R),
                 TableOp::new("t0", Operation::R)
             ]))
