@@ -4,11 +4,9 @@ use futures::future::poll_fn;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::future::Future;
 use std::iter;
 use std::net::SocketAddr;
 use std::panic::{RefUnwindSafe, UnwindSafe};
-use std::string::ToString;
 use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
@@ -21,7 +19,7 @@ use tracing::{debug, info, warn};
 /// 1. `addr` is the tcp port to bind to
 /// 2. `connection_handler` is a `FnMut` closure takes in `TcpStream` and returns `Future<Output=()>`
 /// 3. `max_connection` can be specified to limit the max number of connections allowed. Server will shutdown immediately once `max_connection` connections are all dropped.
-/// 4. `server_name` is an optional name to be used for output
+/// 4. `server_name` is a name to be used for output
 pub async fn start_tcplistener<A, C, Fut, S>(
     addr: A,
     mut connection_handler: C,
@@ -31,12 +29,12 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     A: ToSocketAddrs,
     C: FnMut(TcpStream) -> Fut,
     Fut: Future<Output = ()> + Send + 'static,
-    S: ToString,
+    S: Into<String>,
 {
     let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
-    let server_name = server_name.to_string();
+    let server_name = server_name.into();
     info!("[{}] {} successfully binded ", local_addr, server_name);
 
     let mut cur_num_connection = 0;
@@ -99,7 +97,7 @@ where
 /// Send a collection of msg through the argument `TcpStream`, and expecting a reply for each of the msg sent.
 /// The msgs are send received using a json encoding.
 ///
-/// Note:
+/// # Notes:
 /// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
 /// 2. `msgs: Msgs` must be an owned collection that contains owned data types.
 /// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
