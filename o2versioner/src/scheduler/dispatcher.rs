@@ -10,7 +10,7 @@ use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 /// Sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
@@ -39,17 +39,35 @@ impl State {
     }
 
     async fn execute(&self, request: Request) {
-        // Check for allowed executions
-        let (is_endtx, op_str) = match &request.command {
+        // Check whether there are no dbproxies in managers at all,
+        // if such case, early exit
+        if !self.is_dbproxy_existed().await {
+            warn!("There are currently no dbproxy servers online, Scheduler dispatcher skipped the work");
+
+            request
+                .reply
+                .unwrap()
+                .send(MsqlResponse::err("Dbproxy servers are all offline", &request.command))
+                .expect("Dispatcher cannot reply response to handler");
+
+            return;
+        }
+
+        let (is_endtx, op_str, dbproxy_addrs) = match &request.command {
             Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
             Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
                 AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
-                _ => (false, "query"),
+                AccessPattern::ReadOnly => (
+                    false,
+                    "query",
+                    vec![self.wait_on_version(msqlquery, &request.txvn).await],
+                ),
+                AccessPattern::WriteOnly => (false, "query", self.dbproxy_manager.to_vec()),
             },
-            Msql::EndTx(_) => (true, "endtx"),
+            Msql::EndTx(_) => (true, "endtx", self.dbproxy_manager.to_vec()),
         };
 
-        let dbproxy_tasks_stream = stream::iter(self.assign_dbproxy_for_execution(&request).await);
+        let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
 
         let Request {
             client_addr,
@@ -81,9 +99,9 @@ impl State {
                     .map_ok_or_else(
                         |e| {
                             if is_endtx {
-                                MsqlResponse::EndTx(Err(e))
+                                MsqlResponse::endtx_err(e)
                             } else {
-                                MsqlResponse::Query(Err(e))
+                                MsqlResponse::query_err(e)
                             }
                         },
                         |msqlresponse| msqlresponse,
@@ -122,19 +140,12 @@ impl State {
             .await;
     }
 
-    async fn assign_dbproxy_for_execution(
-        &self,
-        request: &Request,
-    ) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
-        match &request.command {
-            Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
-            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
-                AccessPattern::Mixed => panic!("Does not supported query with mixed R and W"),
-                AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, &request.txvn).await],
-                AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
-            },
-            Msql::EndTx(_) => self.dbproxy_manager.to_vec(),
-        }
+    async fn is_dbproxy_existed(&self) -> bool {
+        let num_dbproxy_pool = self.dbproxy_manager.inner().len();
+        let num_dbproxy_dbvn = self.dbvn_manager.read().await.inner().len();
+
+        assert_eq!(num_dbproxy_pool, num_dbproxy_dbvn);
+        return num_dbproxy_pool > 0;
     }
 
     async fn wait_on_version(

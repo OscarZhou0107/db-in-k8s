@@ -1,3 +1,4 @@
+use crate::core::msql::Msql;
 /// This module contains everything about the response
 /// to a Msql query.
 #[allow(unused_imports)]
@@ -12,6 +13,14 @@ pub enum MsqlResponse {
 }
 
 impl MsqlResponse {
+    pub fn err<S: Into<String>>(err: S, msql: &Msql) -> Self {
+        match msql {
+            Msql::BeginTx(_) => Self::begintx_err(err),
+            Msql::Query(_) => Self::query_err(err),
+            Msql::EndTx(_) => Self::endtx_err(err),
+        }
+    }
+
     pub fn begintx_err<S: Into<String>>(err: S) -> Self {
         Self::BeginTx(Err(err.into()))
     }
