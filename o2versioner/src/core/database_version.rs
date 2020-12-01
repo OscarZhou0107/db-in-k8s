@@ -58,7 +58,7 @@ impl DbVN {
     ///
     /// # Examples:
     /// ```
-    /// use o2versioner::core::database_version::DbVN;
+    /// use o2versioner::core::DbVN;
     /// use o2versioner::core::operation::{Operation, TableOp, TableOps};
     /// use o2versioner::core::transaction_version::{TxTableVN, TxVN};
     /// use std::iter::FromIterator;
@@ -111,7 +111,7 @@ impl DbVN {
     /// # Examples
     /// You can acquire `DbVNReleaseRequest` by:
     /// ```
-    /// use o2versioner::core::database_version::DbVN;
+    /// use o2versioner::core::DbVN;
     /// use o2versioner::core::operation::Operation;
     /// use o2versioner::core::transaction_version::{TxTableVN, TxVN};
     /// let mut dbvn = DbVN::default();
