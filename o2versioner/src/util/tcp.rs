@@ -202,7 +202,7 @@ impl bb8::ManageConnection for TcpStreamConnectionManager {
     }
 }
 
-/// Unit test for `Config`
+/// Unit test for `TcpStreamConnectionManager`
 #[cfg(test)]
 mod tests_tcppool {
     use super::super::tests_helper;
