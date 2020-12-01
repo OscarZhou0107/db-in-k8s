@@ -1,4 +1,4 @@
-use super::core::{DbVersion, Operation, PendingQueue, QueryResult};
+use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     //=====================================Continue an ongoing transaction=======================================//
     //Map that holds all ongoing transactions
-    let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let transactions = Arc::new(Mutex::new(HashMap::new()));
 
     //Global version//
     let mut mock_db = HashMap::new();
@@ -32,10 +32,17 @@ pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     let (tcp_stream, _) = listener.accept().await.unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
+    let mut config = tokio_postgres::Config::new();
+    config.user("postgres");
+    config.password("Rayh8768");
+    config.host("localhost");
+    config.port(5432);
+    config.dbname("Test");
+
     Dispatcher::run(
         pending_queue,
         responder_sender,
-        sql_addr.to_string(),
+        config,
         version,
         transactions,
     );

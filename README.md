@@ -65,6 +65,7 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] Query stmt
 - [x] Commit&Abort tx stmt
 - [ ] Single read
+- [ ] Single write
 - [ ] Early release
 - [ ] Multiple Schedulers
 
@@ -87,12 +88,41 @@ o2versioner
 ## Architecture
 
 ### Sequencer
-- `sequenecer::handler::main()` - main entrance
-- for every incomming tcp connection - `tokio::spawn(process_connection)`
-- `process_connection`
+- `sequenecer::main()` - main entrance
+- For every incomming tcp connection - `tokio::spawn()`
+- For each incomming tcp connection
   - Run until the connection is closed
   - Process all requests through this connection
-  - Reply response after a request `future` is received and processed
+  - Receive a single request, process the request, and send one response back
+- Keep a central state for versions assigned for each table
+- Lifetime is till all incoming connections are closed if the max connection is set
+
+
+### Scheduler
+- `scheduler::main()` - main entrance
+- Handler and Dispatcher decoupled, running concurrently, communicate through channels
+- Handler
+  - For every incoming tcp connection - `tokio::spawn()`
+  - For each incomming tcp connection
+    - Until the connection is closed
+    - Process all requests through this connection
+    - Keep a connection/session state
+    - Receive a single request, process the request, and send one response back
+    - For sequencer action, send a request to Sequencer and wait for reply
+    - For dbproxy action, send a requst to dispatcher and wait for reply
+    - Manages a `DispatcherAddr` object to the Dispatcher
+  - Manages a pool connection to Sequencer
+  - Lifetime is till all incoming connections are closed if the max connection is set
+- Dispatcher
+  - Manages a pool connection to each Dbproxy
+  - Manages the DbVN for each Dbproxy
+  - Receives request via `DispatcherAddr` object, which can send a request to the Dispatcher 
+  - Request is sent from `DispatcherAddr` object, which includes a single-use `Oneshot::Sender` channel,
+  for replying back to the handler
+  - Only reply back the handler the response received from the first Dbproxy replying,
+  the rest of the reponses are not sent back to the handler, but they are still needed to
+  update the internal state of the Dispatcher
+  - Lifetime is till all `DispatcherAddr` objects are dropped
 
 
 ## Notes for asynchronous

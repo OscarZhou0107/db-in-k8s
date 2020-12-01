@@ -40,10 +40,21 @@ impl DbVN {
             .collect()
     }
 
+    fn can_execute_query_on_table(&self, txtablevn: &TxTableVN) -> bool {
+        match &txtablevn.op {
+            Operation::R => self.0.get(&txtablevn.table).cloned().unwrap_or_default() >= txtablevn.vn,
+            Operation::W => self.0.get(&txtablevn.table).cloned().unwrap_or_default() == txtablevn.vn,
+        }
+    }
+
     /// Check whether the query with the `TableOps` and belongs to transaction with `TxVN`
     /// is allowed to execute
     ///
-    /// Notes:
+    /// # Important:
+    /// You must check the original `TableOps` that is used to yield `txtablevns`
+    /// for any potential mixing of R and W.
+    ///
+    /// # Notes:
     /// 1. A write query is executed only when the version numbers for each table at the
     /// database match the version numbers in the query.
     /// 2. A read query is executed only when the version numbers for each table at the
@@ -59,19 +70,10 @@ impl DbVN {
     /// until the transaction owning that VN is ended. In such case, although the read-only
     /// query is still executed based on the read-only VN rule, tables using W VN are still implicitly
     /// blocked until the database version == the assigned VN.
-    pub fn can_execute_query(&self, tableops: &TableOps, txvn: &TxVN) -> bool {
-        let rule = match tableops.access_pattern() {
-            AccessPattern::WriteOnly => |db_vn, assigned_vn| db_vn == assigned_vn,
-            AccessPattern::ReadOnly => |db_vn, assigned_vn| db_vn >= assigned_vn,
-            AccessPattern::Mixed => panic!("Queries involving both read and write are not supported!"),
-        };
-
-        tableops.get().iter().all(|tableop| {
-            let txtablevn = txvn
-                .find_from_tableop(tableop)
-                .expect(&format!("TableOp {:?} does not match with TxVN {:?}", tableop, txvn));
-            rule(self.get_from_tableop(&tableop).vn, txtablevn.vn)
-        })
+    pub fn can_execute_query(&self, txtablevns: &[TxTableVN]) -> bool {
+        txtablevns
+            .iter()
+            .all(|txtablevn| self.can_execute_query_on_table(txtablevn))
     }
 
     /// Increment all database versions by 1 for tables listed in `TxVN`
@@ -157,6 +159,28 @@ mod tests_dbvn {
     }
 
     #[test]
+    fn test_can_execute_query_on_table() {
+        let dbvn = DbVN::default();
+        assert!(!dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 5, Operation::W)));
+        assert!(!dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 5, Operation::R)));
+        assert!(dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 0, Operation::R)));
+        assert!(dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 0, Operation::W)));
+
+        let dbvn = DbVN(
+            [("t0", 5), ("t1", 6)]
+                .iter()
+                .cloned()
+                .map(|(s, vn)| (s.to_owned(), vn as VN))
+                .collect(),
+        );
+        assert!(dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 5, Operation::W)));
+        assert!(dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 5, Operation::R)));
+        assert!(dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 0, Operation::R)));
+        assert!(!dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 6, Operation::W)));
+        assert!(!dbvn.can_execute_query_on_table(&TxTableVN::new("t0", 6, Operation::R)));
+    }
+
+    #[test]
     fn test_can_execute_query() {
         let tableops0 = TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]);
         let tableops1 = TableOps::from_iter(vec![TableOp::new("t0", Operation::W), TableOp::new("t1", Operation::W)]);
@@ -193,7 +217,7 @@ mod tests_dbvn {
         };
 
         let dbvn = DbVN::default();
-        assert!(!dbvn.can_execute_query(&tableops0, &txvn0));
+        assert!(!dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops0).unwrap()));
 
         let dbvn = DbVN(
             [("t0", 5), ("t1", 6)]
@@ -202,49 +226,18 @@ mod tests_dbvn {
                 .map(|(s, vn)| (s.to_owned(), vn as VN))
                 .collect(),
         );
-        assert!(dbvn.can_execute_query(&tableops0, &txvn0));
-        assert!(!dbvn.can_execute_query(&tableops0, &txvn1));
-        assert!(dbvn.can_execute_query(&tableops0, &txvn2));
+        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops0).unwrap()));
+        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops0).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops0).unwrap()));
 
-        assert!(!dbvn.can_execute_query(&tableops1, &txvn1));
-        assert!(dbvn.can_execute_query(&tableops1, &txvn2));
+        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops1).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops1,).unwrap()));
 
-        assert!(dbvn.can_execute_query(&tableops2, &txvn0));
-        assert!(!dbvn.can_execute_query(&tableops2, &txvn1));
-        assert!(dbvn.can_execute_query(&tableops2, &txvn2));
+        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops2,).unwrap()));
+        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops2,).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops2,).unwrap()));
 
-        assert!(dbvn.can_execute_query(&tableops3, &txvn3));
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_can_execute_queyr_panic_0() {
-        let dbvn = DbVN::default();
-        let txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 5, Operation::W),
-                TxTableVN::new("t1", 5, Operation::R),
-            ],
-        };
-        let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::W), TableOp::new("t1", Operation::R)]);
-        dbvn.can_execute_query(&tableops, &txvn);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_can_execute_query_panic_1() {
-        let dbvn = DbVN::default();
-        let txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 5, Operation::W),
-                TxTableVN::new("t1", 5, Operation::R),
-            ],
-        };
-
-        let tableops = TableOps::from_iter(vec![TableOp::new("t1", Operation::W)]);
-        dbvn.can_execute_query(&tableops, &txvn);
+        assert!(dbvn.can_execute_query(&txvn3.get_from_tableops(&tableops3,).unwrap()));
     }
 
     #[test]
@@ -276,9 +269,9 @@ mod tests_dbvn {
 
         let tableops = TableOps::from_iter(vec![TableOp::new("t0", Operation::R), TableOp::new("t1", Operation::R)]);
 
-        assert!(dbvn.can_execute_query(&tableops, &txvn0));
-        assert!(!dbvn.can_execute_query(&tableops, &txvn1));
+        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops,).unwrap()));
+        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
         dbvn.release_version(&txvn0);
-        assert!(dbvn.can_execute_query(&tableops, &txvn1));
+        assert!(dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
     }
 }

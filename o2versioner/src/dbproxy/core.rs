@@ -1,15 +1,86 @@
-use crate::core::operation::Operation as OperationType;
+use crate::comm::msql_response::MsqlResponse;
+use crate::comm::scheduler_dbproxy::Message;
+use crate::core::msql::IntoMsqlFinalString;
+use crate::core::msql::MsqlEndTxMode;
 use crate::core::transaction_version::{TxTableVN, TxVN};
+use crate::core::{msql::Msql, operation::Operation as OperationType};
+use async_trait::async_trait;
+use bb8_postgres::{
+    bb8::{ManageConnection, Pool, PooledConnection},
+    PostgresConnectionManager,
+};
+use csv::*;
 use futures::prelude::*;
-use mysql_async::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
+use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
+
+#[derive(Clone)]
+pub struct PostgresSqlConnPool {
+    pool: Pool<PostgresConnectionManager<NoTls>>,
+}
+
+impl PostgresSqlConnPool {
+    pub async fn new(url: Config, max_conn: u32) -> Self {
+        let manager = PostgresConnectionManager::new(url, NoTls);
+        let pool = Pool::builder().max_size(max_conn).build(manager).await.unwrap();
+
+        Self { pool: pool }
+    }
+
+    pub async fn get_conn(&self) -> PooledConnection<'_, PostgresConnectionManager<NoTls>> {
+        self.pool.get().await.unwrap()
+    }
+}
+
+#[derive(Clone)]
+pub struct QueueMessage {
+    pub identifier: SocketAddr,
+    pub operation_type: Task,
+    pub query: String,
+    pub versions: Option<TxVN>,
+}
+
+impl QueueMessage {
+    pub fn new(identifier: SocketAddr, request: Msql, versions: Option<TxVN>) -> Self {
+        let operation_type;
+        let mut query_string = String::new();
+
+        match request {
+            Msql::BeginTx(_) => {
+                operation_type = Task::BEGIN;
+            }
+
+            Msql::Query(op) => {
+                operation_type = Task::READ;
+                query_string = op.into_msqlfinalstring().into_inner();
+            }
+
+            Msql::EndTx(op) => match op.mode() {
+                MsqlEndTxMode::Commit => {
+                    operation_type = Task::COMMIT;
+                }
+                MsqlEndTxMode::Rollback => {
+                    operation_type = Task::ABORT;
+                }
+            },
+        }
+
+        QueueMessage {
+            identifier: identifier,
+            operation_type: operation_type,
+            query: query_string,
+            versions: versions,
+        }
+    }
+}
 
 pub struct PendingQueue {
-    pub queue: Vec<Operation>,
+    pub queue: Vec<QueueMessage>,
     pub notify: Arc<Notify>,
 }
 
@@ -21,7 +92,7 @@ impl PendingQueue {
         }
     }
 
-    pub fn push(&mut self, op: Operation) {
+    pub fn push(&mut self, op: QueueMessage) {
         self.queue.push(op);
         self.notify.notify_one();
     }
@@ -30,9 +101,9 @@ impl PendingQueue {
         self.notify.clone()
     }
 
-    pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<Operation> {
+    pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
         let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
-            .then(|op| async { (op.clone(), version.lock().await.violate_version(op)) })
+            .then(|op| async { (op.clone(), version.lock().await.violate_version(op.versions)) })
             .collect()
             .await;
         let (unready_ops, ready_ops): (Vec<_>, Vec<_>) =
@@ -75,14 +146,17 @@ impl DbVersion {
         self.notify.notify_one();
     }
 
-    pub fn violate_version(&self, transaction_version: Operation) -> bool {
-        transaction_version.txtablevns.iter().any(|t| {
-            if let Some(v) = self.table_versions.get(&t.table) {
-                return *v < t.vn;
-            } else {
-                return true;
-            }
-        })
+    pub fn violate_version(&self, transaction_version: Option<TxVN>) -> bool {
+        if let Some(versions) = transaction_version {
+            versions.txtablevns.iter().any(|t| {
+                if let Some(v) = self.table_versions.get(&t.table) {
+                    return *v < t.vn;
+                } else {
+                    return true;
+                }
+            });
+        }
+        false
     }
 
     pub fn get_notify(&self) -> Arc<Notify> {
@@ -90,65 +164,161 @@ impl DbVersion {
     }
 }
 
-pub struct Repository {
-    conn: mysql_async::Conn,
+#[async_trait]
+trait Repository {
+    async fn start_transaction(&mut self);
+    async fn execute_read(&mut self) -> QueryResult;
+    async fn execute_write(&mut self) -> QueryResult;
+    async fn commit(&mut self) -> QueryResult;
+    async fn abort(&mut self) -> QueryResult;
 }
 
-impl Repository {
-    pub async fn new(pool: mysql_async::Pool) -> Self {
-        let conn = pool.get_conn().await.unwrap();
-        Self { conn: conn }
-    }
+// pub struct PostgresSqlRepository {
+//     conn : PooledConnection<PostgresConnectionManager<NoTls>>,
+// }
 
-    pub async fn start_transaction(&mut self) {
-        self.conn.query_drop("START TRANSACTION;").await.unwrap();
-    }
+// impl PostgresSqlRepository {
+//     pub async fn new(pool : PostgresSqlConnPool) -> Self{
+//         let conn = pool.get_conn().await;
+//         PostgresSqlRepository {conn : conn}
+//     }
+// }
 
-    pub async fn execute_read(&mut self) -> QueryResult {
-        let _ = self
-            .conn
-            .query_iter("INSERT INTO cats (name, owner, birth) VALUES ('haha2', 'haha3', CURDATE())")
-            .await
-            .unwrap();
-        test_helper_get_query_result_non_release()
-    }
+// #[async_trait]
+// impl Repository for PostgresSqlRepository {
+//     async fn start_transaction(&mut self) {
+//     }
 
-    pub async fn execute_write(&mut self) -> QueryResult {
-        let _ = self
-            .conn
-            .query_iter("INSERT INTO cats (name, owner, birth) VALUES ('haha2', 'haha3', CURDATE())")
-            .await
-            .unwrap();
-        test_helper_get_query_result_non_release()
-    }
+//     async fn execute_read(&mut self) -> QueryResult {
+//         todo!()
+//     }
 
-    pub async fn commit(&mut self) -> QueryResult {
-        self.conn.query_drop("COMMIT;").await.unwrap();
-        test_helper_get_query_result_version_release()
-    }
+//     async fn execute_write(&mut self) -> QueryResult {
+//         todo!()
+//     }
 
-    pub async fn abort(&mut self) -> QueryResult {
-        self.conn.query_drop("ROLLBACK;").await.unwrap();
-        test_helper_get_query_result_version_release()
-    }
+//     async fn commit(&mut self) -> QueryResult {
+//         todo!()
+//     }
+
+//     async fn abort(&mut self) -> QueryResult {
+//         todo!()
+//     }
+// }
+
+pub struct PostgreToCsvWriter {
+    mode: Task,
+    wrt: Writer<Vec<u8>>,
 }
 
-#[derive(Default, Serialize, Deserialize, Clone)]
-pub struct QueryResult {
-    pub result: String,
-    pub version_release: bool,
-    pub contained_newer_versions: Vec<TxTableVN>,
+#[derive(Serialize)]
+pub struct Row {
+    label: String,
+    value: String,
+}
+
+impl PostgreToCsvWriter {
+    pub fn new(mode: Task) -> Self {
+        let wrt = Writer::from_writer(vec![]);
+        Self { mode: mode, wrt: wrt }
+    }
+
+    pub fn to_csv(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
+        match self.mode {
+            Task::BEGIN => return "".to_string(),
+            Task::READ => return self.convert_result_to_csv_string(message),
+            Task::WRITE => return self.generate_csv_string_with_header(message, "Affected rows".to_string()),
+            Task::COMMIT => return self.generate_csv_string_with_header(message, "Status".to_string()),
+            Task::ABORT => return self.generate_csv_string_with_header(message, "Status".to_string()),
+        }
+    }
+
+    pub fn convert_result_to_csv_string(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
+        message.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                let len = query_row.len();
+                let mut row: Vec<&str> = Vec::new();
+                row.reserve(len);
+
+                for index in 0..len {
+                    row.push(query_row.get(index).unwrap());
+                }
+                self.wrt.write_record(&row).unwrap();
+            }
+            _ => {}
+        });
+
+        String::from_utf8(self.wrt.into_inner().unwrap()).unwrap()
+    }
+
+    pub fn generate_csv_string_with_header(
+        mut self,
+        message: Vec<tokio_postgres::SimpleQueryMessage>,
+        header: String,
+    ) -> String {
+        self.wrt.write_record(vec![header]).unwrap();
+
+        message.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::CommandComplete(status) => {
+                self.wrt.write_record(vec![status.clone().to_string()]).unwrap();
+            }
+            _ => {}
+        });
+
+        String::from_utf8(self.wrt.into_inner().unwrap()).unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Operation {
-    pub transaction_id: String,
-    pub task: Task,
-    pub txtablevns: Vec<TxTableVN>,
+pub enum QueryResultType {
+    BEGIN,
+    QUERY,
+    END,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct QueryResult {
+    pub result: String,
+    pub succeed: bool,
+    pub result_type: QueryResultType,
+    pub contained_newer_versions: Vec<TxTableVN>,
+}
+
+impl QueryResult {
+    pub fn into_msql_response(self) -> MsqlResponse {
+        let message;
+
+        match self.result_type {
+            QueryResultType::BEGIN => {
+                if self.succeed {
+                    message = MsqlResponse::BeginTx(Ok(()));
+                } else {
+                    message = MsqlResponse::BeginTx(Err(self.result));
+                }
+            }
+            QueryResultType::QUERY => {
+                if self.succeed {
+                    message = MsqlResponse::Query(Ok(self.result));
+                } else {
+                    message = MsqlResponse::Query(Err(self.result));
+                }
+            }
+            QueryResultType::END => {
+                if self.succeed {
+                    message = MsqlResponse::EndTx(Ok(self.result));
+                } else {
+                    message = MsqlResponse::EndTx(Err(self.result));
+                }
+            }
+        };
+
+        message
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub enum Task {
+    BEGIN,
     READ,
     WRITE,
     ABORT,
@@ -156,142 +326,179 @@ pub enum Task {
 }
 
 fn test_helper_get_query_result_version_release() -> QueryResult {
-    let mock_table_vs = vec![
-        TxTableVN {
-            table: "table1".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-        TxTableVN {
-            table: "table2".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-    ];
     QueryResult {
         result: " ".to_string(),
-        version_release: true,
-        contained_newer_versions: mock_table_vs,
+        result_type: QueryResultType::BEGIN,
+        succeed: true,
+        contained_newer_versions: Vec::new(),
     }
 }
 
 fn test_helper_get_query_result_non_release() -> QueryResult {
-    let mock_table_vs = vec![
-        TxTableVN {
-            table: "table1".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-        TxTableVN {
-            table: "table2".to_string(),
-            vn: 0,
-            op: OperationType::R,
-        },
-    ];
     QueryResult {
         result: " ".to_string(),
-        version_release: false,
-        contained_newer_versions: mock_table_vs,
+        result_type: QueryResultType::END,
+        succeed: true,
+        contained_newer_versions: Vec::new(),
     }
 }
 //================================Test================================//
 
-#[cfg(test)]
-mod tests_dbproxy_core {
-    use super::DbVersion;
-    use super::Operation;
-    use super::Task;
-    use super::TxTableVN;
-    use crate::core::operation::Operation as OperationType;
-    use mysql_async::prelude::Queryable;
-    use std::collections::HashMap;
+// #[cfg(test)]
+// mod tests_dbproxy_core {
+//     use super::DbVersion;
+//     use super::Task;
+//     use super::TxTableVN;
+//     use crate::core::operation::Operation as OperationType;
+//     use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
+//     use mysql_async::prelude::Queryable;
+//     use tokio_postgres::NoTls;
+//     use std::collections::HashMap;
 
-    #[test]
-    fn voilate_dbversion_should_return_true() {
-        //Prepare
-        let mut table_versions = HashMap::new();
-        table_versions.insert("table1".to_string(), 0);
-        table_versions.insert("table2".to_string(), 0);
-        let db_version = DbVersion::new(table_versions);
-        let versions = vec![
-            TxTableVN {
-                table: "table1".to_string(),
-                vn: 0,
-                op: OperationType::R,
-            },
-            TxTableVN {
-                table: "table2".to_string(),
-                vn: 1,
-                op: OperationType::R,
-            },
-        ];
-        let operation = Operation {
-            txtablevns: versions,
-            transaction_id: "t1".to_string(),
-            task: Task::READ,
-        };
-        //Action
-        //Assert
-        assert!(db_version.violate_version(operation));
-    }
+//     #[test]
+//     fn voilate_dbversion_should_return_true() {
+//         //Prepare
+//         let mut table_versions = HashMap::new();
+//         table_versions.insert("table1".to_string(), 0);
+//         table_versions.insert("table2".to_string(), 0);
+//         let db_version = DbVersion::new(table_versions);
+//         let versions = vec![
+//             TxTableVN {
+//                 table: "table1".to_string(),
+//                 vn: 0,
+//                 op: OperationType::R,
+//             },
+//             TxTableVN {
+//                 table: "table2".to_string(),
+//                 vn: 1,
+//                 op: OperationType::R,
+//             },
+//         ];
+//         let operation = Operation {
+//             txtablevns: versions,
+//             transaction_id: "t1".to_string(),
+//             task: Task::READ,
+//         };
+//         //Action
+//         //Assert
+//         assert!(db_version.violate_version(operation));
+//     }
 
-    #[test]
-    fn obey_dbversion_should_return_false() {
-        //Prepare
-        let mut table_versions = HashMap::new();
-        table_versions.insert("table1".to_string(), 0);
-        table_versions.insert("table2".to_string(), 0);
-        let db_version = DbVersion::new(table_versions);
-        let versions = vec![
-            TxTableVN {
-                table: "table1".to_string(),
-                vn: 0,
-                op: OperationType::R,
-            },
-            TxTableVN {
-                table: "table2".to_string(),
-                vn: 0,
-                op: OperationType::R,
-            },
-        ];
-        let operation = Operation {
-            txtablevns: versions,
-            transaction_id: "t1".to_string(),
-            task: Task::READ,
-        };
-        //Action
-        //Assert
-        assert!(!db_version.violate_version(operation));
-    }
+//     #[test]
+//     fn obey_dbversion_should_return_false() {
+//         //Prepare
+//         let mut table_versions = HashMap::new();
+//         table_versions.insert("table1".to_string(), 0);
+//         table_versions.insert("table2".to_string(), 0);
+//         let db_version = DbVersion::new(table_versions);
+//         let versions = vec![
+//             TxTableVN {
+//                 table: "table1".to_string(),
+//                 vn: 0,
+//                 op: OperationType::R,
+//             },
+//             TxTableVN {
+//                 table: "table2".to_string(),
+//                 vn: 0,
+//                 op: OperationType::R,
+//             },
+//         ];
+//         let operation = Operation {
+//             txtablevns: versions,
+//             transaction_id: "t1".to_string(),
+//             task: Task::READ,
+//         };
+//         //Action
+//         //Assert
+//         assert!(!db_version.violate_version(operation));
+//     }
 
-    #[ignore]
-    #[tokio::test]
-    async fn test_sql_connection() {
-        let url = "mysql://root:Rayh8768@localhost:3306/test";
-        let pool = mysql_async::Pool::new(url);
-        match pool.get_conn().await {
-            Ok(_) => {
-                println!("OK");
+#[test]
+#[ignore]
+fn postgres_write_test() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(async move {
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
+
+        let size: u32 = 50;
+        let manager = PostgresConnectionManager::new(config, NoTls);
+        let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
+
+        let conn = pool.get().await.unwrap();
+        conn.simple_query("START TRANSACTION;").await.unwrap();
+        let result = conn
+            .simple_query("INSERT INTO tbltest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999)")
+            .await
+            .unwrap();
+        conn.simple_query("COMMIT;").await.unwrap();
+
+        result.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                let len = query_row.len();
+                for index in 0..len {
+                    println!("value is : {}", query_row.get(index).unwrap().to_string());
+                }
             }
-            Err(e) => {
-                println!("error is =============================== : {}", e);
+            tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                println!("Command result is : {}", complete_status);
             }
-        }
-    }
-
-    #[ignore]
-    #[tokio::test]
-    async fn run_sql_query() {
-        let url = "mysql://root:Rayh8768@localhost:3306/test";
-        let pool = mysql_async::Pool::new(url);
-        //let mut wtr = csv::Writer::from_writer(io::stdout());
-
-        let mut conn = pool.get_conn().await.unwrap();
-
-        let mut raw = conn.query_iter("select * from cats").await.unwrap();
-        let results: Vec<mysql_async::Row> = raw.collect().await.unwrap();
-        results.iter().for_each(|r| {
-            println!("len {}", r.len());
+            _ => {}
         });
-    }
+
+        let writer = PostgreToCsvWriter::new(Task::WRITE);
+        let csv = writer.to_csv(result);
+
+        println!("Converted string is: {}", csv);
+    });
 }
+
+#[test]
+#[ignore]
+fn postgres_read_test() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+
+    rt.block_on(async move {
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
+
+        let size: u32 = 50;
+        let manager = PostgresConnectionManager::new(config, NoTls);
+        let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
+
+        let conn = pool.get().await.unwrap();
+        let result = conn
+            .simple_query("SELECT name, age, designation, salary FROM public.tbltest;")
+            .await
+            .unwrap();
+
+        result.iter().for_each(|q_message| match q_message {
+            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                let len = query_row.len();
+                for index in 0..len {
+                    println!("value is : {}", query_row.get(index).unwrap().to_string());
+                }
+            }
+            tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                println!("Command result is : {}", complete_status);
+            }
+            _ => {}
+        });
+
+        let writer = PostgreToCsvWriter::new(Task::READ);
+        let csv = writer.to_csv(result);
+
+        println!("Converted string is: {}", csv);
+    });
+}
+
+//}

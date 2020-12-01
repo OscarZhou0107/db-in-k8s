@@ -1,31 +1,27 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer;
+use crate::util::config::SequencerConfig;
 use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, warn};
 
-type ArcState = Arc<Mutex<State>>;
-
 /// Main entrance for Sequencer
-pub async fn main<A>(addr: A, max_connection: Option<u32>)
-where
-    A: ToSocketAddrs,
-{
+pub async fn main(conf: SequencerConfig) {
     let state = Arc::new(Mutex::new(State::new()));
 
     tcp::start_tcplistener(
-        addr,
+        conf.to_addr(),
         |tcp_stream| {
             let state_cloned = state.clone();
             process_connection(tcp_stream, state_cloned)
         },
-        max_connection,
+        conf.max_connection,
         "Sequencer",
     )
     .await;
@@ -35,9 +31,9 @@ where
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-async fn process_connection(tcp_stream: TcpStream, state: ArcState) {
+async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>) {
     let peer_addr = tcp_stream.peer_addr().unwrap();
-    let (tcp_read, tcp_write) = tcp_stream.into_split();
+    let (tcp_read, tcp_write) = tcp_stream.split();
 
     // Delimit frames from bytes using a length header
     let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
