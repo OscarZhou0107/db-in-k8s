@@ -14,6 +14,10 @@ use async_trait::async_trait;
 use csv::*;
 use std::net::SocketAddr;
 use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
+use crate::core::msql::IntoMsqlFinalString;
+use crate::core::msql::MsqlEndTxMode;
+use crate::comm::appserver_scheduler::MsqlResponse;
+use crate::comm::scheduler_dbproxy::Message;
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -39,6 +43,41 @@ pub struct QueueMessage {
     pub operation_type: Task,
     pub query: String,
     pub versions: Option<TxVN>,
+}
+
+impl QueueMessage {
+    pub fn new(identifier : SocketAddr, request : Msql, versions : Option<TxVN>) -> Self {
+
+        let operation_type;
+        let mut query_string = String::new();
+
+        match request {
+            Msql::BeginTx(_) => {
+                operation_type  = Task::BEGIN;
+            }
+
+            Msql::Query(op) => {
+                operation_type = Task::READ;
+                query_string = op.into_msqlfinalstring().0;
+            }
+
+            Msql::EndTx(op) => match op.mode() {
+                MsqlEndTxMode::Commit => {
+                    operation_type = Task::COMMIT;
+                }
+                MsqlEndTxMode::Rollback => {
+                    operation_type = Task::ABORT;
+                }
+            }
+        }
+
+        QueueMessage {
+            identifier: identifier,
+            operation_type: operation_type,
+            query: query_string,
+            versions: versions,
+        }
+    }
 }
 
 pub struct PendingQueue {
@@ -244,6 +283,39 @@ pub struct QueryResult {
     pub succeed: bool,
     pub result_type: QueryResultType,
     pub contained_newer_versions: Vec<TxTableVN>,
+}
+
+impl QueryResult {
+    pub fn into_msql_response(self) -> MsqlResponse {
+
+        let message;
+
+        match self.result_type {
+            QueryResultType::BEGIN => { 
+                if self.succeed {
+                    message = MsqlResponse::BeginTx(Ok(()));
+                } else {
+                    message = MsqlResponse::BeginTx(Err(self.result));
+                }
+            }
+            QueryResultType::QUERY => {
+                if self.succeed {
+                    message = MsqlResponse::Query(Ok(self.result));
+                } else {
+                    message = MsqlResponse::Query(Err(self.result));
+                }
+            }
+            QueryResultType::END => {
+                if self.succeed {
+                    message = MsqlResponse::EndTx(Ok(self.result));
+                } else {
+                    message = MsqlResponse::EndTx(Err(self.result));
+                }
+            }
+        };
+
+        message
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone)]

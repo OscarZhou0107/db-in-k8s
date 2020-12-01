@@ -23,35 +23,17 @@ impl Responder {
                 match result.result_type {
                     QueryResultType::END => {
                         version
-                        .lock()
-                        .await
-                        .release_on_tables(result.contained_newer_versions.clone());
-                    },
+                            .lock()
+                            .await
+                            .release_on_tables(result.contained_newer_versions.clone());
+                    }
                     _ => {}
                 }
 
-                let response;
-                let message;
-                if result.succeed {
-                    response = Ok(result.result);
-                } else {
-                    response = Err(result.result);
-                }
-
-                match result.result_type {
-                    QueryResultType::BEGIN => { 
-                        let response = Ok(());
-                        message = MsqlResponse::BeginTx(response);
-                    }
-                    QueryResultType::QUERY => {
-                        message = MsqlResponse::Query(response);
-                    }
-                    QueryResultType::END => {
-                        message = MsqlResponse::EndTx(response);
-                    }
-                }
-
-                serializer.send(Message::MsqlResponse(message)).await.unwrap();
+                serializer
+                    .send(Message::MsqlResponse(result.into_msql_response()))
+                    .await
+                    .unwrap();
             }
         });
     }

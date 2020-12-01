@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 ///
 /// The process of converting into `MsqlFinalString` is not reversible.
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct MsqlFinalString(String);
+pub struct MsqlFinalString(pub String);
 
 impl<M> From<M> for MsqlFinalString
 where

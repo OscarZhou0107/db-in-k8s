@@ -11,6 +11,7 @@ use tokio::sync::Notify;
 use tokio::{stream, sync::mpsc};
 
 use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
+use mpsc::*;
 use tokio_postgres::NoTls;
 
 pub struct Dispatcher {}
@@ -19,21 +20,13 @@ impl Dispatcher {
     pub fn run(
         pending_queue: Arc<Mutex<PendingQueue>>,
         sender: mpsc::Sender<QueryResult>,
-        sql_addr: String,
+        config: tokio_postgres::Config,
         mut version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
-
             let mut task_notify = pending_queue.lock().await.get_notify();
             let mut version_notify = version.lock().await.get_notify();
-
-            let mut config = tokio_postgres::Config::new();
-            config.user("postgres");
-            config.password("Rayh8768");
-            config.host("localhost");
-            config.port(5432);
-            config.dbname("Test");
 
             let manager = PostgresConnectionManager::new(config, NoTls);
             let pool = Pool::builder().max_size(50).build(manager).await.unwrap();
@@ -58,8 +51,7 @@ impl Dispatcher {
                         match op_cloned.operation_type {
                             Task::BEGIN => {
                                 if !lock.contains_key(&op_cloned.identifier) {
-                                    let (ts, tr): (mpsc::Sender<QueueMessage>, mpsc::Receiver<QueueMessage>) =
-                                        mpsc::channel(1);
+                                    let (ts, tr): (Sender<QueueMessage>, Receiver<QueueMessage>) = mpsc::channel(1);
                                     lock.insert(op_cloned.identifier.clone(), ts);
                                     Self::spawn_transaction(pool_cloned, tr, sender_cloned);
                                 };
@@ -84,8 +76,8 @@ impl Dispatcher {
 
     fn spawn_transaction(
         pool: Pool<PostgresConnectionManager<NoTls>>,
-        mut rec: mpsc::Receiver<QueueMessage>,
-        mut sender: mpsc::Sender<QueryResult>,
+        mut rec: Receiver<QueueMessage>,
+        sender: Sender<QueryResult>,
     ) {
         tokio::spawn(async move {
             let mut result: QueryResult;
@@ -93,45 +85,28 @@ impl Dispatcher {
                 let mut finish = false;
                 let conn = pool.get().await.unwrap();
                 while let Some(operation) = rec.recv().await {
+                    let raw;
                     match operation.operation_type {
                         Task::BEGIN => {
-                            result = prepare_query_result(
-                                operation.operation_type,
-                                operation.versions,
-                                conn.simple_query("START TRANSACTION;").await,
-                            );
+                            raw = conn.simple_query("START TRANSACTION;").await;
                         }
                         Task::READ => {
-                            result = prepare_query_result(
-                                operation.operation_type,
-                                operation.versions,
-                                conn.simple_query(&operation.query).await,
-                            );
+                            raw = conn.simple_query(&operation.query).await;
                         }
                         Task::WRITE => {
-                            result = prepare_query_result(
-                                operation.operation_type,
-                                operation.versions,
-                                conn.simple_query(&operation.query).await,
-                            );
+                            raw = conn.simple_query(&operation.query).await;
                         }
                         Task::COMMIT => {
-                            result = prepare_query_result(
-                                operation.operation_type,
-                                operation.versions,
-                                conn.simple_query("COMMIT;").await,
-                            );
+                            raw = conn.simple_query("COMMIT;").await;
                             finish = true;
                         }
                         Task::ABORT => {
-                            result = prepare_query_result(
-                                operation.operation_type,
-                                operation.versions,
-                                conn.simple_query("ROLLBACK;").await,
-                            );
+                            raw = conn.simple_query("ROLLBACK;").await;
                             finish = true;
                         }
                     }
+
+                    result = prepare_query_result(operation.operation_type, operation.versions, raw);
 
                     let _ = sender.send(result.clone()).await;
                     if finish {
@@ -142,7 +117,7 @@ impl Dispatcher {
         });
     }
 
-    fn spawn_unblock_send(sender: mpsc::Sender<QueueMessage>, op: QueueMessage) {
+    fn spawn_unblock_send(sender: Sender<QueueMessage>, op: QueueMessage) {
         tokio::spawn(async move {
             let _ = sender.send(op).await;
         });
@@ -163,35 +138,9 @@ fn prepare_query_result(
     transaction_version: Option<TxVN>,
     raw: Result<Vec<tokio_postgres::SimpleQueryMessage>, tokio_postgres::error::Error>,
 ) -> QueryResult {
-    let mut result_type;
-    let mut contained_newer_versions = Vec::new();
-    match mode {
-        Task::BEGIN => {
-            result_type = QueryResultType::BEGIN;
-            match transaction_version {
-                Some(versions) => {
-                    contained_newer_versions = versions.txtablevns;
-                }
-                None => {}
-            }
-        }
-        Task::READ => {
-            result_type = QueryResultType::QUERY;
-        }
-        Task::WRITE => {
-            result_type = QueryResultType::QUERY;
-        }
-        Task::COMMIT => {
-            result_type = QueryResultType::END;
-        }
-        Task::ABORT => {
-            result_type = QueryResultType::END;
-        }
-    };
-
     let result;
     let succeed;
-    let writer = PostgreToCsvWriter::new(mode);
+    let writer = PostgreToCsvWriter::new(mode.clone());
     match raw {
         Ok(message) => {
             result = writer.to_csv(message);
@@ -203,9 +152,30 @@ fn prepare_query_result(
         }
     }
 
+    let result_type;
+    let mut contained_newer_versions = Vec::new();
+
+    match mode {
+        Task::BEGIN => {
+            result_type = QueryResultType::BEGIN;
+            match transaction_version {
+                Some(versions) => {
+                    contained_newer_versions = versions.txtablevns;
+                }
+                None => {}
+            }
+        }
+        Task::READ | Task::WRITE => {
+            result_type = QueryResultType::QUERY;
+        }
+        Task::COMMIT | Task::ABORT => {
+            result_type = QueryResultType::END;
+        }
+    };
+
     QueryResult {
         result: result,
-        result_type: QueryResultType::BEGIN,
+        result_type: result_type,
         succeed: succeed,
         contained_newer_versions: contained_newer_versions,
     }
