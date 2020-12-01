@@ -1,7 +1,7 @@
 use o2versioner::comm::appserver_scheduler;
 use o2versioner::core::msql::*;
 use o2versioner::core::operation::*;
-use o2versioner::scheduler;
+use o2versioner::scheduler_main;
 use o2versioner::util::config::*;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
@@ -29,7 +29,7 @@ async fn test_scheduler() {
     };
 
     let conf_clone = conf.clone();
-    let scheduler_handle = tokio::spawn(scheduler::main(conf_clone));
+    let scheduler_handle = tokio::spawn(scheduler_main(conf_clone));
 
     let conf_clone = conf.clone();
     let sequencer_handle = tokio::spawn(tests_helper::mock_echo_server(

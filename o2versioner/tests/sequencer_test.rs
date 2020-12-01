@@ -2,7 +2,7 @@ use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::msql::*;
 use o2versioner::core::operation::*;
 use o2versioner::core::transaction_version::*;
-use o2versioner::sequencer;
+use o2versioner::sequencer_main;
 use o2versioner::util::config::SequencerConfig;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
@@ -15,7 +15,7 @@ async fn test_sequencer() {
         max_connection: Some(2),
     };
 
-    let sequencer_handle = tokio::spawn(sequencer::main(conf.clone()));
+    let sequencer_handle = tokio::spawn(sequencer_main(conf.clone()));
 
     let conf_cloned = conf.clone();
     let tester_handle_0 = tokio::spawn(async move {

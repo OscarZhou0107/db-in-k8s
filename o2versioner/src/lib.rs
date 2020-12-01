@@ -1,6 +1,9 @@
 pub mod comm;
 pub mod core;
 pub mod dbproxy;
-pub mod scheduler;
-pub mod sequencer;
+mod scheduler;
+mod sequencer;
 pub mod util;
+
+pub use scheduler::main as scheduler_main;
+pub use sequencer::main as sequencer_main;

@@ -1,8 +1,7 @@
 use clap::{App, Arg, ArgGroup, ArgMatches};
 use o2versioner::dbproxy;
-use o2versioner::scheduler;
-use o2versioner::sequencer;
 use o2versioner::util::config::Config;
+use o2versioner::{scheduler_main, sequencer_main};
 use tracing::info;
 
 pub fn init_logger() {
@@ -25,9 +24,9 @@ async fn main() {
     if matches.is_present("dbproxy") {
         dbproxy::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await
     } else if matches.is_present("scheduler") {
-        scheduler::main(conf).await
+        scheduler_main(conf).await
     } else if matches.is_present("sequencer") {
-        sequencer::main(conf.sequencer).await
+        sequencer_main(conf.sequencer).await
     } else {
         panic!("Unknown error!")
     }
