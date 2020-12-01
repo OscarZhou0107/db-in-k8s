@@ -66,13 +66,17 @@ where
 {
     let local_addr = tcp_stream.local_addr().unwrap();
     let (tcp_read, tcp_write) = tcp_stream.split();
-    let line_reader = BufReader::new(tcp_read).lines();
+    // Must send this line_reader as a mut ref into the closure for fold,
+    // moving this line_reader into the closure will make its owner to be the closure,
+    // which will indefinitely hold the Lines stream without consuming it,
+    // raising a compiler warning.
+    let mut line_reader = BufReader::new(tcp_read).lines();
 
     let mut responses = Vec::new();
     stream::iter(msgs)
         .fold(
-            (line_reader, tcp_write, &mut responses),
-            |(mut line_reader, mut tcp_write, responses), send_msg| async move {
+            (&mut line_reader, tcp_write, &mut responses),
+            |(line_reader, mut tcp_write, responses), send_msg| async move {
                 let mut send_msg = send_msg.into();
                 assert!(
                     !send_msg.contains("\n"),
