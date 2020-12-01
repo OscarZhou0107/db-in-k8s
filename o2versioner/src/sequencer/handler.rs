@@ -1,9 +1,10 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer;
+use crate::util::config::SequencerConfig;
 use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
@@ -11,19 +12,16 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, warn};
 
 /// Main entrance for Sequencer
-pub async fn main<A>(addr: A, max_conn_till_dropped: Option<u32>)
-where
-    A: ToSocketAddrs,
-{
+pub async fn main(conf: SequencerConfig) {
     let state = Arc::new(Mutex::new(State::new()));
 
     tcp::start_tcplistener(
-        addr,
+        conf.to_addr(),
         |tcp_stream| {
             let state_cloned = state.clone();
             process_connection(tcp_stream, state_cloned)
         },
-        max_conn_till_dropped,
+        conf.max_connection,
         "Sequencer",
     )
     .await;
