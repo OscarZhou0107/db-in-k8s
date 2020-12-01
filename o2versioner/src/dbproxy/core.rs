@@ -16,7 +16,7 @@ use std::net::SocketAddr;
 use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
 use crate::core::msql::IntoMsqlFinalString;
 use crate::core::msql::MsqlEndTxMode;
-use crate::comm::appserver_scheduler::MsqlResponse;
+use crate::comm::msql_response::MsqlResponse;
 use crate::comm::scheduler_dbproxy::Message;
 
 #[derive(Clone)]

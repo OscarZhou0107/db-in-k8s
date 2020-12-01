@@ -1,12 +1,6 @@
+use super::msql_response::MsqlResponse;
 use crate::core::msql;
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum MsqlResponse {
-    BeginTx(Result<(), String>),
-    Query(Result<String, String>),
-    EndTx(Result<String, String>),
-}
 
 /// Message for communication to Sceduler from appserver
 ///

@@ -1,5 +1,6 @@
 use super::core::*;
 use super::dispatcher::*;
+use crate::comm::msql_response::MsqlResponse;
 use crate::comm::{appserver_scheduler, scheduler_sequencer};
 use crate::core::msql::*;
 use crate::util::config::*;
@@ -8,6 +9,7 @@ use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
@@ -114,12 +116,14 @@ async fn process_connection(
             let conn_state_cloned = conn_state.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr.clone();
+            let client_addr_cloned = peer_addr.clone();
             async move {
                 debug!("<- [{}] Received {:?}", peer_addr, msg);
                 let response = match msg {
                     appserver_scheduler::Message::RequestMsql(msql) => {
                         process_msql(
                             msql,
+                            client_addr_cloned,
                             conn_state_cloned,
                             sequencer_socket_pool_cloned,
                             dispatcher_addr_cloned,
@@ -131,6 +135,7 @@ async fn process_connection(
                         Ok(msql) => {
                             process_msql(
                                 msql,
+                                client_addr_cloned,
                                 conn_state_cloned,
                                 sequencer_socket_pool_cloned,
                                 dispatcher_addr_cloned,
@@ -154,16 +159,15 @@ async fn process_connection(
 
 async fn process_msql(
     msql: Msql,
+    client_addr: SocketAddr,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    _dispatcher_addr: Arc<DispatcherAddr>,
+    dispatcher_addr: Arc<DispatcherAddr>,
 ) -> appserver_scheduler::Message {
     match msql {
         Msql::BeginTx(msqlbegintx) => {
             if conn_state.lock().await.current_txvn().is_some() {
-                appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(String::from(
-                    "Previous transaction not finished yet",
-                ))))
+                appserver_scheduler::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
             } else {
                 let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
                 let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
@@ -184,12 +188,36 @@ async fn process_msql(
                         }
                     })
                     .map_ok_or_else(
-                        |e| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Err(e))),
-                        |_| appserver_scheduler::Message::Reply(appserver_scheduler::MsqlResponse::BeginTx(Ok(()))),
+                        |e| appserver_scheduler::Message::Reply(MsqlResponse::begintx_err(e)),
+                        |_| appserver_scheduler::Message::Reply(MsqlResponse::begintx_ok()),
                     )
                     .await
             }
         }
-        _ => unimplemented!(),
+        Msql::Query(_) => {
+            let txvn = conn_state.lock().await.current_txvn().clone();
+            assert!(txvn.is_some(), "Does not support single un-transactioned query for now");
+            dispatcher_addr
+                .request(client_addr, msql, txvn)
+                .map_ok_or_else(
+                    |e| appserver_scheduler::Message::Reply(MsqlResponse::query_err(e)),
+                    |res| appserver_scheduler::Message::Reply(res),
+                )
+                .await
+        }
+        Msql::EndTx(_) => {
+            let txvn = conn_state.lock().await.take_current_txvn();
+            if txvn.is_none() {
+                appserver_scheduler::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
+            } else {
+                dispatcher_addr
+                    .request(client_addr, msql, txvn)
+                    .map_ok_or_else(
+                        |e| appserver_scheduler::Message::Reply(MsqlResponse::endtx_err(e)),
+                        |res| appserver_scheduler::Message::Reply(res),
+                    )
+                    .await
+            }
+        }
     }
 }
