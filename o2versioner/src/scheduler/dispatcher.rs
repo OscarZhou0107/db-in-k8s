@@ -92,8 +92,13 @@ impl State {
 
                     // if this is a EndTx, need to release the version and notifier other queries waiting on versions
                     if is_endtx {
-                        self.release_version(&dbproxy_addr, &txvn_cloned.expect("EndTx must include Some(TxVN)"))
-                            .await;
+                        self.release_version(
+                            &dbproxy_addr,
+                            txvn_cloned
+                                .expect("EndTx must include Some(TxVN)")
+                                .into_dbvn_release_request(),
+                        )
+                        .await;
                     }
 
                     // If the oneshot channel is not consumed, consume it to send the reply back to handler
@@ -196,10 +201,13 @@ impl State {
     }
 
     /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`
-    async fn release_version(&self, dbproxy_addr: &SocketAddr, txvn: &TxVN) {
-        self.dbvn_manager.write().await.release_version(dbproxy_addr, txvn);
+    async fn release_version(&self, dbproxy_addr: &SocketAddr, release_request: DbVNReleaseRequest) {
+        debug!("Releasing version for {} with {:?}", dbproxy_addr, release_request);
 
-        debug!("Released version for {} with {:?}", dbproxy_addr, txvn);
+        self.dbvn_manager
+            .write()
+            .await
+            .release_version(dbproxy_addr, release_request);
 
         // Notify all others on any DbVN changes
         self.dbvn_manager_notify.notify_waiters();
