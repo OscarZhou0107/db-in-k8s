@@ -1,31 +1,69 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer;
+use crate::util::admin_handler::*;
 use crate::util::config::SequencerConfig;
 use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// Main entrance for Sequencer
+/// 
+/// Three flavors:
+/// 1. Unlimited, the server will keep running forever.
+/// 2. Limit the total maximum number of input connections,
+/// once reaching that limit, no new connections are accepted.
+/// 3. Admin port, can send `kill`, `exit` or `quit` in raw bytes
+/// to the admin port, which will then force to not accept any new
+/// connections.
 pub async fn main(conf: SequencerConfig) {
     let state = Arc::new(Mutex::new(State::new()));
 
-    tcp::start_tcplistener(
+    // Create a stop_signal channel if admin mode is turned on
+    let (stop_tx, stop_rx) = if conf.admin_addr.is_some() {
+        let (tx, rx) = oneshot::channel();
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
+
+    let handler_handle = tokio::spawn(tcp::start_tcplistener(
         conf.to_addr(),
-        |tcp_stream| {
+        move |tcp_stream| {
             let state_cloned = state.clone();
             process_connection(tcp_stream, state_cloned)
         },
         conf.max_connection,
         "Sequencer",
-        None
-    )
-    .await;
+        stop_rx,
+    ));
+
+    // Allow sequencer to be terminated by admin
+    if let Some(admin_addr) = &conf.admin_addr {
+        let admin_addr = admin_addr.clone();
+        let admin_handle = tokio::spawn(async move {
+            start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Sequencer").await;
+            stop_tx.unwrap().send(()).unwrap();
+        });
+
+        // handler_handle can either run to finish or be the result
+        // of the above stop_tx.send()
+        handler_handle.await.unwrap();
+
+        // At this point, we just want to cancel the admin_handle
+        tokio::select! {
+            _ = future::ready(()) => info!("Sequencer admin is terminated" ),
+            _ = admin_handle => {}
+        };
+    } else {
+        handler_handle.await.unwrap();
+    }
 }
 
 /// Process the `tcp_stream` for a single connection
