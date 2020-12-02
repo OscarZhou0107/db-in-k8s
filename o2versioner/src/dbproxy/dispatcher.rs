@@ -183,7 +183,7 @@ fn prepare_query_result(
 #[cfg(test)]
 mod tests_dispatcher {
     // use super::Dispatcher;
-    // use crate::core::operation::Operation as OperationType;
+    // use crate::core::RWOperation;
     // use crate::core::transaction_version::TxTableVN;
     // use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
     // use std::{collections::HashMap, sync::Arc};
@@ -221,12 +221,12 @@ mod tests_dispatcher {
     //     mock_vs.push(TxTableVN {
     //         table: "table2".to_string(),
     //         vn: 0,
-    //         op: OperationType::R,
+    //         op: RWOperation::R,
     //     });
     //     mock_vs.push(TxTableVN {
     //         table: "table1".to_string(),
     //         vn: 0,
-    //         op: OperationType::R,
+    //         op: RWOperation::R,
     //     });
 
     //     let mut mock_ops = Vec::new();
@@ -297,12 +297,12 @@ mod tests_dispatcher {
     //     mock_vs.push(TxTableVN {
     //         table: "table2".to_string(),
     //         vn: 0,
-    //         op: OperationType::R,
+    //         op: RWOperation::R,
     //     });
     //     mock_vs.push(TxTableVN {
     //         table: "table1".to_string(),
     //         vn: 0,
-    //         op: OperationType::R,
+    //         op: RWOperation::R,
     //     });
 
     //     let mut mock_ops = Vec::new();

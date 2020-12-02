@@ -39,8 +39,8 @@ impl Receiver {
 mod tests_receiver {
     // use super::Receiver;
     // use crate::comm::scheduler_dbproxy::Message;
-    // use crate::core::operation::Operation as OperationType;
-    // use crate::core::transaction_version::TxTableVN;
+    // use crate::core::RWOperation;
+    // use crate::core::TxTableVN;
     // use crate::dbproxy::core::{Operation, PendingQueue, Task};
     // use futures::prelude::*;
     // use std::sync::Arc;
@@ -72,12 +72,12 @@ mod tests_receiver {
     //             TxTableVN {
     //                 table: "table1".to_string(),
     //                 vn: 0,
-    //                 op: OperationType::R,
+    //                 op: RWOperation::R,
     //             },
     //             TxTableVN {
     //                 table: "table2".to_string(),
     //                 vn: 0,
-    //                 op: OperationType::R,
+    //                 op: RWOperation::R,
     //             },
     //         ];
     //         let socket = TcpStream::connect(addr).await.unwrap();
@@ -127,12 +127,12 @@ mod tests_receiver {
     //             TxTableVN {
     //                 table: "table1".to_string(),
     //                 vn: 0,
-    //                 op: OperationType::R,
+    //                 op: RWOperation::R,
     //             },
     //             TxTableVN {
     //                 table: "table2".to_string(),
     //                 vn: 0,
-    //                 op: OperationType::R,
+    //                 op: RWOperation::R,
     //             },
     //         ];
 

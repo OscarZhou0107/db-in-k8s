@@ -44,7 +44,7 @@ mod tests_test {
     use super::Responder;
     use crate::comm::scheduler_dbproxy::Message;
     use crate::comm::MsqlResponse;
-    use crate::core::operation::Operation as OperationType;
+    use crate::core::RWOperation;
     use crate::core::TxTableVN;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
@@ -66,12 +66,12 @@ mod tests_test {
             TxTableVN {
                 table: "table1".to_string(),
                 vn: 0,
-                op: OperationType::R,
+                op: RWOperation::R,
             },
             TxTableVN {
                 table: "table2".to_string(),
                 vn: 0,
-                op: OperationType::R,
+                op: RWOperation::R,
             },
         ];
         let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));

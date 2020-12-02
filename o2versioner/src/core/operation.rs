@@ -6,9 +6,9 @@ use unicase::UniCase;
 
 /// Enum representing either a W (write) or R (read) for a table
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Serialize, Deserialize)]
-pub enum Operation {
-    W,
+pub enum RWOperation {
     R,
+    W,
 }
 
 /// Enum representing the access pattern of a `TableOps`
@@ -19,15 +19,15 @@ pub enum AccessPattern {
     Mixed,
 }
 
-/// Representing the access mode for `Self::table`, can be either `Operation::R` or `Operation::W`
+/// Representing the access mode for `Self::table`, can be either `RWOperation::R` or `RWOperation::W`
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
     pub table: String,
-    pub op: Operation,
+    pub op: RWOperation,
 }
 
 impl TableOp {
-    pub fn new<S: Into<String>>(table: S, op: Operation) -> Self {
+    pub fn new<S: Into<String>>(table: S, op: RWOperation) -> Self {
         Self {
             table: table.into(),
             op,
@@ -38,23 +38,23 @@ impl TableOp {
 /// Representing a collection of TableOp
 ///
 /// Automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
-/// (`Operation`s with same `String` are ordered such that `Operation::W` comes before `Operation::R`)
+/// (`RWOperation`s with same `String` are ordered such that `RWOperation::W` comes before `RWOperation::R`)
 ///
 /// # Examples
 /// ```
-/// use o2versioner::core::operation::*;
+/// use o2versioner::core::*;
 /// use std::iter::FromIterator;
 ///
 /// let tableops0 = TableOps::from_iter(vec![
-///     TableOp::new("table0", Operation::R),
-///     TableOp::new("table1", Operation::W),
+///     TableOp::new("table0", RWOperation::R),
+///     TableOp::new("table1", RWOperation::W),
 /// ]);
 ///
 /// let tableops1 = TableOps::from("read table0 write  table1");
 ///
 /// let tableops2 = TableOps::default()
-///     .add_tableop(TableOp::new("table1", Operation::W))
-///     .add_tableop(TableOp::new("table0", Operation::R));
+///     .add_tableop(TableOp::new("table1", RWOperation::W))
+///     .add_tableop(TableOp::new("table0", RWOperation::R));
 ///
 /// assert_eq!(tableops0, tableops1);
 /// assert_eq!(tableops1, tableops2);
@@ -87,9 +87,9 @@ impl TableOps {
 
     /// The access pattern of this `TableOps`
     pub fn access_pattern(&self) -> AccessPattern {
-        if self.0.iter().all(|tableop| tableop.op == Operation::R) {
+        if self.0.iter().all(|tableop| tableop.op == RWOperation::R) {
             AccessPattern::ReadOnly
-        } else if self.0.iter().all(|tableop| tableop.op == Operation::W) {
+        } else if self.0.iter().all(|tableop| tableop.op == RWOperation::W) {
             AccessPattern::WriteOnly
         } else {
             AccessPattern::Mixed
@@ -110,7 +110,7 @@ impl FromIterator<TableOp> for TableOps {
     /// Convert the input `IntoIterator<Item = TableOp>` into `TableOps`
     ///
     /// Sort input `Iterator<Item = TableOp>` in ascending order by `TableOp::name` and by `TableOp::op`
-    /// (`TableOp`s with same `TableOp::name` are ordered such that `Operation::W` comes before `Operation::R`)
+    /// (`TableOp`s with same `TableOp::name` are ordered such that `RWOperation::W` comes before `RWOperation::R`)
     fn from_iter<I: IntoIterator<Item = TableOp>>(iter: I) -> Self {
         Self(
             iter.into_iter()
@@ -121,7 +121,7 @@ impl FromIterator<TableOp> for TableOps {
                         if left.op == right.op {
                             Ordering::Equal
                         } else {
-                            if left.op == Operation::W {
+                            if left.op == RWOperation::W {
                                 Ordering::Less
                             } else {
                                 Ordering::Greater
@@ -143,7 +143,7 @@ where
     ///
     /// # Examples
     /// ```
-    /// use o2versioner::core::operation::TableOps;
+    /// use o2versioner::core::TableOps;
     /// let tableops = TableOps::from("read t0 write t1 read t2");
     /// ```
     ///
@@ -173,9 +173,9 @@ where
                         // is_read_st can't be None here because
                         // we should have met at least one key word
                         if is_read_st.unwrap() {
-                            return Some(Some(TableOp::new(token_ci.into_inner(), Operation::R)));
+                            return Some(Some(TableOp::new(token_ci.into_inner(), RWOperation::R)));
                         } else {
-                            return Some(Some(TableOp::new(token_ci.into_inner(), Operation::W)));
+                            return Some(Some(TableOp::new(token_ci.into_inner(), RWOperation::W)));
                         }
                     }
                 })
@@ -193,105 +193,105 @@ mod tests_tableops {
     fn test_from_iter() {
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_w_0", Operation::W)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_w_0", RWOperation::W)
             ])
             .into_vec(),
             vec![
-                TableOp::new("table_r_0".to_owned(), Operation::R),
-                TableOp::new("table_r_1".to_owned(), Operation::R),
-                TableOp::new("table_w_0".to_owned(), Operation::W),
+                TableOp::new("table_r_0".to_owned(), RWOperation::R),
+                TableOp::new("table_r_1".to_owned(), RWOperation::R),
+                TableOp::new("table_w_0".to_owned(), RWOperation::W),
             ]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
             ])
             .into_iter()
             .collect::<Vec<_>>(),
             vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
             ]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_w_0", Operation::W),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_w_1", Operation::W)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_w_0", RWOperation::W),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_w_1", RWOperation::W)
             ])
             .into_vec(),
             vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_w_0", Operation::W),
-                TableOp::new("table_w_1", Operation::W),
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_w_0", RWOperation::W),
+                TableOp::new("table_w_1", RWOperation::W),
             ]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_0", Operation::R)
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_0", RWOperation::R)
             ])
             .into_vec(),
-            vec![TableOp::new("table_0", Operation::R)]
+            vec![TableOp::new("table_0", RWOperation::R)]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_0", Operation::W),
-                TableOp::new("table_0", Operation::W)
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_0", RWOperation::W)
             ])
             .into_vec(),
-            vec![TableOp::new("table_0", Operation::W)]
+            vec![TableOp::new("table_0", RWOperation::W)]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_0", Operation::W)
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
             ])
             .into_vec(),
-            vec![TableOp::new("table_0", Operation::W)]
+            vec![TableOp::new("table_0", RWOperation::W)]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_0", Operation::W)
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
             ])
             .into_vec(),
-            vec![TableOp::new("table_0", Operation::W,)]
+            vec![TableOp::new("table_0", RWOperation::W,)]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_0", Operation::W),
-                TableOp::new("table_0", Operation::W)
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_0", RWOperation::W)
             ])
             .into_vec(),
-            vec![TableOp::new("table_0", Operation::W)]
+            vec![TableOp::new("table_0", RWOperation::W)]
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_1", Operation::R),
-                TableOp::new("table_0", Operation::W)
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_1", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
             ])
             .into_vec(),
             vec![
-                TableOp::new("table_0", Operation::W,),
-                TableOp::new("table_1", Operation::R)
+                TableOp::new("table_0", RWOperation::W,),
+                TableOp::new("table_1", RWOperation::R)
             ]
         );
     }
@@ -301,52 +301,52 @@ mod tests_tableops {
         assert_eq!(
             TableOps::from("ReAd table_R_0 table_r_1 WRite table_w_0").into_vec(),
             vec![
-                TableOp::new("table_R_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_w_0", Operation::W)
+                TableOp::new("table_R_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_w_0", RWOperation::W)
             ]
         );
 
         assert_eq!(
             TableOps::from(" read     tAble_r_0   tAble_r_1    WRITE  tAble_w_0 ").into_vec(),
             vec![
-                TableOp::new("tAble_r_0", Operation::R),
-                TableOp::new("tAble_r_1", Operation::R),
-                TableOp::new("tAble_w_0", Operation::W)
+                TableOp::new("tAble_r_0", RWOperation::R),
+                TableOp::new("tAble_r_1", RWOperation::R),
+                TableOp::new("tAble_w_0", RWOperation::W)
             ]
         );
 
         assert_eq!(
             TableOps::from("WrItE Table_w_0 read table_r_0 table_r_1").into_vec(),
             vec![
-                TableOp::new("Table_w_0", Operation::W),
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R)
+                TableOp::new("Table_w_0", RWOperation::W),
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
             ]
         );
 
         assert_eq!(
             TableOps::from("write table_w_0writE read table_r_0read writetable_r_1reAd").into_vec(),
             vec![
-                TableOp::new("table_r_0read", Operation::R),
-                TableOp::new("table_w_0writE", Operation::W),
-                TableOp::new("writetable_r_1reAd", Operation::R),
+                TableOp::new("table_r_0read", RWOperation::R),
+                TableOp::new("table_w_0writE", RWOperation::W),
+                TableOp::new("writetable_r_1reAd", RWOperation::R),
             ]
         );
 
         assert_eq!(
             TableOps::from("write read Table_r_0 Table_r_1").into_vec(),
             vec![
-                TableOp::new("Table_r_0", Operation::R),
-                TableOp::new("Table_r_1", Operation::R),
+                TableOp::new("Table_r_0", RWOperation::R),
+                TableOp::new("Table_r_1", RWOperation::R),
             ]
         );
 
         assert_eq!(
             TableOps::from("read table_r_0 Table_r_1 write").into_vec(),
             vec![
-                TableOp::new("Table_r_1", Operation::R),
-                TableOp::new("table_r_0", Operation::R)
+                TableOp::new("Table_r_1", RWOperation::R),
+                TableOp::new("table_r_0", RWOperation::R)
             ]
         );
 
@@ -357,31 +357,31 @@ mod tests_tableops {
         assert_eq!(
             TableOps::from("ReAd table_R_0 WrItE table_W_0 rEad table_R_1 ").into_vec(),
             vec![
-                TableOp::new("table_R_0", Operation::R),
-                TableOp::new("table_R_1", Operation::R),
-                TableOp::new("table_W_0", Operation::W)
+                TableOp::new("table_R_0", RWOperation::R),
+                TableOp::new("table_R_1", RWOperation::R),
+                TableOp::new("table_W_0", RWOperation::W)
             ]
         );
 
         assert_eq!(
             TableOps::from("read Table_r_0 WRITE REAd").into_vec(),
-            vec![TableOp::new("Table_r_0", Operation::R)]
+            vec![TableOp::new("Table_r_0", RWOperation::R)]
         );
 
         assert_eq!(
             TableOps::from("Read table_r_0 writereAD").into_vec(),
             vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("writereAD", Operation::R)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("writereAD", RWOperation::R)
             ]
         );
 
         assert_eq!(
             TableOps::from("table0 table1 table2 read table_r_0 table_r_1 Write table_w_0").into_vec(),
             vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_w_0", Operation::W)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_w_0", RWOperation::W)
             ]
         );
 
@@ -392,38 +392,38 @@ mod tests_tableops {
     fn test_add_tableop() {
         let tableops = TableOps::default();
 
-        let tableops = tableops.add_tableop(TableOp::new("table_0", Operation::R));
-        assert_eq!(tableops.get(), vec![TableOp::new("table_0", Operation::R)].as_slice());
+        let tableops = tableops.add_tableop(TableOp::new("table_0", RWOperation::R));
+        assert_eq!(tableops.get(), vec![TableOp::new("table_0", RWOperation::R)].as_slice());
 
-        let tableops = tableops.add_tableop(TableOp::new("table_0", Operation::R));
-        assert_eq!(tableops.get(), vec![TableOp::new("table_0", Operation::R)].as_slice());
+        let tableops = tableops.add_tableop(TableOp::new("table_0", RWOperation::R));
+        assert_eq!(tableops.get(), vec![TableOp::new("table_0", RWOperation::R)].as_slice());
 
-        let tableops = tableops.add_tableop(TableOp::new("table_1", Operation::R));
+        let tableops = tableops.add_tableop(TableOp::new("table_1", RWOperation::R));
         assert_eq!(
             tableops.get(),
             vec![
-                TableOp::new("table_0", Operation::R),
-                TableOp::new("table_1", Operation::R)
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("table_1", RWOperation::R)
             ]
             .as_slice()
         );
 
-        let tableops = tableops.add_tableop(TableOp::new("table_0", Operation::W));
+        let tableops = tableops.add_tableop(TableOp::new("table_0", RWOperation::W));
         assert_eq!(
             tableops.get(),
             vec![
-                TableOp::new("table_0", Operation::W),
-                TableOp::new("table_1", Operation::R)
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::R)
             ]
             .as_slice()
         );
 
-        let tableops = tableops.add_tableop(TableOp::new("table_1", Operation::W));
+        let tableops = tableops.add_tableop(TableOp::new("table_1", RWOperation::W));
         assert_eq!(
             tableops.get(),
             vec![
-                TableOp::new("table_0", Operation::W),
-                TableOp::new("table_1", Operation::W)
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
             ]
             .as_slice()
         );
@@ -432,20 +432,20 @@ mod tests_tableops {
     #[test]
     fn test_access_pattern() {
         assert_eq!(
-            TableOps::from_iter(vec![TableOp::new("table_r_0", Operation::R),]).access_pattern(),
+            TableOps::from_iter(vec![TableOp::new("table_r_0", RWOperation::R),]).access_pattern(),
             AccessPattern::ReadOnly
         );
 
         assert_eq!(
-            TableOps::from_iter(vec![TableOp::new("table_w_0", Operation::W),]).access_pattern(),
+            TableOps::from_iter(vec![TableOp::new("table_w_0", RWOperation::W),]).access_pattern(),
             AccessPattern::WriteOnly
         );
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_w_0", Operation::W)
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_w_0", RWOperation::W)
             ])
             .access_pattern(),
             AccessPattern::Mixed
@@ -453,9 +453,9 @@ mod tests_tableops {
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_r_0", Operation::R),
-                TableOp::new("table_r_1", Operation::R),
-                TableOp::new("table_r_2", Operation::R),
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R),
+                TableOp::new("table_r_2", RWOperation::R),
             ])
             .access_pattern(),
             AccessPattern::ReadOnly
@@ -463,9 +463,9 @@ mod tests_tableops {
 
         assert_eq!(
             TableOps::from_iter(vec![
-                TableOp::new("table_w_0", Operation::W),
-                TableOp::new("table_w_1", Operation::W),
-                TableOp::new("table_w_2", Operation::W),
+                TableOp::new("table_w_0", RWOperation::W),
+                TableOp::new("table_w_1", RWOperation::W),
+                TableOp::new("table_w_2", RWOperation::W),
             ])
             .access_pattern(),
             AccessPattern::WriteOnly

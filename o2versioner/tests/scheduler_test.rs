@@ -1,6 +1,6 @@
 use o2versioner::comm::appserver_scheduler;
 use o2versioner::core::msql::*;
-use o2versioner::core::operation::*;
+use o2versioner::core::*;
 use o2versioner::scheduler_main;
 use o2versioner::util::config::*;
 use o2versioner::util::tests_helper;

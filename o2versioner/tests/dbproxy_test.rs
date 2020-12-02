@@ -1,5 +1,5 @@
 // use futures::prelude::*;
-// use o2versioner::core::operation::Operation as OperationType;
+// use o2versioner::core::RWOperation;
 // use o2versioner::dbproxy;
 // use o2versioner::dbproxy::core::{Operation, Task};
 // use o2versioner::{comm::scheduler_dbproxy::Message, core::transaction_version::TxTableVN};
@@ -38,12 +38,12 @@
 //                 TxTableVN {
 //                     table: "table1".to_string(),
 //                     vn: 0,
-//                     op: OperationType::R,
+//                     op: RWOperation::R,
 //                 },
 //                 TxTableVN {
 //                     table: "table2".to_string(),
 //                     vn: 0,
-//                     op: OperationType::R,
+//                     op: RWOperation::R,
 //                 },
 //             ];
 //             let item = Message::SqlRequest(Operation {

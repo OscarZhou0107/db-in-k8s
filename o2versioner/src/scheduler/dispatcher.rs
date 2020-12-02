@@ -2,7 +2,6 @@ use super::core::{DbVNManager, DbproxyManager};
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::msql::*;
-use crate::core::operation::*;
 use crate::core::*;
 use crate::util::tcp::*;
 use bb8::Pool;

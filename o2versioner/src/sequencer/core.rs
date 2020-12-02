@@ -1,6 +1,5 @@
 use crate::core::msql::MsqlBeginTx;
-use crate::core::operation::Operation;
-use crate::core::{TxTableVN, TxVN, VN};
+use crate::core::{RWOperation, TxTableVN, TxVN, VN};
 use std::collections::HashMap;
 
 /// Version number info for a single table
@@ -28,10 +27,10 @@ impl TableVNRecord {
         return vn_write;
     }
 
-    fn assign(&mut self, op: &Operation) -> VN {
+    fn assign(&mut self, op: &RWOperation) -> VN {
         match op {
-            Operation::R => self.assign_read(),
-            Operation::W => self.assign_write(),
+            RWOperation::R => self.assign_read(),
+            RWOperation::W => self.assign_write(),
         }
     }
 }
@@ -203,7 +202,7 @@ mod tests_table_vn_record {
 mod tests_state {
     use super::State;
     use crate::core::msql::MsqlBeginTx;
-    use crate::core::operation::*;
+    use crate::core::*;
     use crate::core::{TxTableVN, TxVN};
     use std::iter::FromIterator;
 
@@ -216,9 +215,9 @@ mod tests_state {
         // next_for_write    0     0     0
         assert_eq!(
             state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("a", Operation::W),
-                TableOp::new("b", Operation::W),
-                TableOp::new("c", Operation::R)
+                TableOp::new("a", RWOperation::W),
+                TableOp::new("b", RWOperation::W),
+                TableOp::new("c", RWOperation::R)
             ]))),
             TxVN {
                 tx: None,
@@ -226,17 +225,17 @@ mod tests_state {
                     TxTableVN {
                         table: String::from("a"),
                         vn: 0,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     },
                     TxTableVN {
                         table: String::from("b"),
                         vn: 0,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     },
                     TxTableVN {
                         table: String::from("c"),
                         vn: 0,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     }
                 ]
             }
@@ -247,8 +246,8 @@ mod tests_state {
         // next_for_write    1     1     1
         assert_eq!(
             state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("b", Operation::W),
-                TableOp::new("c", Operation::R)
+                TableOp::new("b", RWOperation::W),
+                TableOp::new("c", RWOperation::R)
             ]))),
             TxVN {
                 tx: None,
@@ -256,12 +255,12 @@ mod tests_state {
                     TxTableVN {
                         table: String::from("b"),
                         vn: 1,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     },
                     TxTableVN {
                         table: String::from("c"),
                         vn: 0,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     }
                 ]
             }
@@ -272,8 +271,8 @@ mod tests_state {
         // next_for_write    1     2     2
         assert_eq!(
             state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("b", Operation::R),
-                TableOp::new("c", Operation::W)
+                TableOp::new("b", RWOperation::R),
+                TableOp::new("c", RWOperation::W)
             ]))),
             TxVN {
                 tx: None,
@@ -281,12 +280,12 @@ mod tests_state {
                     TxTableVN {
                         table: String::from("b"),
                         vn: 2,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     },
                     TxTableVN {
                         table: String::from("c"),
                         vn: 2,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     }
                 ]
             }
@@ -297,9 +296,9 @@ mod tests_state {
         // next_for_write    1     3     3
         assert_eq!(
             state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("a", Operation::R),
-                TableOp::new("b", Operation::R),
-                TableOp::new("c", Operation::W)
+                TableOp::new("a", RWOperation::R),
+                TableOp::new("b", RWOperation::R),
+                TableOp::new("c", RWOperation::W)
             ],))),
             TxVN {
                 tx: None,
@@ -307,17 +306,17 @@ mod tests_state {
                     TxTableVN {
                         table: String::from("a"),
                         vn: 1,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     },
                     TxTableVN {
                         table: String::from("b"),
                         vn: 2,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     },
                     TxTableVN {
                         table: String::from("c"),
                         vn: 3,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     }
                 ]
             }

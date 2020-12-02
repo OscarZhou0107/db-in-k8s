@@ -9,11 +9,11 @@ pub type VN = u64;
 pub struct TxTableVN {
     pub table: String,
     pub vn: VN,
-    pub op: Operation,
+    pub op: RWOperation,
 }
 
 impl TxTableVN {
-    pub fn new<S: Into<String>>(table: S, vn: VN, op: Operation) -> Self {
+    pub fn new<S: Into<String>>(table: S, vn: VN, op: RWOperation) -> Self {
         Self {
             table: table.into(),
             vn,
@@ -23,12 +23,12 @@ impl TxTableVN {
 
     /// Check whether the current `TxTableVN` matches with the argument `TableOp`
     ///
-    /// If `TableOp` is of `Operation::R`, then only need to match the name with `TxTableVN`;
-    /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TxTableVN`
+    /// If `TableOp` is of `RWOperation::R`, then only need to match the name with `TxTableVN`;
+    /// If `TableOp` is of `RWOperation::W`, then need to match both the name and also the operation (ie., `RWOperation::W`) with `TxTableVN`
     pub fn match_with(&self, tableop: &TableOp) -> bool {
         match tableop.op {
-            Operation::R => self.table == tableop.table,
-            Operation::W => self.table == tableop.table && self.op == tableop.op,
+            RWOperation::R => self.table == tableop.table,
+            RWOperation::W => self.table == tableop.table && self.op == tableop.op,
         }
     }
 }
@@ -56,8 +56,8 @@ impl Default for TxVN {
 impl TxVN {
     /// Find the `TxTableVN` that matches with the argument `TableOp` from the `TxVN`
     ///
-    /// If `TableOp` is of `Operation::R`, then only need to match the name with `TxTableVN`;
-    /// If `TableOp` is of `Operation::W`, then need to match both the name and also the operation (ie., `Operation::W`) with `TxTableVN`
+    /// If `TableOp` is of `RWOperation::R`, then only need to match the name with `TxTableVN`;
+    /// If `TableOp` is of `RWOperation::W`, then need to match both the name and also the operation (ie., `RWOperation::W`) with `TxTableVN`
     pub fn get_from_tableop(&self, tableop: &TableOp) -> Option<TxTableVN> {
         self.txtablevns
             .iter()
@@ -125,23 +125,23 @@ mod tests_txvn {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
             ],
         };
 
         assert_eq!(
-            txvn.get_from_tableop(&TableOp::new("t0", Operation::R)),
-            Some(TxTableVN::new("t0", 0, Operation::R))
+            txvn.get_from_tableop(&TableOp::new("t0", RWOperation::R)),
+            Some(TxTableVN::new("t0", 0, RWOperation::R))
         );
-        assert_eq!(txvn.get_from_tableop(&TableOp::new("t0", Operation::W)), None);
+        assert_eq!(txvn.get_from_tableop(&TableOp::new("t0", RWOperation::W)), None);
         assert_eq!(
-            txvn.get_from_tableop(&TableOp::new("t1", Operation::R)),
-            Some(TxTableVN::new("t1", 2, Operation::W))
+            txvn.get_from_tableop(&TableOp::new("t1", RWOperation::R)),
+            Some(TxTableVN::new("t1", 2, RWOperation::W))
         );
         assert_eq!(
-            txvn.get_from_tableop(&TableOp::new("t1", Operation::W)),
-            Some(TxTableVN::new("t1", 2, Operation::W))
+            txvn.get_from_tableop(&TableOp::new("t1", RWOperation::W)),
+            Some(TxTableVN::new("t1", 2, RWOperation::W))
         );
     }
 
@@ -150,87 +150,87 @@ mod tests_txvn {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
             ],
         };
 
         assert_eq!(
             txvn.get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t0", Operation::R),
-                TableOp::new("t1", Operation::R)
+                TableOp::new("t0", RWOperation::R),
+                TableOp::new("t1", RWOperation::R)
             ])),
             Ok(vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W)
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W)
             ])
         );
 
         assert_eq!(
             txvn.get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t1", Operation::R),
-                TableOp::new("t0", Operation::R),
+                TableOp::new("t1", RWOperation::R),
+                TableOp::new("t0", RWOperation::R),
             ])),
             Ok(vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
             ])
         );
 
         assert_eq!(
             txvn.get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t0", Operation::R),
-                TableOp::new("t1", Operation::W)
+                TableOp::new("t0", RWOperation::R),
+                TableOp::new("t1", RWOperation::W)
             ])),
             Ok(vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W)
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W)
             ])
         );
 
         assert_eq!(
             txvn.get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t1", Operation::W),
-                TableOp::new("t0", Operation::R),
+                TableOp::new("t1", RWOperation::W),
+                TableOp::new("t0", RWOperation::R),
             ])),
             Ok(vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
             ])
         );
 
         assert!(txvn
             .get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t0", Operation::W),
-                TableOp::new("t1", Operation::R)
+                TableOp::new("t0", RWOperation::W),
+                TableOp::new("t1", RWOperation::R)
             ]))
             .is_err());
 
         assert!(txvn
             .get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t0", Operation::W),
-                TableOp::new("t1", Operation::W)
+                TableOp::new("t0", RWOperation::W),
+                TableOp::new("t1", RWOperation::W)
             ]))
             .is_err());
 
         assert_eq!(
-            txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t0", Operation::R),])),
-            Ok(vec![TxTableVN::new("t0", 0, Operation::R),])
+            txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R),])),
+            Ok(vec![TxTableVN::new("t0", 0, RWOperation::R),])
         );
 
         assert_eq!(
-            txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t1", Operation::R)])),
-            Ok(vec![TxTableVN::new("t1", 2, Operation::W)])
+            txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t1", RWOperation::R)])),
+            Ok(vec![TxTableVN::new("t1", 2, RWOperation::W)])
         );
 
         assert!(txvn
-            .get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t2", Operation::R)]))
+            .get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t2", RWOperation::R)]))
             .is_err());
 
         assert!(txvn
             .get_from_tableops(&TableOps::from_iter(vec![
-                TableOp::new("t2", Operation::R),
-                TableOp::new("t0", Operation::R)
+                TableOp::new("t2", RWOperation::R),
+                TableOp::new("t0", RWOperation::R)
             ]))
             .is_err());
     }
@@ -240,8 +240,8 @@ mod tests_txvn {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
-                TxTableVN::new("t0", 0, Operation::R),
-                TxTableVN::new("t1", 2, Operation::W),
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
             ],
         };
 

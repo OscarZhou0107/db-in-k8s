@@ -2,7 +2,7 @@ use crate::comm::scheduler_dbproxy::Message;
 use crate::comm::MsqlResponse;
 use crate::core::msql::IntoMsqlFinalString;
 use crate::core::msql::MsqlEndTxMode;
-use crate::core::{msql::Msql, operation::Operation as OperationType};
+use crate::core::{msql::Msql, RWOperation};
 use crate::core::{TxTableVN, TxVN};
 use async_trait::async_trait;
 use bb8_postgres::{
@@ -347,7 +347,7 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 //     use super::DbVersion;
 //     use super::Task;
 //     use super::TxTableVN;
-//     use crate::core::operation::Operation as OperationType;
+//     use crate::core::operation::Operation as RWOperation;
 //     use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
 //     use mysql_async::prelude::Queryable;
 //     use tokio_postgres::NoTls;
@@ -364,12 +364,12 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 //             TxTableVN {
 //                 table: "table1".to_string(),
 //                 vn: 0,
-//                 op: OperationType::R,
+//                 op: RWOperation::R,
 //             },
 //             TxTableVN {
 //                 table: "table2".to_string(),
 //                 vn: 1,
-//                 op: OperationType::R,
+//                 op: RWOperation::R,
 //             },
 //         ];
 //         let operation = Operation {
@@ -393,12 +393,12 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 //             TxTableVN {
 //                 table: "table1".to_string(),
 //                 vn: 0,
-//                 op: OperationType::R,
+//                 op: RWOperation::R,
 //             },
 //             TxTableVN {
 //                 table: "table2".to_string(),
 //                 vn: 0,
-//                 op: OperationType::R,
+//                 op: RWOperation::R,
 //             },
 //         ];
 //         let operation = Operation {

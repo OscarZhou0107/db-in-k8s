@@ -1,6 +1,5 @@
 use o2versioner::comm::scheduler_sequencer;
 use o2versioner::core::msql::*;
-use o2versioner::core::operation::*;
 use o2versioner::core::*;
 use o2versioner::sequencer_main;
 use o2versioner::util::config::SequencerConfig;
@@ -37,12 +36,12 @@ async fn test_sequencer() {
                     TxTableVN {
                         table: String::from("table0"),
                         vn: 0,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     },
                     TxTableVN {
                         table: String::from("table1"),
                         vn: 2,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     },
                 ],
             }),
@@ -73,12 +72,12 @@ async fn test_sequencer() {
                     TxTableVN {
                         table: String::from("table0"),
                         vn: 0,
-                        op: Operation::W,
+                        op: RWOperation::W,
                     },
                     TxTableVN {
                         table: String::from("table1"),
                         vn: 2,
-                        op: Operation::R,
+                        op: RWOperation::R,
                     },
                 ],
             }),

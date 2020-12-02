@@ -48,7 +48,7 @@ pub trait IntoMsqlFinalString {
 /// # Examples
 /// ```
 /// use o2versioner::core::msql::MsqlBeginTx;
-/// use o2versioner::core::operation::TableOps;
+/// use o2versioner::core::TableOps;
 ///
 /// MsqlBeginTx::default()
 ///     .set_name(Some("tx0"))
@@ -121,7 +121,7 @@ impl MsqlBeginTx {
 /// # Examples
 /// ```
 /// use o2versioner::core::msql::MsqlQuery;
-/// use o2versioner::core::operation::TableOps;
+/// use o2versioner::core::TableOps;
 ///
 /// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
 ///     .unwrap();
@@ -424,15 +424,15 @@ mod tests_into_msqlfinalstring {
     fn test_from_msqlbegintx() {
         assert_eq!(
             MsqlFinalString::from(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("table0", Operation::R),
-                TableOp::new("table0", Operation::W),
+                TableOp::new("table0", RWOperation::R),
+                TableOp::new("table0", RWOperation::W),
             ]))),
             MsqlFinalString::new("BEGIN TRAN;")
         );
 
         let mfs: MsqlFinalString = MsqlBeginTx::from(TableOps::from_iter(vec![
-            TableOp::new("table0", Operation::R),
-            TableOp::new("table0", Operation::W),
+            TableOp::new("table0", RWOperation::R),
+            TableOp::new("table0", RWOperation::W),
         ]))
         .set_name(Some("tx0"))
         .into();
@@ -445,7 +445,7 @@ mod tests_into_msqlfinalstring {
             MsqlFinalString::from(
                 MsqlQuery::new(
                     "select * from table0 where true;",
-                    TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+                    TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
                 )
                 .unwrap()
             ),
@@ -454,7 +454,7 @@ mod tests_into_msqlfinalstring {
 
         let mfs: MsqlFinalString = MsqlQuery::new(
             "update table1 set name=\"ray\" where id = 20;",
-            TableOps::from_iter(vec![TableOp::new("table1", Operation::W)]),
+            TableOps::from_iter(vec![TableOp::new("table1", RWOperation::W)]),
         )
         .unwrap()
         .into();
@@ -479,8 +479,8 @@ mod tests_into_msqlfinalstring {
     fn test_from_msql() {
         assert_eq!(
             MsqlFinalString::from(Msql::BeginTx(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("table0", Operation::R),
-                TableOp::new("table0", Operation::W),
+                TableOp::new("table0", RWOperation::R),
+                TableOp::new("table0", RWOperation::W),
             ])))),
             MsqlFinalString::new("BEGIN TRAN;")
         );
@@ -489,7 +489,7 @@ mod tests_into_msqlfinalstring {
             MsqlFinalString::from(Msql::Query(
                 MsqlQuery::new(
                     "select * from table0 where true;",
-                    TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+                    TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
                 )
                 .unwrap()
             )),
@@ -511,21 +511,21 @@ mod tests_msqlquery {
     fn test_new() {
         assert!(MsqlQuery::new(
             "Select * from table0;",
-            TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+            TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
         )
         .is_ok());
 
         assert!(MsqlQuery::new(
             "Update table1 set name=\"ray\" where id = 20;",
-            TableOps::from_iter(vec![TableOp::new("table1", Operation::W)])
+            TableOps::from_iter(vec![TableOp::new("table1", RWOperation::W)])
         )
         .is_ok());
 
         assert!(MsqlQuery::new(
             "some_black_magic;",
             TableOps::from_iter(vec![
-                TableOp::new("table0", Operation::W),
-                TableOp::new("table1", Operation::R)
+                TableOp::new("table0", RWOperation::W),
+                TableOp::new("table1", RWOperation::R)
             ])
         )
         .is_err());
@@ -557,7 +557,7 @@ mod tests_msql {
             }),
             MsqlQuery::new(
                 "select * from table0;",
-                TableOps::from_iter(vec![TableOp::new("table0", Operation::R)])
+                TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
             )
             .map(|q| Msql::Query(q))
         );
