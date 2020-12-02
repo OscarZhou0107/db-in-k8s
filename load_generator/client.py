@@ -6,15 +6,15 @@ from random import randint
 from random import uniform
 import argparse
 import json
+import sys
 
 import web_to_sql
 import con_data
-import json_proc
 import sql
 
 
 
-HOST = "localhost"
+HOST = '127.0.0.1'
 TT = 3 # think time
 MAX_TIME = 600
 MAX_PROB = 9999
@@ -28,12 +28,12 @@ WRONG_PASSWD_FRENQUENCY = 1 # out of 10
 MAX_STRING_LEN = 100
 MAX_NUM_LEN = 12
 
-def determineNext(curr, prob):
-    row = prob[curr]
+def determineNext(curr_index, prob):
+    row = prob[curr_index]
     value = randint(0, MAX_PROB)
     for i in range(len(row)):
-        if value < row[i]:
-            return i
+        if value <= row[i]:
+            return con_data.states[i]
 
 def generateRandomString():
     res = []
@@ -72,7 +72,7 @@ def generateRandomCountry():
     return countries[index]
 
 class Client:
-    def _init_(self, c_id, port, mix):
+    def __init__(self, c_id, port, mix):
         self.c_id = c_id
         self.port = port
         self.curr = "home"
@@ -90,64 +90,65 @@ class Client:
         print("Client {} connected at port {}".format(self.c_id, self.port))
         # 
         while datetime.datetime.now() < self.max_time:
-            curr_url = con_data.urls[abbrs[self.curr]]
-            print("Entering webpage {}".format(curr_url))
-            # TODO: All comunication is plain text for now, will change to JSON
+            curr_index = con_data.states.index(self.curr)
+            print("Entering webpage {}".format(self.curr))
+
             # send BEGIN to start the transaction
-            begin = web_to_sql.getBegin(curr_url)
-            self.soc.sendall(begin)
-            # TODO: check if we will get a response from backend (e.g. )
-            data = self.soc.recv(2**24)
-            if not json_proc.response_ok(data):
+            begin = web_to_sql.getBegin(self.curr)
+            if DEBUG:
+                print(begin)
+            self.soc.sendall(begin.encode('utf-8'))
+            # TODO: check if we will get a response from backend
+            data = json.loads(self.soc.recv(2**24).decode('utf-8'))
+            if self.isErr(data):
                 print("Response contains error, terminating...")
                 return 0
-            # TODO: actually send the sql commands in order
             
-            if curr_url == 'adminConf':
-                ok = self.doAdminConf(s)
-            elif curr_url == 'adminReq':
-                ok = self.doAdminReq(s)
-            elif curr_url == 'bestSell':
-                ok = self.doBestSell(s)
-            elif curr_url == 'buyConf':
-                ok = self.doBuyConf(s)
-            elif curr_url == 'buyReq':
-                ok = self.doBuyReq(s)
-            elif curr_url == 'custReg':
-                ok = self.doCustReg(s)
-            elif curr_url == 'home':
-                ok = self.doHome(s)
-            elif curr_url == 'newProd':
-                ok = self.doNewProd(s)
-            elif curr_url == 'orderDisp':
-                ok = self.doOrderDisp(s)
-            elif curr_url == 'orderInq':
-                ok = self.doOrderInq(s)
-            elif curr_url == 'prodDet':
-                ok = self.doProdDet(s)
-            elif curr_url == 'searchReq':
-                ok = self.doSearchReq(s)
-            elif curr_url == 'searchResult':
-                ok = self.doSearchResult(s)
-            elif curr_url == 'shopCart':
-                ok = self.doShopCart(s)
+            if self.curr == 'adminConf':
+                okay = self.doAdminConf()
+            elif self.curr == 'adminReq':
+                okay = self.doAdminReq()
+            elif self.curr == 'bestSell':
+                okay = self.doBestSell()
+            elif self.curr == 'buyConf':
+                okay = self.doBuyConf()
+            elif self.curr == 'buyReq':
+                okay = self.doBuyReq()
+            elif self.curr == 'custReg':
+                okay = self.doCustReg()
+            elif self.curr == 'home':
+                okay = self.doHome()
+            elif self.curr == 'newProd':
+                okay = self.doNewProd()
+            elif self.curr == 'orderDisp':
+                okay = self.doOrderDisp()
+            elif self.curr == 'orderInq':
+                okay = self.doOrderInq()
+            elif self.curr == 'prodDet':
+                okay = self.doProdDet()
+            elif self.curr == 'searchReq':
+                okay = self.doSearchReq()
+            elif self.curr == 'searchResult':
+                okay = self.doSearchResult()
+            elif self.curr == 'shopCart':
+                okay = self.doShopCart()
             
-            if not ok:
+            if not okay:
                 print("Response contains error, terminating...")
                 return 0
             
             # determine next state
-            self.curr = determineNext(self.curr, self.mix)
+            self.curr = determineNext(curr_index, self.mix)
             time.sleep(TT)
 
-'''
-==================================================================================================================
-==================================================================================================================
-==================================================================================================================
-'''
+    '''
+    ==================================================================================================================
+    ==================================================================================================================
+    ==================================================================================================================
+    '''
 
-    # TODO: each response will be a JSON object through TCP
-    # just use response["var_name"] to read back
+    # Each response will be a JSON object through TCP
+    # actual result from sql will be in csv format
 
     # Note: each function will take whatever retrieved by req.getParameter(varname) as argument 
     # sql response types:
@@ -156,11 +157,11 @@ class Client:
     #   - ReadResponse -> need to read data from response
     
 
-    def doAdminConf(self):
+    def doAdminConf(self): # state 0
         # getBook
         i_id = randint(1, NUM_ITEM)
         response = self.getBook(i_id)
-        # ReadResponse - SELECT * FROM item,author
+        # DispOnly
         if self.isErr(response):
             return False
         
@@ -171,14 +172,14 @@ class Client:
         cost = round(uniform(1, 1500), 2)
         item_info = [cost, image, thumbnail, i_id]
         query = sql.replaceVars(sql.sqlNameToCommand["adminUpdate"], 4, item_info)
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "adminUpdate")
         # UpdateOnly
         if self.isErr(response):
             return False
 
         #   b. adminUpdateRelated
         query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated"], 2, i_id, i_id)
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "adminUpdateRelated")
         # ReadResponse - SELECT ol_i_id FROM orders, order_line
         if self.isErr(response):
             return False
@@ -197,14 +198,14 @@ class Client:
 
         #   c. adminUpdateRelated1
         query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated1"], 6, related)
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "adminUpdateRelated1")
         # UpdateOnly
         if self.isErr(response):
             return False
 
         return True
 
-    def doAdminReq(self):
+    def doAdminReq(self): # state 1
         # getBook
         response = self.getBook(-1)
         # DispOnly
@@ -212,7 +213,7 @@ class Client:
             return False
         return True
 
-    def doBestSell(self):
+    def doBestSell(self): # state 2
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -221,17 +222,17 @@ class Client:
         # getBestSellers
         subject = generateRandomSubject()
         query = sql.replaceVars(sql.sqlNameToCommand["getBestSellers"], 1, [subject])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "getBestSellers")
         # DispOnly
         if self.isErr(response):
             return False
         
         return True
 
-    def doBuyConf(self):
+    def doBuyConf(self): # state 3
         # getCDiscount
         query = sql.replaceVars(sql.sqlNameToCommand["getCDiscount"], 1, [self.c_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "getCDiscount")
         # ReadResponse - SELECT c_discount
         if self.isErr(response):
             return False
@@ -264,7 +265,7 @@ class Client:
             else:
                 # getCAddr
                 query = sql.replaceVars(sql.sqlNameToCommand["getCAddr"], 1, [self.c_id])
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "getCAddr")
                 # ReadResponse - SELECT c_addr_id
                 if self.isErr(response):
                     return False
@@ -273,7 +274,7 @@ class Client:
             # enterOrder (sequence)
             #   a. getCAddrId - same as getCAddr
             query = sql.replaceVars(sql.sqlNameToCommand["getCAddrId"], 1, [self.c_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "getCAddrId")
             # ReadResponse - SELECT c_addr_id
             if self.isErr(response):
                 return False
@@ -281,7 +282,7 @@ class Client:
 
             #   b. enterOrderMaxId
             query = sql.sqlNameToCommand["enterOrderMaxId"]
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "enterOrderMaxId")
             # ReadResponse - SELECT count(o_id)
             if self.isErr(response):
                 return False
@@ -295,7 +296,7 @@ class Client:
             interval = randint(1, 7)
             order_info = [o_id, self.c_id, o_sub_total, o_total, o_ship_type, interval, c_addr_id, ship_addr_id]
             query = sql.replaceVars(sql.sqlNameToCommand["enterOrderInsert"], 8, order_info)
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "enterOrderInsert")
             # UpdateOnly
             if self.isErr(response):
                 return False
@@ -306,14 +307,14 @@ class Client:
                                   processed["lines"][i]["scl_qty"], discount, 
                                   generateRandomString()]
                 query = sql.replaceVars(sql.sqlNameToCommand["addOrderLine"], 6, orderline_info)
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "addOrderLine")
                 # UpdateOnly
                 if self.isErr(response):
                     return False
 
                 # getStock
                 query = sql.replaceVars(sql.sqlNameToCommand["getStock"], 1, [processed["lines"][i]["scl_i_id"]])
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "getStock")
                 # ReadResponse - SELECT i_stock
                 if self.isErr(response):
                     return False
@@ -325,6 +326,7 @@ class Client:
                 else:
                     stock = stock - processed["lines"][i]["scl_qty"]
                 query = sql.replaceVars(sql.sqlNameToCommand["setStock"], 2, [stock, processed["lines"][i]["scl_i_id"]])
+                response = self.send_query_and_receive_response(query, "setStock")
                 # UpdateOnly
                 if self.isErr(response):
                     return False
@@ -337,34 +339,34 @@ class Client:
             cc_expiry = (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
             cc_info = [o_id, cc_type, cc_num, cc_name, cc_expiry, o_total, ship_addr_id]
             query = sql.replaceVars(sql.sqlNameToCommand["enterCCXact"], 7, cc_info)
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "enterCCXact")
             # UpdateOnly
             if self.isErr(response):
                 return False
 
             # clearCart
             query = sql.replaceVars(sql.sqlNameToCommand["clearCart"], 1, [self.shopping_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "clearCart")
             # UpdateOnly
             if self.isErr(response):
                 return False
 
         return True
 
-    def doBuyReq(self):
+    def doBuyReq(self): # state 4
         flag = randint(0, 1)
         if (flag == 1): # only if flag is Y == 1
             if self.load: # only if both c_uname and c_passwd are given (implied by load)
                 # getCustomer
                 query = sql.replaceVars(sql.sqlNameToCommand["getCustomer"], 1, [self.c_uname])
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "getCustomer")
                 # DispOnly
                 if self.isErr(response):
                     return False
 
                 # refreshSession 
                 query = sql.replaceVars(sql.sqlNameToCommand["refreshSession"], 1, [self.c_id])
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "refreshSession")
                 # UpdateOnly
                 if self.isErr(response):
                     return False
@@ -392,7 +394,7 @@ class Client:
            
             #   2. createNewCustomerMaxId
             query = sql.sqlNameToCommand["createNewCustomerMaxId"]
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "createNewCustomerMaxId")
             # ReadResponse - SELECT max(c_id)
             if self.isErr(response):
                 return False
@@ -424,7 +426,7 @@ class Client:
                             c_birthdate, c_data
                         ]
             query = sql.replaceVars(sql.sqlNameToCommand["refreshSession"], 17, cust_info)
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "refreshSession")
             # UpdateOnly
             if self.isErr(response):
                 return False
@@ -437,10 +439,10 @@ class Client:
 
         return True
 
-    def doCustReg(self):
+    def doCustReg(self): # state 5
         # getUserName
         query = sql.replaceVars(sql.sqlNameToCommand["getUserName"], 1, [self.c_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "getUserName")
         # ReadResponse - SELECT c_uname
         if self.isErr(response):
             return False
@@ -448,11 +450,11 @@ class Client:
 
         return True
 
-    def doHome(self):
+    def doHome(self): # state 6
         # say hello - getName - c_id, shopping_id
         if self.new_session: # only getName when it is a new_session
             query = sql.replaceVars(sql.sqlNameToCommand["getName"], 1, [self.c_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "getName")
             # ReadResponse - if not empty, existing customer, load data
             if self.isErr(response):
                 return False
@@ -467,7 +469,7 @@ class Client:
         
         return True
 
-    def doNewProd(self):
+    def doNewProd(self): # state 7
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -476,18 +478,18 @@ class Client:
         # getNewProducts
         subject = generateRandomSubject()
         query = sql.replaceVars(sql.sqlNameToCommand["getNewProducts"], 1, [subject])
-        response = self.send_query_and_receive_response(query)
-            # DispOnly
-            if self.isErr(response):
-                return False
+        response = self.send_query_and_receive_response(query, "getNewProducts")
+        # DispOnly
+        if self.isErr(response):
+            return False
 
         return True
 
-    def doOrderDisp(self):
+    def doOrderDisp(self): # state 8
         # 1. getPassword 
         if self.load: # only if both c_uname and c_passwd are given (implied by load)
             query = sql.replaceVars(sql.sqlNameToCommand["getPassword"], 1, [self.c_uname])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "getPassword")
             # DispOnly
             if self.isErr(response):
                 return False
@@ -500,7 +502,7 @@ class Client:
                 #       c. getMostRecentOrderLines - only execyte if b. is not empty; need o_id from a.
                     # GetMostRecentOrderId
                 query = sql.replaceVars(sql.sqlNameToCommand["GetMostRecentOrderId"], 1, [self.c_uname])
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "GetMostRecentOrderId")
                 # ReadResponse - SELECT o_id
                 if self.isErr(response):
                     return False
@@ -508,13 +510,13 @@ class Client:
                     o_id = response[0][0]
                     # getMostRecentOrderOrder
                     query = sql.replaceVars(sql.sqlNameToCommand["GetMostRecentOrderOrder"], 1, [o_id])
-                    response = self.send_query_and_receive_response(query)
+                    response = self.send_query_and_receive_response(query, "GetMostRecentOrderOrder")
                     # ReadResponse - SELECT orders.*, customer.*; but only care if it is empty
                     if self.isErr(response):
                         return False
                     if not self.isEmpty(response):
                         query = sql.replaceVars(sql.sqlNameToCommand["GetMostRecentOrderLines"], 1, [o_id])
-                        response = self.send_query_and_receive_response(query)
+                        response = self.send_query_and_receive_response(query, "GetMostRecentOrderLines")
                         # DispOnly
                         if self.isErr(response):
                             return False
@@ -522,24 +524,24 @@ class Client:
 
         return True
 
-    def doOrderInq(self):
+    def doOrderInq(self): # state 9
         return True
 
-    def doProdDet(self):
+    def doProdDet(self): # state 10
         response = self.getBook(-1)
         # DispOnly
         if self.isErr(response):
             return False
         return True
 
-    def doSearchReq(self):
+    def doSearchReq(self): # state 11
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
             return False
         return True
 
-    def doSearchResult(self):
+    def doSearchResult(self): # state 12
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -554,7 +556,7 @@ class Client:
             # author
             searchKey = generateRandomString()
             query = sql.replaceVars(sql.sqlNameToCommand["doAuthorSearch"], 1, [searchKey])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "doAuthorSearch")
             # DispOnly
             if self.isErr(response):
                 return False
@@ -562,27 +564,27 @@ class Client:
             # title
             searchKey = generateRandomString()
             query = sql.replaceVars(sql.sqlNameToCommand["doTitleSearch"], 1, [searchKey])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "doTitleSearch")
             # DispOnly
             if self.isErr(response):
                 return False
-        else: searchType == 3:
+        else: # searchType == 3
             # subject
             searchKey = generateRandomSubject()
             query = sql.replaceVars(sql.sqlNameToCommand["doSubjectSearch"], 1, [searchKey])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "doSubjectSearch")
             # DispOnly
             if self.isErr(response):
                 return False
 
         return True
 
-    def doShopCart(self):
+    def doShopCart(self): # state 13
         # createEmptyCart (sequence)
         if not self.shopping_id: # only createEmptyCart (sequence) if no shopping_id yet
             # 1. createEmptyCart
             query = sql.sqlNameToCommand["createEmptyCart"]
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "createEmptyCart")
             # ReadResponse - read COUNT
             if self.isErr(response):
                 return False
@@ -590,7 +592,7 @@ class Client:
 
             # 2. createEmptyCartInsertV2
             query = sql.replaceVars(sql.sqlNameToCommand["createEmptyCartInsertV2"], 1, [self.shopping_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "createEmptyCartInsertV2")
             # UpdateOnly:
             if self.isErr(response):
                 return False
@@ -616,13 +618,13 @@ class Client:
                 iid = randint(1, NUM_ITEM)
                 if qty == 0:
                     query = sql.replaceVars(sql.sqlNameToCommand["refreshCartRemove"], 2, [self.shopping_id, iid])
-                    response = self.send_query_and_receive_response(query)
+                    response = self.send_query_and_receive_response(query, "refreshCartRemove")
                     # UpdateOnly
                     if self.isErr(response):
                         return False
                 else:
                     query = sql.replaceVars(sql.sqlNameToCommand["refreshCartUpdate"], 3, [qty, self.shopping_id, iid])
-                    response = self.send_query_and_receive_response(query)
+                    response = self.send_query_and_receive_response(query, "refreshCartUpdate")
                     # UpdateOnly
                     if self.isErr(response):
                         return False
@@ -632,7 +634,7 @@ class Client:
         #       b. getRelated1 - b.c. only if a. returned 0
         #       c. addItem
         query = sql.replaceVars(sql.sqlNameToCommand["addRandomItemToCartIfNecessary"], 1, [self.shopping_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "addRandomItemToCartIfNecessary")
         # ReadResponse - read COUNT
         if self.isErr(response):
             return False
@@ -641,7 +643,7 @@ class Client:
         if count == 0:
             i_id = randint(1, NUM_ITEM)
             query = sql.replaceVars(sql.sqlNameToCommand["getRelated1"], 1, [i_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "getRelated1")
             # ReadResponse - read SELECT i_related1
             r_id = int(response[0][0])
 
@@ -651,7 +653,7 @@ class Client:
         
         # 4. resetCartTime
         query = sql.replaceVars(sql.sqlNameToCommand["resetCartTime"], 1, [self.shopping_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "resetCartTime")
         # UpdateOnly:
         if self.isErr(response):
             return False
@@ -667,23 +669,53 @@ class Client:
             return False
 
         return True
-'''
-==================================================================================================================
-==================================================================================================================
-==================================================================================================================
-'''
-    def send_query_and_receive_response(self, query):
+
+    '''
+    ==================================================================================================================
+    ==================================================================================================================
+    ==================================================================================================================
+    '''
+
+    def send_query_and_receive_response(self, query, name):
         # take raw query, return result in list -> result[row][col]
-        serialized = json_proc.construct_query(query)
-        self.soc.sendall(serialized)
+        pairs = sql.sqlNameToOP[name]
+        ops = {"READ":set(), "WRITE":set()}
+        for table in pairs:
+            if pairs[table] == "W":
+                ops["WRITE"].add(table)
+            else:
+                ops["READ"].add(table)
+
+        readString = ""
+        writeString = ""
+        if len(ops["READ"]):
+            readString = "READ " + " ".join(ops["READ"])
+        if len(ops["WRITE"]):
+            writeString = "WRITE " + " ".join(ops["WRITE"])
+        opsString = readString + " " + writeString
+
+        serialized = json.dumps({
+            "request_msql_text":{
+                "op":"query",
+                "query":query,
+                "tableops":opsString
+            }
+        })
+        if DEBUG:
+            print("Sending data:", name)
+            print(query)
+
+        self.soc.sendall(serialized.encode('utf-8'))
         response = self.soc.recv(2**24) # raw response
         # TODO: will get result in .csv, parse to list -> result[row][col]
+        parsed = json.loads(response.decode(('utf-8')))
         if DEBUG:
-            print(response)
-        parsed = json.loads(response)
+            print("Receiving data:", parsed)
+
         if OK not in parsed:
             return "Err"
-        result = response[OK]
+
+        result = parsed[OK]
         if not result:
             return "Empty"
         # only sql result, no rust layers
@@ -721,11 +753,11 @@ class Client:
         cart["sc_total"] = cart["sc_sub_total"] + tax + shipping 
         return cart
 
-'''
-==================================================================================================================
-==================================================================================================================
-==================================================================================================================
-'''
+    '''
+    ==================================================================================================================
+    ==================================================================================================================
+    ==================================================================================================================
+    '''
 
     # All sql handler return the last response (might an intermediate Err response if a sequence)
 
@@ -733,7 +765,7 @@ class Client:
         # getRelated - generate a random i_id (item id) as argument
         i_id = randint(1, NUM_ITEM)
         query = sql.replaceVars(sql.sqlNameToCommand["getRelated"], 1, [i_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "getRelated")
         # DispOnly
         return response
 
@@ -746,14 +778,14 @@ class Client:
         if i_id == -1:
             i_id = randint(1, NUM_ITEM)
         query = sql.replaceVars(sql.sqlNameToCommand["addItem"], 2, [self.shopping_id, i_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "addItem")
         # ReadResponse - read SELECT scl_qty
         if self.isErr(response):
             return response
         if self.isEmpty(response):
             # addItemPut
             query = sql.replaceVars(sql.sqlNameToCommand["addItemPut"], 3, [self.shopping_id, 1, i_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "addItemPut")
             # UpdateOnly
             if self.isErr(response):
                 return response
@@ -761,7 +793,7 @@ class Client:
             # addItemUpdate
             newQty = response[0]["scl_qty"] + 1
             query = sql.replaceVars(sql.sqlNameToCommand["addItemUpdate"], 3, [newQty, self.shopping_id, i_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "addItemUpdate")
             # UpdateOnly
             if self.isErr(response):
                 return response
@@ -771,7 +803,7 @@ class Client:
     def getCart(self):
         # getCart
         query = sql.replaceVars(sql.sqlNameToCommand["getCart"], 1, [self.shopping_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "getCart")
         # DispOnly
         return response
 
@@ -781,7 +813,7 @@ class Client:
             # If invalid i_id, generate a random one
             i_id = randint(1, NUM_ITEM)
         query = sql.replaceVars(sql.sqlNameToCommand["getBook"], 1, [i_id])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "getBook")
         # DispOnly
         return response
 
@@ -790,7 +822,7 @@ class Client:
         # enterAddress (sequence)
         #   a. enterAddressId
         query = sql.replaceVars(sql.sqlNameToCommand["enterAddressId"], 1, [country])
-        response = self.send_query_and_receive_response(query)
+        response = self.send_query_and_receive_response(query, "enterAddressId")
         # ReadResponse - SELECT co_id
         if self.isErr(response):
             return response
@@ -798,14 +830,14 @@ class Client:
             co_id = response[0][0]
             #   b. enterAddressMatch
             query = sql.replaceVars(sql.sqlNameToCommand["enterAddressMatch"], 6, [street1. street2, city, state, zzip, co_id])
-            response = self.send_query_and_receive_response(query)
+            response = self.send_query_and_receive_response(query, "enterAddressMatch")
             # ReadResponse - SELECT addr_id
             if self.isErr(response):
                 return response
             if self.isEmpty(response):
                 #   c. enterAddressMaxId
                 query = sql.sqlNameToCommand["enterAddressMaxId"]
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "enterAddressMaxId")
                 # ReadResponse - SELECT max(addr_id)
                 if self.isErr(response):
                     return response
@@ -813,7 +845,7 @@ class Client:
 
                 #   d. enterAddressInsert
                 query = sql.replaceVars(sql.sqlNameToCommand["enterAddressInsert"], 7, [addr_id, street1, street2, city, state, zzip, co_id])
-                response = self.send_query_and_receive_response(query)
+                response = self.send_query_and_receive_response(query, "enterAddressInsert")
                 # UpdateOnly
                 if self.isErr(response):
                     return response
@@ -830,6 +862,7 @@ if __name__ == "__main__":
     parser.add_argument("--c_id", type=int)
     parser.add_argument("--mix", type=int, default=0)
     args = parser.parse_args()
+    print(args)
     if args.mix == 0:
         mix = con_data.fake
     elif args.mix == 1:
@@ -840,11 +873,11 @@ if __name__ == "__main__":
         mix = con_data.mix3
     else:
         print("Wrong mix number! Teminating...")
-        return 0
+        sys.exit()
     # Check mix dimension
     if len(mix) != len(mix[0]):
         print("Probability table is not square! Terminating...")
-        return 0
+        sys.exit()
 
-    newClient = Client(args.c_id, args.port, mix)
+    newClient = Client(int(args.c_id), int(args.port), mix)
     newClient.run()
