@@ -163,11 +163,26 @@ def getBegin(url):
 
     # serialize
     serialized = json.dumps({
-        "request_msql_text":{
-        "op":"begin_tx",
-        "tableops":resultString
+        "request_msql_text":
+        {
+            "op":"begin_tx",
+            "tableops":resultString
         }
     })
+    return serialized
+
+def getCommit():
+    serialized = json.dumps({
+        "request_msql_text":
+        {
+            "op":"end_tx",
+            "mode":"commit"
+        }
+    })
+    return serialized
+
+def getCrash(curr):
+    serialized = json.dumps({"request_crash":"fail in state ".format(curr)})
     return serialized
 
 if __name__ == "__main__":

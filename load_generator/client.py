@@ -96,6 +96,7 @@ class Client:
             # send BEGIN to start the transaction
             begin = web_to_sql.getBegin(self.curr)
             if DEBUG:
+                print("Sending data: BEGIN")
                 print(begin)
             self.soc.sendall(begin.encode('utf-8'))
             # TODO: check if we will get a response from backend
@@ -135,7 +136,16 @@ class Client:
             
             if not okay:
                 print("Response contains error, terminating...")
+                crash = web_to_sql.getCrash(self.curr)
+                self.soc.sendall(crash.encode('utf-8'))
                 return 0
+
+            commit = web_to_sql.getCommit()
+            if DEBUG:
+                print("Sending data: COMMIT")
+                print(commit)
+            self.soc.sendall(commit.encode('utf-8'))
+            # TODO: check if we will get a response from backend
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
