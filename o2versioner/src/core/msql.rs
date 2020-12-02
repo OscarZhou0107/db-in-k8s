@@ -47,8 +47,7 @@ pub trait IntoMsqlFinalString {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::core::msql::MsqlBeginTx;
-/// use o2versioner::core::TableOps;
+/// use o2versioner::core::{MsqlBeginTx, TableOps};
 ///
 /// MsqlBeginTx::default()
 ///     .set_name(Some("tx0"))
@@ -120,8 +119,7 @@ impl MsqlBeginTx {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::core::msql::MsqlQuery;
-/// use o2versioner::core::TableOps;
+/// use o2versioner::core::{MsqlQuery, TableOps};
 ///
 /// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
 ///     .unwrap();
@@ -179,7 +177,7 @@ pub enum MsqlEndTxMode {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::core::msql::MsqlEndTx;
+/// use o2versioner::core::MsqlEndTx;
 ///
 /// MsqlEndTx::commit();
 /// MsqlEndTx::rollback().set_name(Some("tx1"));
@@ -326,7 +324,7 @@ impl TryFrom<MsqlText> for Msql {
 ///
 /// # Examples - Json conversion
 /// ```
-/// use o2versioner::core::msql::{MsqlEndTxMode, MsqlText};
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 ///
 /// // "op":"query" suggests MsqlText::Query
 /// let query_str = r#"

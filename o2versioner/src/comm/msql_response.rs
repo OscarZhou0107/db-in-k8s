@@ -1,4 +1,4 @@
-use crate::core::msql::Msql;
+use crate::core::Msql;
 /// This module contains everything about the response
 /// to a Msql query.
 #[allow(unused_imports)]

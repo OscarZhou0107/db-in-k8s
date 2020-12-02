@@ -1,5 +1,4 @@
 use o2versioner::comm::scheduler_sequencer;
-use o2versioner::core::msql::*;
 use o2versioner::core::*;
 use o2versioner::sequencer_main;
 use o2versioner::util::config::SequencerConfig;

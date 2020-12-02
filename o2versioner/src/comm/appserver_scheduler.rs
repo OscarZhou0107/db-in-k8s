@@ -1,5 +1,5 @@
 use super::msql_response::MsqlResponse;
-use crate::core::msql;
+use crate::core::{Msql, MsqlText};
 use serde::{Deserialize, Serialize};
 
 /// Message for communication to Sceduler from appserver
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 /// # Examples - Json conversion
 /// ```
 /// use o2versioner::comm::appserver_scheduler::Message;
-/// use o2versioner::core::msql::{MsqlEndTxMode, MsqlText};
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 ///
 /// let rmt_begin_tx_str = r#"
 /// {
@@ -46,9 +46,9 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum Message {
     /// Request in `Msql` format
-    RequestMsql(msql::Msql),
+    RequestMsql(Msql),
     /// Request in `MsqlText` format
-    RequestMsqlText(msql::MsqlText),
+    RequestMsqlText(MsqlText),
     /// Response to an invalid request, for exmample, sending `Reply(MsqlResponse)` to the Scheduler
     InvalidRequest,
     /// Invalid `MsqlText`, happens when `MsqlText` cannot be converted into `Msql`
@@ -68,7 +68,7 @@ impl Message {
 #[cfg(test)]
 mod tests_message {
     use super::*;
-    use crate::core::msql::*;
+    use crate::core::MsqlEndTxMode;
 
     #[test]
     fn test_requestmsqltext_json() {
