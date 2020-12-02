@@ -53,6 +53,11 @@ impl State {
     }
 
     async fn execute(&self, request: Request) {
+        debug!(
+            "Scheduler dispatcher received from handler: {:?} {:?} {:?}",
+            request.client_addr, request.command, request.txvn
+        );
+
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
         if !self.is_dbproxy_existed().await {
@@ -103,11 +108,17 @@ impl State {
                 let txvn_cloned = txvn.clone();
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
                 async move {
+                    debug!(
+                        "Scheduler dispatcher send {:?} to dbproxy {:?}",
+                        msg_cloned, dbproxy_addr
+                    );
+                    let mut tcpsocket = dbproxy_pool.get().await.unwrap();
                     let msqlresponse = send_and_receive_single_as_json(
-                        &mut dbproxy_pool.get().await.unwrap(),
+                        &mut tcpsocket,
                         msg_cloned,
                         format!("Scheduler dispatcher-{}", op_str),
                     )
+                    .inspect_err(|e| warn!("Scheduler dispatcher cannot send to dbproxy: {:?}", e))
                     .map_err(|e| e.to_string())
                     .and_then(|res| match res {
                         Message::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
@@ -206,7 +217,7 @@ impl State {
             // For now, pick the first dbproxy from all available
             let dbproxy_addr = avail_dbproxy[0].0;
             debug!(
-                "Found {} for executing the ReadOnly {:?} with {:?}",
+                "Found dbproxy {} for executing the ReadOnly {:?} with {:?}",
                 dbproxy_addr, msqlquery, txvn
             );
             (dbproxy_addr, self.dbproxy_manager.get(&dbproxy_addr))
@@ -304,6 +315,11 @@ impl DispatcherAddr {
             txvn,
             reply: Some(tx),
         };
+
+        debug!(
+            "Scheduler handler send to dispatcher: {:?} {:?} {:?}",
+            request.client_addr, request.command, request.txvn
+        );
 
         // Send the request
         self.request_tx.send(request).await.map_err(|e| e.to_string())?;

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use bb8;
-use futures::future::poll_fn;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -205,9 +204,7 @@ impl bb8::ManageConnection for TcpStreamConnectionManager {
     }
 
     async fn is_valid(&self, conn: &mut bb8::PooledConnection<'_, Self>) -> Result<(), Self::Error> {
-        let mut buf = [0; 10];
-
-        poll_fn(|cx| conn.poll_peek(cx, &mut buf)).await.map(|_| ())
+        conn.writable().await
     }
 
     fn has_broken(&self, _conn: &mut Self::Connection) -> bool {

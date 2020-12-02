@@ -1,11 +1,19 @@
+use futures::prelude::*;
 use o2versioner::comm::scheduler_api::*;
+use o2versioner::comm::scheduler_dbproxy;
+use o2versioner::comm::MsqlResponse;
 use o2versioner::core::*;
 use o2versioner::scheduler_main;
 use o2versioner::sequencer_main;
 use o2versioner::util::config::*;
+use o2versioner::util::tcp::*;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::debug;
 
 #[tokio::test]
 async fn test_double_s() {
@@ -81,7 +89,7 @@ async fn run_double_s() {
             admin_addr: None,
             max_connection: None,
             sequencer_pool_size: 10,
-            dbproxy_pool_size: 1,
+            dbproxy_pool_size: 10,
             dispatcher_queue_size: 1,
         },
         sequencer: SequencerConfig {
@@ -97,7 +105,52 @@ async fn run_double_s() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy_handle = tokio::spawn(tests_helper::mock_echo_server(dbproxy_addr, Some(1), "Mock dbproxy"));
+    let dbproxy_handle = tokio::spawn(start_tcplistener(
+        dbproxy_addr,
+        move |mut tcp_stream| {
+            async move {
+                let _peer_addr = tcp_stream.peer_addr().unwrap();
+                let (tcp_read, tcp_write) = tcp_stream.split();
+
+                // Delimit frames from bytes using a length header
+                let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
+                let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
+
+                // Deserialize/Serialize frames using JSON codec
+                let serded_read = SymmetricallyFramed::new(
+                    length_delimited_read,
+                    SymmetricalJson::<scheduler_dbproxy::Message>::default(),
+                );
+                let serded_write = SymmetricallyFramed::new(
+                    length_delimited_write,
+                    SymmetricalJson::<scheduler_dbproxy::Message>::default(),
+                );
+
+                // Process a stream of incoming messages from a single tcp connection
+                serded_read
+                    .and_then(move |msg| async move {
+                        debug!("dbproxy mock receives {:?}", msg);
+                        match msg {
+                            scheduler_dbproxy::Message::MsqlRequest(_client, msql, _txvn) => {
+                                Ok(scheduler_dbproxy::Message::MsqlResponse(match msql {
+                                    Msql::BeginTx(_) => MsqlResponse::begintx_err("Dbproxy does not handle BeginTx"),
+                                    Msql::Query(_) => MsqlResponse::query_ok("QUERY GOOD"),
+                                    Msql::EndTx(_) => MsqlResponse::endtx_ok("ENDTX GOOD"),
+                                }))
+                            }
+                            _ => Ok(scheduler_dbproxy::Message::Invalid),
+                        }
+                    })
+                    .inspect_ok(|m| debug!("dbproxy mock rpelies {:?}", m))
+                    .forward(serded_write)
+                    .map(|_| ())
+                    .await;
+            }
+        },
+        None,
+        "Mock dbproxy",
+        None,
+    ));
 
     sleep(Duration::from_millis(300)).await;
 
