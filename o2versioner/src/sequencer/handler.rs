@@ -14,7 +14,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, info, warn};
 
 /// Main entrance for Sequencer
-/// 
+///
 /// Three flavors:
 /// 1. Unlimited, the server will keep running forever.
 /// 2. Limit the total maximum number of input connections,

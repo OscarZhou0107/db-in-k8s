@@ -81,6 +81,7 @@ where
     );
 }
 
+/// A very basic admin command handler
 pub async fn basic_admin_command_handler(command: String) -> (String, bool) {
     let command = UniCase::new(command);
     if command == UniCase::new(String::from("kill"))

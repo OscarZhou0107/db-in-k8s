@@ -226,8 +226,14 @@ mod tests_dbvn {
 
     #[test]
     fn test_can_execute_query() {
-        let tableops0 = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R), TableOp::new("t1", RWOperation::R)]);
-        let tableops1 = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::W), TableOp::new("t1", RWOperation::W)]);
+        let tableops0 = TableOps::from_iter(vec![
+            TableOp::new("t0", RWOperation::R),
+            TableOp::new("t1", RWOperation::R),
+        ]);
+        let tableops1 = TableOps::from_iter(vec![
+            TableOp::new("t0", RWOperation::W),
+            TableOp::new("t1", RWOperation::W),
+        ]);
         let tableops2 = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::W)]);
         let tableops3 = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R)]);
 
@@ -311,7 +317,10 @@ mod tests_dbvn {
             ],
         };
 
-        let tableops = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R), TableOp::new("t1", RWOperation::R)]);
+        let tableops = TableOps::from_iter(vec![
+            TableOp::new("t0", RWOperation::R),
+            TableOp::new("t1", RWOperation::R),
+        ]);
 
         assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops,).unwrap()));
         assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
