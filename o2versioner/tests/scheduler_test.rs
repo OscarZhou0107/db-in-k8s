@@ -1,4 +1,4 @@
-use o2versioner::comm::appserver_scheduler;
+use o2versioner::comm::scheduler_api;
 use o2versioner::core::*;
 use o2versioner::scheduler_main;
 use o2versioner::util::config::*;
@@ -42,9 +42,9 @@ async fn test_scheduler() {
     let conf_clone = conf.clone();
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
-            appserver_scheduler::Message::test("0-hello"),
-            appserver_scheduler::Message::test("0-world"),
-            appserver_scheduler::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            scheduler_api::Message::test("0-hello"),
+            scheduler_api::Message::test("0-world"),
+            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
                 "READ table0 WRITE table1 table2 read table3",
             )))),
         ];
@@ -56,9 +56,9 @@ async fn test_scheduler() {
     let conf_clone = conf.clone();
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
-            appserver_scheduler::Message::test("0-hello"),
-            appserver_scheduler::Message::test("0-world"),
-            appserver_scheduler::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            scheduler_api::Message::test("0-hello"),
+            scheduler_api::Message::test("0-world"),
+            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
                 "READ table0 WRITE table1 table2 read table3",
             )))),
         ];

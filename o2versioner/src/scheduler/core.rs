@@ -8,6 +8,7 @@ use std::iter::FromIterator;
 use std::net::SocketAddr;
 use tracing::warn;
 
+#[derive(Debug)]
 pub struct ConnectionState {
     cur_txvn: Option<TxVN>,
 }

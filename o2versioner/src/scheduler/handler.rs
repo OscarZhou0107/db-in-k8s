@@ -1,7 +1,7 @@
 use super::core::*;
 use super::dispatcher::*;
 use crate::comm::MsqlResponse;
-use crate::comm::{appserver_scheduler, scheduler_sequencer};
+use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::Msql;
 use crate::util::admin_handler::*;
 use crate::util::config::*;
@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -115,11 +115,11 @@ async fn process_connection(
     // Deserialize/Serialize frames using JSON codec
     let serded_read = SymmetricallyFramed::new(
         length_delimited_read,
-        SymmetricalJson::<appserver_scheduler::Message>::default(),
+        SymmetricalJson::<scheduler_api::Message>::default(),
     );
     let serded_write = SymmetricallyFramed::new(
         length_delimited_write,
-        SymmetricalJson::<appserver_scheduler::Message>::default(),
+        SymmetricalJson::<scheduler_api::Message>::default(),
     );
 
     // Each individual connection communication is executed in blocking order,
@@ -138,7 +138,7 @@ async fn process_connection(
             async move {
                 debug!("<- [{}] Received {:?}", peer_addr, msg);
                 let response = match msg {
-                    appserver_scheduler::Message::RequestMsql(msql) => {
+                    scheduler_api::Message::RequestMsql(msql) => {
                         process_msql(
                             msql,
                             client_addr_cloned,
@@ -148,7 +148,7 @@ async fn process_connection(
                         )
                         .await
                     }
-                    appserver_scheduler::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
+                    scheduler_api::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
                         // Try to convert MsqlText to Msql first
                         Ok(msql) => {
                             process_msql(
@@ -160,9 +160,20 @@ async fn process_connection(
                             )
                             .await
                         }
-                        Err(e) => appserver_scheduler::Message::InvalidMsqlText(e.to_owned()),
+                        Err(e) => scheduler_api::Message::InvalidMsqlText(e.to_owned()),
                     },
-                    _ => appserver_scheduler::Message::InvalidRequest,
+                    scheduler_api::Message::Crash(reason) => {
+                        error!(
+                            "[{}] <- [{}] Requested for a soft crash because of {}",
+                            local_addr, peer_addr, reason
+                        );
+                        error!(
+                            "[{}] -- [{}] Current connection state: {:?}",
+                            local_addr, peer_addr, conn_state_cloned
+                        );
+                        panic!("Received a soft crash request");
+                    }
+                    _ => scheduler_api::Message::InvalidRequest,
                 };
                 debug!("-> [{}] Reply {:?}", peer_addr, response);
                 Ok(response)
@@ -181,13 +192,13 @@ async fn process_msql(
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
-) -> appserver_scheduler::Message {
+) -> scheduler_api::Message {
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
     match msql {
         Msql::BeginTx(msqlbegintx) => {
             if conn_state_guard.current_txvn().is_some() {
-                appserver_scheduler::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
+                scheduler_api::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
             } else {
                 let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
                 let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
@@ -209,8 +220,8 @@ async fn process_msql(
                         }
                     })
                     .map_ok_or_else(
-                        |e| appserver_scheduler::Message::Reply(MsqlResponse::begintx_err(e)),
-                        |_| appserver_scheduler::Message::Reply(MsqlResponse::begintx_ok()),
+                        |e| scheduler_api::Message::Reply(MsqlResponse::begintx_err(e)),
+                        |_| scheduler_api::Message::Reply(MsqlResponse::begintx_ok()),
                     )
                     .await
             }
@@ -223,11 +234,11 @@ async fn process_msql(
             dispatcher_addr
                 .request(client_addr, msql, conn_state_guard.current_txvn().clone())
                 .map_ok_or_else(
-                    |e| appserver_scheduler::Message::Reply(MsqlResponse::query_err(e)),
+                    |e| scheduler_api::Message::Reply(MsqlResponse::query_err(e)),
                     |res| {
                         let DispatcherReply { msql_res, txvn_res } = res;
                         conn_state_guard.replace_txvn(txvn_res);
-                        appserver_scheduler::Message::Reply(msql_res)
+                        scheduler_api::Message::Reply(msql_res)
                     },
                 )
                 .await
@@ -235,17 +246,17 @@ async fn process_msql(
         Msql::EndTx(_) => {
             let txvn = conn_state_guard.replace_txvn(None);
             if txvn.is_none() {
-                appserver_scheduler::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
+                scheduler_api::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
             } else {
                 dispatcher_addr
                     .request(client_addr, msql, txvn)
                     .map_ok_or_else(
-                        |e| appserver_scheduler::Message::Reply(MsqlResponse::endtx_err(e)),
+                        |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
                         |res| {
                             let DispatcherReply { msql_res, txvn_res } = res;
                             let existing = conn_state_guard.replace_txvn(txvn_res);
                             assert!(existing.is_none());
-                            appserver_scheduler::Message::Reply(msql_res)
+                            scheduler_api::Message::Reply(msql_res)
                         },
                     )
                     .await

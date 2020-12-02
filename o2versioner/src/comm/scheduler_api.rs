@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples - Json conversion
 /// ```
-/// use o2versioner::comm::appserver_scheduler::Message;
+/// use o2versioner::comm::scheduler_api::Message;
 /// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 ///
 /// let rmt_begin_tx_str = r#"
@@ -49,13 +49,16 @@ pub enum Message {
     RequestMsql(Msql),
     /// Request in `MsqlText` format
     RequestMsqlText(MsqlText),
+    /// Request the Scheduler to crash with session info dumped out
+    Crash(String),
+    /// Unimplemented yet, reserved for testing
+    Test(String),
     /// Response to an invalid request, for exmample, sending `Reply(MsqlResponse)` to the Scheduler
     InvalidRequest,
-    /// Invalid `MsqlText`, happens when `MsqlText` cannot be converted into `Msql`
+    /// Invalid `MsqlText`, happens when `MsqlText` in the `RequestMsqlText` request cannot be converted into `Msql`
     InvalidMsqlText(String),
     /// Response to the incoming `RequestMsql` or `RequestMsqlText`
     Reply(MsqlResponse),
-    Test(String),
 }
 
 impl Message {
