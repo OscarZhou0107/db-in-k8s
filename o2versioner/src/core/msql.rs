@@ -412,6 +412,40 @@ pub enum MsqlText {
     },
 }
 
+impl MsqlText {
+    pub fn begintx<S1, S2>(tx: Option<S1>, tableops: S2) -> Self
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+    {
+        Self::BeginTx {
+            tx: tx.map(|s| s.into()),
+            tableops: tableops.into(),
+        }
+    }
+
+    pub fn query<S1, S2>(query: S1, tableops: S2) -> Self
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+    {
+        Self::Query {
+            query: query.into(),
+            tableops: tableops.into(),
+        }
+    }
+
+    pub fn endtx<S>(tx: Option<S>, mode: MsqlEndTxMode) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::EndTx {
+            tx: tx.map(|s| s.into()),
+            mode,
+        }
+    }
+}
+
 /// Unit test for `IntoMsqlFinalString`
 #[cfg(test)]
 mod tests_into_msqlfinalstring {
@@ -599,16 +633,10 @@ mod tests_msqltext {
     fn test_msqltext_endtx_json() {
         println!("SERIALIZE");
 
-        let a = MsqlText::EndTx {
-            tx: Some(String::from("tx0")),
-            mode: MsqlEndTxMode::Commit,
-        };
+        let a = MsqlText::endtx(Some("tx0"), MsqlEndTxMode::Commit);
         println!("{}", serde_json::to_string(&a).unwrap());
 
-        let a = MsqlText::EndTx {
-            tx: None,
-            mode: MsqlEndTxMode::Rollback,
-        };
+        let a = MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Rollback);
         println!("{}", serde_json::to_string(&a).unwrap());
 
         println!("DESERIALIZE");
