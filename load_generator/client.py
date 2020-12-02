@@ -91,12 +91,13 @@ class Client:
         # 
         while datetime.datetime.now() < self.max_time:
             curr_index = con_data.states.index(self.curr)
+            print("=======================================")
             print("Entering webpage {}".format(self.curr))
 
             # send BEGIN to start the transaction
             begin = web_to_sql.getBegin(self.curr)
             if DEBUG:
-                print("Sending data: BEGIN")
+                print("### Sending data: BEGIN")
                 print(begin)
             self.soc.sendall(begin.encode('utf-8'))
             # TODO: check if we will get a response from backend
@@ -142,10 +143,11 @@ class Client:
 
             commit = web_to_sql.getCommit()
             if DEBUG:
-                print("Sending data: COMMIT")
+                print("### Sending data: COMMIT")
                 print(commit)
             self.soc.sendall(commit.encode('utf-8'))
             # TODO: check if we will get a response from backend
+            data = json.loads(self.soc.recv(2**24).decode('utf-8'))
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
@@ -712,22 +714,25 @@ class Client:
             }
         })
         if DEBUG:
-            print("Sending data:", name)
+            print("### Sending data: {}".format(name))
             print(query)
 
         self.soc.sendall(serialized.encode('utf-8'))
         response = self.soc.recv(2**24) # raw response
-        # TODO: will get result in .csv, parse to list -> result[row][col]
-        parsed = json.loads(response.decode(('utf-8')))
+        
+        parsed = json.loads(response.decode(('utf-8')))["reply"]
         if DEBUG:
-            print("Receiving data:", parsed)
+            print("### Receiving data: {}".format(parsed))
 
         if OK not in parsed:
             return "Err"
 
-        result = parsed[OK]
-        if not result:
+        csv = parsed[OK]
+        if not csv:
             return "Empty"
+
+        # TODO: will get result in .csv, parse to list -> result[row][col]
+        result = csv
         # only sql result, no rust layers
         return result
     
