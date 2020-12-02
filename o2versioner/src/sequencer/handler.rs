@@ -23,6 +23,7 @@ pub async fn main(conf: SequencerConfig) {
         },
         conf.max_connection,
         "Sequencer",
+        None
     )
     .await;
 }

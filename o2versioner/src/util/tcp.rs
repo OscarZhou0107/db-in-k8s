@@ -8,6 +8,7 @@ use std::iter;
 use std::net::SocketAddr;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use tokio::net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs};
+use tokio::sync::oneshot;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
@@ -25,13 +26,14 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     mut connection_handler: C,
     max_connection: Option<u32>,
     server_name: S,
+    stop_rx: Option<oneshot::Receiver<()>>,
 ) where
     A: ToSocketAddrs,
     C: FnMut(TcpStream) -> Fut,
     Fut: Future<Output = ()> + Send + 'static,
     S: Into<String>,
 {
-    let mut listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.into();
@@ -40,34 +42,50 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     let mut cur_num_connection = 0;
     let mut spawned_tasks = Vec::new();
 
-    while let Some(tcp_stream) = listener.next().await {
-        match tcp_stream {
-            Ok(tcp_stream) => {
-                info!(
-                    "[{}] <- [{}] Incomming connection [{}] established",
-                    local_addr,
-                    tcp_stream.peer_addr().unwrap(),
-                    cur_num_connection
-                );
+    let mut should_stopped = if let Some(stop_rx) = stop_rx {
+        stop_rx.boxed()
+    } else {
+        // If terminate_sig is None, this future will never resolve,
+        // so that select will always shortcut to listener.accept()
+        future::pending().boxed()
+    };
 
-                // Spawn a new thread for each tcp connection
-                spawned_tasks.push(tokio::spawn(connection_handler(tcp_stream)));
-            }
-            Err(e) => {
-                warn!(
-                    "[{}] {} TcpListener cannot get client: {:?}",
-                    local_addr, server_name, e
-                );
-            }
-        }
+    loop {
+        tokio::select! {
+            tcp_stream = listener.accept() => {
+                match tcp_stream {
+                    Ok((tcp_stream, peer_addr)) => {
+                        info!(
+                            "[{}] <- [{}] Incomming connection [{}] established",
+                            local_addr,
+                            peer_addr,
+                            cur_num_connection
+                        );
 
-        cur_num_connection += 1;
-        // An optional max number of connections allowed
-        if let Some(nmax) = max_connection {
-            if cur_num_connection >= nmax {
+                        // Spawn a new thread for each tcp connection
+                        spawned_tasks.push(tokio::spawn(connection_handler(tcp_stream)));
+                    }
+                    Err(e) => {
+                        warn!(
+                            "[{}] {} TcpListener cannot get client: {:?}",
+                            local_addr, server_name, e
+                        );
+                    }
+                }
+
+                cur_num_connection += 1;
+                // An optional max number of connections allowed
+                if let Some(nmax) = max_connection {
+                    if cur_num_connection >= nmax {
+                        break;
+                    }
+                }
+            },
+            _ = &mut should_stopped => {
+                warn!( "[{}] {} TcpListener no longer accepts any new connections",local_addr, server_name);
                 break;
             }
-        }
+        };
     }
 
     // Wait on all spawned tasks to finish

@@ -13,6 +13,7 @@ use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
@@ -57,6 +58,14 @@ pub async fn main(conf: Config) {
     // Launch dispatcher as a new task
     let dispatcher_handle = tokio::spawn(dispatcher.run());
 
+    // Create a stop_signal channel if admin mode is turned on
+    let (stop_tx, stop_rx) = if conf.scheduler.admin_addr.is_some() {
+        let (tx, rx) = oneshot::channel();
+        (Some(tx), Some(rx))
+    } else {
+        (None, None)
+    };
+
     // Launch main handler as a new task
     let handler_handle = tokio::spawn(tcp::start_tcplistener(
         conf.scheduler.to_addr(),
@@ -72,6 +81,7 @@ pub async fn main(conf: Config) {
         },
         conf.scheduler.max_connection,
         "Scheduler",
+        stop_rx,
     ));
 
     // Combine the dispatcher handle and main handler handle into a main_handle
@@ -80,16 +90,20 @@ pub async fn main(conf: Config) {
     // Allow scheduler to be terminated by admin
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
         let admin_addr = admin_addr.clone();
-        let admin_handle = tokio::spawn(start_admin_tcplistener(
-            admin_addr,
-            basic_admin_command_handler,
-            "Scheduler",
-        ));
+        let admin_handle = tokio::spawn(async move {
+            start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Scheduler").await;
+            stop_tx.unwrap().send(()).unwrap();
+        });
 
-        tokio::select!(
-            res = main_handle => res.map(|_|()).unwrap(),
-            _ = admin_handle => info!("Scheduler terminated by admin")
-        );
+        // main_handle can either run to finish or be the result
+        // of the above stop_tx.send()
+        main_handle.await.unwrap();
+
+        // At this point, we just want to cancel the admin_handle
+        tokio::select! {
+            _ = future::ready(()) => info!("Scheduler admin is terminated" ),
+            _ = admin_handle => {}
+        };
     } else {
         main_handle.await.unwrap();
     }
