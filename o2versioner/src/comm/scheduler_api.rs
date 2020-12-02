@@ -4,8 +4,16 @@ use serde::{Deserialize, Serialize};
 
 /// Message for communication to Sceduler from appserver
 ///
+/// The input bytes stream should be encoded in such a way like,
+/// where the first part denotes the length of data, using bigendian.
+/// ```
+/// // +---- len: u32 ----+---- data ----+
+/// // | \x00\x00\x00\x0b |  hello world |
+/// // +------------------+--------------+
+/// ```
+///
 /// # Examples - Json conversion
-/// 
+///
 /// To do a `Message::RequestMsqlText(MsqlText::BeginTx {..})`:
 /// ```
 /// use o2versioner::comm::scheduler_api::Message;
@@ -27,7 +35,7 @@ use serde::{Deserialize, Serialize};
 ///     })
 /// );
 /// ```
-/// 
+///
 /// To do a `Message::RequestMsqlText(MsqlText::EndTx {..})`:
 /// ```
 /// use o2versioner::comm::scheduler_api::Message;
@@ -50,7 +58,7 @@ use serde::{Deserialize, Serialize};
 ///     })
 /// );
 /// ```
-/// 
+///
 /// To do a `Message::RequestCrash(..)`:
 /// ```
 /// use o2versioner::comm::scheduler_api::Message;
