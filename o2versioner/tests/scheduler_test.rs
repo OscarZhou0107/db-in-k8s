@@ -64,7 +64,7 @@ async fn test_scheduler() {
         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await;
     });
 
-    // Must run the sequencer_handler, otherwise it won't do the work
+    // Must run, otherwise it won't do the work
     tokio::try_join!(scheduler_handle, sequencer_handle, tester_handle_0, tester_handle_1).unwrap();
 }
 
@@ -142,7 +142,7 @@ async fn test_scheduler_with_admin() {
         println!("admin_client_handle DONE: All responses received: {:?}", res);
     });
 
-    // Must run the sequencer_handler, otherwise it won't do the work
+    // Must run, otherwise it won't do the work
     tokio::try_join!(
         scheduler_handle,
         sequencer_handle,
@@ -219,6 +219,6 @@ async fn test_scheduler_with_request_crash() {
         println!("tester_handle_1 DONE");
     });
 
-    // Must run the sequencer_handler, otherwise it won't do the work
+    // Must run, otherwise it won't do the work
     tokio::try_join!(scheduler_handle, sequencer_handle, tester_handle_0, tester_handle_1,).unwrap();
 }

@@ -87,6 +87,6 @@ async fn test_sequencer() {
         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await
     });
 
-    // Must run the sequencer_handler, otherwise it won't do the work
+    // Must run, otherwise it won't do the work
     tokio::try_join!(tester_handle_0, tester_handle_1, sequencer_handle).unwrap();
 }
