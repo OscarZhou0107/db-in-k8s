@@ -41,6 +41,16 @@ use serde::{Deserialize, Serialize};
 ///         mode: MsqlEndTxMode::Commit
 ///     })
 /// );
+///
+/// let crash_req_str = r#"
+/// {
+///     "request_crash":"just for fun"
+/// }"#;
+/// let crash_req_msg_recovered: Message = serde_json::from_str(crash_req_str).unwrap();
+/// assert_eq!(
+///     crash_req_msg_recovered,
+///     Message::RequestCrash(String::from("just for fun"))
+/// );
 /// ```
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,7 +60,7 @@ pub enum Message {
     /// Request in `MsqlText` format
     RequestMsqlText(MsqlText),
     /// Request the Scheduler to crash with session info dumped out
-    Crash(String),
+    RequestCrash(String),
     /// Unimplemented yet, reserved for testing
     Test(String),
     /// Response to an invalid request, for exmample, sending `Reply(MsqlResponse)` to the Scheduler
@@ -111,5 +121,20 @@ mod tests_message {
         }"#;
         let b: Message = serde_json::from_str(a).unwrap();
         println!("{:?}", b);
+    }
+
+    #[test]
+    fn test_request_crash() {
+        let crash_req_msg = Message::RequestCrash(String::from("just for fun"));
+        println!("{}", serde_json::to_string(&crash_req_msg).unwrap());
+
+        let crash_req_str = r#"
+        {
+            "request_crash":"just for fun"
+        }"#;
+        let crash_req_msg_recovered: Message = serde_json::from_str(crash_req_str).unwrap();
+        println!("{:?}", crash_req_msg_recovered);
+
+        assert_eq!(crash_req_msg_recovered, crash_req_msg);
     }
 }

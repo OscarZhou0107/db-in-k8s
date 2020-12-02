@@ -162,7 +162,7 @@ async fn process_connection(
                         }
                         Err(e) => scheduler_api::Message::InvalidMsqlText(e.to_owned()),
                     },
-                    scheduler_api::Message::Crash(reason) => {
+                    scheduler_api::Message::RequestCrash(reason) => {
                         error!(
                             "[{}] <- [{}] Requested for a soft crash because of {}",
                             local_addr, peer_addr, reason
