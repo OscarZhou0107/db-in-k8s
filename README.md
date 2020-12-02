@@ -55,6 +55,7 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] Sequencer
 - [x] DbProxy
 - [x] Msql interface
+- [ ] Better debugging and logging
 
 ### Features
 - [x] msql: simple sql
@@ -67,7 +68,6 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [ ] Single read
 - [ ] Single write
 - [ ] Early release
-- [ ] Multiple Schedulers
 
 
 ### Project layout
@@ -89,13 +89,18 @@ o2versioner
 
 ### Sequencer
 - `sequenecer::main()` - main entrance
-- For every incomming tcp connection - `tokio::spawn()`
-- For each incomming tcp connection
-  - Run until the connection is closed
-  - Process all requests through this connection
-  - Receive a single request, process the request, and send one response back
-- Keep a central state for versions assigned for each table
-- Lifetime is till all incoming connections are closed if the max connection is set
+- Handler
+  - For every incomming tcp connection - `tokio::spawn()`
+  - For each incomming tcp connection
+    - Run until the connection is closed
+    - Process all requests through this connection
+    - Receive a single request, process the request, and send one response back
+  - Keep a central state for versions assigned for each table
+  - Lifetime is till all incoming connections are closed if the max connection is set
+- Admin Handler (Optional)
+  - Only process a single incoming tcp connection at a time
+  - Receie a single request in raw bytes, process the request, and send one response back
+  - Supports remotely stopping the main handler for taking in any new connections
 
 
 ### Scheduler
@@ -123,6 +128,10 @@ o2versioner
   the rest of the reponses are not sent back to the handler, but they are still needed to
   update the internal state of the Dispatcher
   - Lifetime is till all `DispatcherAddr` objects are dropped
+- Admin Handler (Optional)
+  - Only process a single incoming tcp connection at a time
+  - Receie a single request in raw bytes, process the request, and send one response back
+  - Supports remotely stopping the main handler for taking in any new connections
 
 
 ## Notes for asynchronous
