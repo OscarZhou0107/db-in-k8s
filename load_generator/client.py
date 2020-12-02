@@ -101,7 +101,11 @@ class Client:
                 print(begin)
             self.soc.sendall(begin.encode('utf-8'))
             # TODO: check if we will get a response from backend
-            data = json.loads(self.soc.recv(2**24).decode('utf-8'))
+            data = self.soc.recv(2**24).decode('utf-8')
+            #data = json.loads(self.soc.recv(2**24).decode('utf-8'))
+            if DEBUG:
+                print("### Receiving data: BEGIN")
+                print(data)
             if self.isErr(data):
                 print("Response contains error, terminating...")
                 return 0
@@ -706,6 +710,7 @@ class Client:
             writeString = "WRITE " + " ".join(ops["WRITE"])
         opsString = readString + " " + writeString
 
+        '''
         serialized = json.dumps({
             "request_msql_text":{
                 "op":"query",
@@ -713,12 +718,24 @@ class Client:
                 "tableops":opsString
             }
         })
+        '''
+        serialized = json.dumps({
+            "request_msql_text":
+            {
+                "op":"query",
+                "query":"select",
+                "tableops":"read t"
+            }
+        })
         if DEBUG:
             print("### Sending data: {}".format(name))
-            print(query)
+            #print(query)
+            print(type(serialized))
+            print(serialized)
 
         self.soc.sendall(serialized.encode('utf-8'))
         response = self.soc.recv(2**24) # raw response
+        print("### raw response: {}".format(response))
         
         parsed = json.loads(response.decode(('utf-8')))["reply"]
         if DEBUG:
