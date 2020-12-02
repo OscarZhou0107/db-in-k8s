@@ -1,4 +1,5 @@
 import sql
+import json
 urlSql = {
     "home": [ # hello
         "getName", 
@@ -126,24 +127,63 @@ urlSql = {
 }
 
 def getBegin(url):
+    # find all sqls associated with a page
     sqls = urlSql[url]
+
+    # result contains (table:op) pairs
     result = {}
     for name in sqls:
-        ops = sql.sqlNameToOP[name]
-        for table in ops:
+        # find all (table:op) pairs associated with an sql 
+        # pairs[table] gives the op
+        pairs = sql.sqlNameToOP[name]
+        for table in pairs:
             if table not in result:
-                result[table] = ops[table]
+                result[table] = pairs[table]
             else:
                 # only update if this is a write operation
-                if ops[table] == "W":
-                    result[table] = ops[table]
-    # convert result into a string
-    resultList = ["BEGIN"]
-    for table in result:
-        resultList.append(table)
-        resultList.append(result[table])
-    return " ".join(resultList)
+                if pairs[table] == "W":
+                    result[table] = pairs[table]
 
+    # revResult contains (op:table) pairs
+    revResult = {"READ":set(), "WRITE":set()}
+    for table in result:
+        if result[table] == "R":
+            revResult["READ"].add(table)
+        else:
+            revResult["WRITE"].add(table)
+
+    # convert result into a string
+    readString = ""
+    writeString = ""
+    if len(revResult["READ"]):
+        readString = "READ " + " ".join(revResult["READ"])
+    if len(revResult["WRITE"]):
+        writeString = "WRITE " + " ".join(revResult["WRITE"])
+    resultString = "BEGIN TRAN WITH MARK '" + readString + " " + writeString + "'" 
+
+    # serialize
+    serialized = json.dumps({
+        "request_msql_text":
+        {
+            "op":"begin_tx",
+            "tableops":resultString
+        }
+    })
+    return serialized
+
+def getCommit():
+    serialized = json.dumps({
+        "request_msql_text":
+        {
+            "op":"end_tx",
+            "mode":"commit"
+        }
+    })
+    return serialized
+
+def getCrash(curr):
+    serialized = json.dumps({"request_crash":"fail in state ".format(curr)})
+    return serialized
 
 if __name__ == "__main__":
     '''
@@ -158,12 +198,12 @@ if __name__ == "__main__":
         if i not in ls:
             print(i)
     '''
-    '''
     print(getBegin("home"))
-    print(getBegin("bestSell"))
+    print(getBegin("buyConf"))
     '''
     l = []
     for i in urlSql:
         for j in urlSql[i]:
             l.append(j)
     print(len(set(l)))
+    '''

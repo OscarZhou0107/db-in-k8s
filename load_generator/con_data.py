@@ -48,11 +48,28 @@ mix3 = [
     [0,    0,    0,    0,    0,    0, 9499, 9918,    0,    0,    0,    0,    0,    0, 9999]
 ]
 
-fake = []
+fake = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 9999, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 9999, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+]
 
-abbrs = ["admc", "admr", "bess", "buyc", "buyr", "creg", "home", "newp", "ordd", "ordi", "prod", "sreq", "sres", "shop"]
+states = ['adminConf', 'adminReq', 'bestSell', 'buyConf', 'buyReq', 'custReg', 'home', 'newProd', 'orderDisp', 'orderInq', 'prodDet', 'searchReq', 'searchResult', 'shopCart']
+#            0              1          2           3         4          5         6        7           8           9          10          11             12             13  
 
-webpages = {
+
+urlToJavaFile = {
     "home": "TPCW_home_interaction",
     "shopCart": "TPCW_shopping_cart_interaction",
     "orderInq": "TPCW_order_inquiry_servlet",
@@ -69,7 +86,9 @@ webpages = {
     "adminConf": "TPCW_admin_response_servlet"
 }
 
-urls = {     
+abbrs = ["admc", "admr", "bess", "buyc", "buyr", "creg", "home", "newp", "ordd", "ordi", "prod", "sreq", "sres", "shop"]
+
+abbrToUrls = {     
     "admc": "adminConf",
     "admr": "adminReq",
     "bess": "bestSell",
@@ -85,3 +104,18 @@ urls = {
     "sres": "searchResult",
     "shop": "shopCart"
 }
+
+if __name__ == "__main__":
+    '''
+    # fake 1: only access home
+    fake = []
+    for i in range(14):
+        row = []
+        for j in range(14):
+            row.append(0)
+        if i == 6:
+            row[6] = 9999
+        fake.append(row)
+    print(fake)
+    fake = [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 9999, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
+    '''
