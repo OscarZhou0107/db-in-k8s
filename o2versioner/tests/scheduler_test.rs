@@ -37,7 +37,7 @@ async fn test_scheduler() {
         "Mock Sequencer",
     ));
 
-    sleep(Duration::from_millis(200)).await;
+    sleep(Duration::from_millis(300)).await;
 
     let conf_clone = conf.clone();
     let tester_handle_0 = tokio::spawn(async move {

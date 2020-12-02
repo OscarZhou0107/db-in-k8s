@@ -1,73 +1,67 @@
-// use o2versioner::comm::scheduler_api;
-// use o2versioner::core::msql::*;
-// use o2versioner::core::*;
-// use o2versioner::scheduler;
-// use o2versioner::util::config::*;
-// use o2versioner::util::tests_helper;
-// use tokio::net::TcpStream;
-// use tokio::time::{sleep, Duration};
+use o2versioner::comm::scheduler_api::*;
+use o2versioner::core::*;
+use o2versioner::scheduler_main;
+use o2versioner::sequencer_main;
+use o2versioner::util::config::*;
+use o2versioner::util::tests_helper;
+use tokio::net::TcpStream;
+use tokio::time::{sleep, Duration};
 
-// #[tokio::test]
-// async fn test_scheduler() {
-//     let _guard = tests_helper::init_logger();
+#[tokio::test]
+async fn test_double_s() {
+    let _guard = tests_helper::init_logger();
 
-//     let sequencer_max_connection = 2;
-//     let conf = Config {
-//         scheduler: SchedulerConfig {
-//             addr: String::from("127.0.0.1:16379"),
-//             admin_addr: None,
-//             max_connection: Some(2),
-//             sequencer_pool_size: sequencer_max_connection,
-//             dbproxy_pool_size: 1,
-//             dispatcher_queue_size: 1,
-//         },
-//         sequencer: SequencerConfig {
-//             addr: String::from("127.0.0.1:6379"),
-//             max_connection: Some(sequencer_max_connection),
-//         },
-//         dbproxy: vec![],
-//     };
+    let scheduler_addr = "127.0.0.1:16379";
+    let sequencer_max_connection = 2;
+    let conf = Config {
+        scheduler: SchedulerConfig {
+            addr: String::from(scheduler_addr),
+            admin_addr: None,
+            max_connection: Some(2),
+            sequencer_pool_size: sequencer_max_connection,
+            dbproxy_pool_size: 1,
+            dispatcher_queue_size: 1,
+        },
+        sequencer: SequencerConfig {
+            addr: String::from("127.0.0.1:6379"),
+            max_connection: Some(sequencer_max_connection),
+        },
+        dbproxy: vec![],
+    };
 
-//     let conf_clone = conf.clone();
-//     let scheduler_handle = tokio::spawn(scheduler::main(conf_clone));
+    let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
+    let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
 
-//     let conf_clone = conf.clone();
-//     let sequencer_handle = tokio::spawn(tests_helper::mock_echo_server(
-//         conf_clone.sequencer.to_addr(),
-//         conf_clone.sequencer.max_connection,
-//         "Mock Sequencer",
-//     ));
+    sleep(Duration::from_millis(300)).await;
 
-//     sleep(Duration::from_millis(200)).await;
+    let tester_handle_0 = tokio::spawn(async move {
+        let msgs = vec![
+            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
+            Message::RequestMsqlText(MsqlText::query("update w1 set name=\"ray\" where id = 20;", "write w1")),
+            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
+            Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 22;", "write w2")),
+            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+        ];
 
-//     let conf_clone = conf.clone();
-//     let tester_handle_0 = tokio::spawn(async move {
-//         let msgs = vec![
-//             scheduler_api::Message::test("0-hello"),
-//             scheduler_api::Message::test("0-world"),
-//             scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
-//                 "READ table0 WRITE table1 table2 read table3",
-//             )))),
-//         ];
+        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2").await;
+    });
 
-//         let mut tcp_stream = TcpStream::connect(conf_clone.scheduler.to_addr()).await.unwrap();
-//         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2").await;
-//     });
+    let tester_handle_1 = tokio::spawn(async move {
+        let msgs = vec![
+            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
+            Message::RequestMsqlText(MsqlText::query("update w1 set name=\"ray\" where id = 20;", "write w1")),
+            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
+            Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 22;", "write w2")),
+            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+        ];
 
-//     let conf_clone = conf.clone();
-//     let tester_handle_1 = tokio::spawn(async move {
-//         let msgs = vec![
-//             scheduler_api::Message::test("0-hello"),
-//             scheduler_api::Message::test("0-world"),
-//             scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
-//                 "READ table0 WRITE table1 table2 read table3",
-//             )))),
-//         ];
+        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await;
+    });
 
-//         let mut tcp_stream = TcpStream::connect(conf_clone.scheduler.to_addr()).await.unwrap();
-//         tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await;
-//     });
-
-//     // Must run the sequencer_handler, otherwise it won't do the work
-//     tokio::try_join!(scheduler_handle, sequencer_handle, tester_handle_0, tester_handle_1).unwrap();
-// }
+    // Must run the sequencer_handler, otherwise it won't do the work
+    tokio::try_join!(scheduler_handle, sequencer_handle, tester_handle_0, tester_handle_1).unwrap();
+}

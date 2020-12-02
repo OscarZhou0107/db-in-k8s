@@ -75,6 +75,10 @@ impl Message {
     pub fn test<S: Into<String>>(s: S) -> Self {
         Message::Test(s.into())
     }
+
+    pub fn request_crash<S: Into<String>>(s: S) -> Self {
+        Message::RequestCrash(s.into())
+    }
 }
 
 /// Unit test for `Message`
