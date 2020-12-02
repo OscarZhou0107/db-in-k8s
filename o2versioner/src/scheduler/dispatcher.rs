@@ -10,13 +10,29 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
 use tracing::{debug, info, warn};
 
-/// Sent from `DispatcherAddr` to `Dispatcher`
+/// Response sent from `Dispatcher` to `DispatcherAddr`
+#[derive(Debug)]
+pub struct DispatcherReply {
+    /// Response to the `Msql` command
+    pub msql_res: MsqlResponse,
+    /// The modified `TxVN`,
+    /// this should be used to update the `ConnectionState`.
+    pub txvn_res: Option<TxVN>,
+}
+
+impl DispatcherReply {
+    fn new(msql_res: MsqlResponse, txvn_res: Option<TxVN>) -> Self {
+        Self { msql_res, txvn_res }
+    }
+}
+
+/// Request sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
     client_addr: SocketAddr,
     command: Msql,
     txvn: Option<TxVN>,
     /// A single use reply channel
-    reply: Option<oneshot::Sender<MsqlResponse>>,
+    reply: Option<oneshot::Sender<DispatcherReply>>,
 }
 
 /// A state containing shareed variables
@@ -45,7 +61,10 @@ impl State {
             request
                 .reply
                 .unwrap()
-                .send(MsqlResponse::err("Dbproxy servers are all offline", &request.command))
+                .send(DispatcherReply::new(
+                    MsqlResponse::err("Dbproxy servers are all offline", &request.command),
+                    request.txvn,
+                ))
                 .expect("Dispatcher cannot reply response to handler");
 
             return;
@@ -107,7 +126,7 @@ impl State {
                     .await;
 
                     // if this is a EndTx, need to release the version and notifier other queries waiting on versions
-                    if is_endtx {
+                    let txvn = if is_endtx {
                         self.release_version(
                             &dbproxy_addr,
                             txvn_cloned
@@ -115,7 +134,10 @@ impl State {
                                 .into_dbvn_release_request(),
                         )
                         .await;
-                    }
+                        None
+                    } else {
+                        txvn_cloned
+                    };
 
                     // If the oneshot channel is not consumed, consume it to send the reply back to handler
                     if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
@@ -123,10 +145,12 @@ impl State {
                             "<- [{}] Scheduler dispatcher-{} reply response to handler: {:?}",
                             dbproxy_addr, op_str, msqlresponse
                         );
-                        reply.send(msqlresponse).expect(&format!(
-                            "Scheduler dispatcher-{} cannot reply response to handler",
-                            op_str
-                        ));
+                        reply
+                            .send(DispatcherReply::new(msqlresponse, txvn))
+                            .expect(&format!(
+                                "Scheduler dispatcher-{} cannot reply response to handler",
+                                op_str
+                            ));
                     } else {
                         debug!(
                             "<- [{}] Scheduler dispatcher-{} ignore response: {:?}",
@@ -271,7 +295,7 @@ impl DispatcherAddr {
         client_addr: SocketAddr,
         command: Msql,
         txvn: Option<TxVN>,
-    ) -> Result<MsqlResponse, String> {
+    ) -> Result<DispatcherReply, String> {
         // Create a reply oneshot channel
         let (tx, rx) = oneshot::channel();
 

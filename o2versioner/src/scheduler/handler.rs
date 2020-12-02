@@ -182,9 +182,11 @@ async fn process_msql(
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
 ) -> appserver_scheduler::Message {
+    // Not creating any critical session indeed, process_msql will always be executing in serial
+    let mut conn_state_guard = conn_state.lock().await;
     match msql {
         Msql::BeginTx(msqlbegintx) => {
-            if conn_state.lock().await.current_txvn().is_some() {
+            if conn_state_guard.current_txvn().is_some() {
                 appserver_scheduler::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
             } else {
                 let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
@@ -199,7 +201,8 @@ async fn process_msql(
                     .and_then(|res| async {
                         match res {
                             scheduler_sequencer::Message::ReplyTxVN(txvn) => {
-                                conn_state.lock().await.insert_txvn(txvn);
+                                let existing = conn_state_guard.replace_txvn(Some(txvn));
+                                assert!(existing.is_none());
                                 Ok(())
                             }
                             _ => Err(String::from("Invalid response from Sequencer")),
@@ -213,18 +216,24 @@ async fn process_msql(
             }
         }
         Msql::Query(_) => {
-            let txvn = conn_state.lock().await.current_txvn().clone();
-            assert!(txvn.is_some(), "Does not support single un-transactioned query for now");
+            assert!(
+                conn_state_guard.current_txvn().is_some(),
+                "Does not support single un-transactioned query for now"
+            );
             dispatcher_addr
-                .request(client_addr, msql, txvn)
+                .request(client_addr, msql, conn_state_guard.current_txvn().clone())
                 .map_ok_or_else(
                     |e| appserver_scheduler::Message::Reply(MsqlResponse::query_err(e)),
-                    |res| appserver_scheduler::Message::Reply(res),
+                    |res| {
+                        let DispatcherReply { msql_res, txvn_res } = res;
+                        conn_state_guard.replace_txvn(txvn_res);
+                        appserver_scheduler::Message::Reply(msql_res)
+                    },
                 )
                 .await
         }
         Msql::EndTx(_) => {
-            let txvn = conn_state.lock().await.take_current_txvn();
+            let txvn = conn_state_guard.replace_txvn(None);
             if txvn.is_none() {
                 appserver_scheduler::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
             } else {
@@ -232,7 +241,12 @@ async fn process_msql(
                     .request(client_addr, msql, txvn)
                     .map_ok_or_else(
                         |e| appserver_scheduler::Message::Reply(MsqlResponse::endtx_err(e)),
-                        |res| appserver_scheduler::Message::Reply(res),
+                        |res| {
+                            let DispatcherReply { msql_res, txvn_res } = res;
+                            let existing = conn_state_guard.replace_txvn(txvn_res);
+                            assert!(existing.is_none());
+                            appserver_scheduler::Message::Reply(msql_res)
+                        },
                     )
                     .await
             }
