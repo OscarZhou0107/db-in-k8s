@@ -73,7 +73,7 @@ async fn test_scheduler_with_admin() {
     let _guard = tests_helper::init_logger();
 
     let scheduler_addr = "127.0.0.1:14579";
-    let scheduler_admin_addr = "127.0.0.1:32453";
+    let scheduler_admin_addr = "127.0.0.1:39582";
     let sequencer_addr = "127.0.0.1:43279";
     let sequencer_max_connection = 2;
     let conf = Config {
@@ -151,4 +151,74 @@ async fn test_scheduler_with_admin() {
         admin_client_handle,
     )
     .unwrap();
+}
+
+#[tokio::test]
+#[should_panic]
+async fn test_scheduler_with_request_crash() {
+    let _guard = tests_helper::init_logger();
+
+    let scheduler_addr = "127.0.0.1:32523";
+    let sequencer_addr = "127.0.0.1:43582";
+    let sequencer_max_connection = 2;
+    let conf = Config {
+        scheduler: SchedulerConfig {
+            addr: String::from(scheduler_addr),
+            admin_addr: None,
+            max_connection: Some(2),
+            sequencer_pool_size: sequencer_max_connection,
+            dbproxy_pool_size: 1,
+            dispatcher_queue_size: 1,
+        },
+        sequencer: SequencerConfig {
+            addr: String::from(sequencer_addr),
+            max_connection: Some(sequencer_max_connection),
+        },
+        dbproxy: vec![],
+    };
+
+    let scheduler_handle = tokio::spawn(async move {
+        scheduler_main(conf).await;
+        println!("scheduler_handle DONE");
+    });
+
+    let sequencer_handle = tokio::spawn(async move {
+        tests_helper::mock_echo_server(sequencer_addr, Some(sequencer_max_connection), "Mock Sequencer").await;
+
+        println!("sequencer_handle DONE");
+    });
+
+    sleep(Duration::from_millis(300)).await;
+
+    let tester_handle_0 = tokio::spawn(async move {
+        let msgs = vec![
+            scheduler_api::Message::test("0-hello"),
+            scheduler_api::Message::test("0-world"),
+            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+                "READ table0 WRITE table1 table2 read table3",
+            )))),
+        ];
+
+        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2").await;
+        println!("tester_handle_0 DONE");
+    });
+
+    let tester_handle_1 = tokio::spawn(async move {
+        let msgs = vec![
+            scheduler_api::Message::test("0-hello"),
+            scheduler_api::Message::test("0-world"),
+            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+                "READ table0 WRITE table1 table2 read table3",
+            )))),
+            scheduler_api::Message::request_crash("just for fun"),
+        ];
+
+        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await;
+        println!("tester_handle_1 DONE");
+    });
+
+    // Must run the sequencer_handler, otherwise it won't do the work
+    tokio::try_join!(scheduler_handle, sequencer_handle, tester_handle_0, tester_handle_1,).unwrap();
 }
