@@ -69,7 +69,7 @@ async fn test_double_s() {
 
 #[tokio::test]
 #[ignore]
-/// `cargo test run_double_s -- --nocapture`
+/// Run `cargo test run_double_s -- --nocapture`
 async fn run_double_s() {
     let _guard = tests_helper::init_logger();
 
