@@ -145,12 +145,10 @@ impl State {
                             "<- [{}] Scheduler dispatcher-{} reply response to handler: {:?}",
                             dbproxy_addr, op_str, msqlresponse
                         );
-                        reply
-                            .send(DispatcherReply::new(msqlresponse, txvn))
-                            .expect(&format!(
-                                "Scheduler dispatcher-{} cannot reply response to handler",
-                                op_str
-                            ));
+                        reply.send(DispatcherReply::new(msqlresponse, txvn)).expect(&format!(
+                            "Scheduler dispatcher-{} cannot reply response to handler",
+                            op_str
+                        ));
                     } else {
                         debug!(
                             "<- [{}] Scheduler dispatcher-{} ignore response: {:?}",

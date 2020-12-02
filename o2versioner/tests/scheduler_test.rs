@@ -1,4 +1,4 @@
-use o2versioner::comm::scheduler_api;
+use o2versioner::comm::scheduler_api::Message;
 use o2versioner::core::*;
 use o2versioner::scheduler_main;
 use o2versioner::util::config::*;
@@ -23,6 +23,7 @@ async fn test_scheduler() {
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
+            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -40,11 +41,12 @@ async fn test_scheduler() {
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
-            scheduler_api::Message::test("0-hello"),
-            scheduler_api::Message::test("0-world"),
-            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            Message::test("0-hello"),
+            Message::test("0-world"),
+            Message::RequestMsqlText(MsqlText::begintx(
+                Option::<String>::None,
                 "READ table0 WRITE table1 table2 read table3",
-            )))),
+            )),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -53,11 +55,12 @@ async fn test_scheduler() {
 
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
-            scheduler_api::Message::test("0-hello"),
-            scheduler_api::Message::test("0-world"),
-            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            Message::test("0-hello"),
+            Message::test("0-world"),
+            Message::RequestMsqlText(MsqlText::begintx(
+                Option::<String>::None,
                 "READ table0 WRITE table1 table2 read table3",
-            )))),
+            )),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -87,6 +90,7 @@ async fn test_scheduler_with_admin() {
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
+            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -107,11 +111,12 @@ async fn test_scheduler_with_admin() {
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
-            scheduler_api::Message::test("0-hello"),
-            scheduler_api::Message::test("0-world"),
-            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            Message::test("0-hello"),
+            Message::test("0-world"),
+            Message::RequestMsqlText(MsqlText::begintx(
+                Option::<String>::None,
                 "READ table0 WRITE table1 table2 read table3",
-            )))),
+            )),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -121,11 +126,12 @@ async fn test_scheduler_with_admin() {
 
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
-            scheduler_api::Message::test("0-hello"),
-            scheduler_api::Message::test("0-world"),
-            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            Message::test("0-hello"),
+            Message::test("0-world"),
+            Message::RequestMsqlText(MsqlText::begintx(
+                Option::<String>::None,
                 "READ table0 WRITE table1 table2 read table3",
-            )))),
+            )),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -172,6 +178,7 @@ async fn test_scheduler_with_request_crash() {
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
+            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -192,11 +199,12 @@ async fn test_scheduler_with_request_crash() {
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
-            scheduler_api::Message::test("0-hello"),
-            scheduler_api::Message::test("0-world"),
-            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            Message::test("0-hello"),
+            Message::test("0-world"),
+            Message::RequestMsqlText(MsqlText::begintx(
+                Option::<String>::None,
                 "READ table0 WRITE table1 table2 read table3",
-            )))),
+            )),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
@@ -206,12 +214,13 @@ async fn test_scheduler_with_request_crash() {
 
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
-            scheduler_api::Message::test("0-hello"),
-            scheduler_api::Message::test("0-world"),
-            scheduler_api::Message::RequestMsql(Msql::BeginTx(MsqlBeginTx::from(TableOps::from(
+            Message::test("0-hello"),
+            Message::test("0-world"),
+            Message::RequestMsqlText(MsqlText::begintx(
+                Option::<String>::None,
                 "READ table0 WRITE table1 table2 read table3",
-            )))),
-            scheduler_api::Message::request_crash("just for fun"),
+            )),
+            Message::request_crash("just for fun"),
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();

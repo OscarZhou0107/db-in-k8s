@@ -24,6 +24,7 @@ async fn test_double_s() {
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
+            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -68,7 +69,7 @@ async fn test_double_s() {
 
 #[tokio::test]
 #[ignore]
-/// `cargo test run_double_s -- --nocapture`
+/// Run `cargo test run_double_s -- --ignored --nocapture`
 async fn run_double_s() {
     let _guard = tests_helper::init_logger();
 
@@ -85,6 +86,7 @@ async fn run_double_s() {
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:24212"),
+            admin_addr: None,
             max_connection: None,
         },
         dbproxy: vec![DbProxyConfig {

@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 /// Message for communication to Sceduler from appserver
 ///
 /// # Examples - Json conversion
+/// 
+/// To do a `Message::RequestMsqlText(MsqlText::BeginTx {..})`:
 /// ```
 /// use o2versioner::comm::scheduler_api::Message;
 /// use o2versioner::core::{MsqlEndTxMode, MsqlText};
@@ -24,6 +26,12 @@ use serde::{Deserialize, Serialize};
 ///         tableops: String::from("read table0 write table1 t2")
 ///     })
 /// );
+/// ```
+/// 
+/// To do a `Message::RequestMsqlText(MsqlText::EndTx {..})`:
+/// ```
+/// use o2versioner::comm::scheduler_api::Message;
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 ///
 /// let rmt_end_tx_str = r#"
 /// {   
@@ -41,6 +49,12 @@ use serde::{Deserialize, Serialize};
 ///         mode: MsqlEndTxMode::Commit
 ///     })
 /// );
+/// ```
+/// 
+/// To do a `Message::RequestCrash(..)`:
+/// ```
+/// use o2versioner::comm::scheduler_api::Message;
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 ///
 /// let crash_req_str = r#"
 /// {
@@ -121,6 +135,17 @@ mod tests_message {
                 "op":"end_tx",
                 "tx":"tx0",
                 "mode":"commit"
+            }
+        }"#;
+        let b: Message = serde_json::from_str(a).unwrap();
+        println!("{:?}", b);
+
+        let a = r#"
+        {   
+            "request_msql_text":{
+                "op":"query",
+                "query":"select * from t;",
+                "tableops":"read t"
             }
         }"#;
         let b: Message = serde_json::from_str(a).unwrap();
