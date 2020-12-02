@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -188,6 +188,9 @@ async fn process_connection(
                 debug!("-> [{}] Reply {:?}", peer_addr, response);
                 Ok(response)
             }
+        })
+        .inspect_err(|err| {
+            warn!("Can not decode input bytes: {:?}", err);
         })
         .forward(serded_write)
         .map(|_| ())
