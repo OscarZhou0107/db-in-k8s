@@ -10,6 +10,7 @@ async fn test_sequencer() {
     let _guard = tests_helper::init_logger();
     let conf = SequencerConfig {
         addr: String::from("127.0.0.1:6389"),
+        admin_addr: None,
         max_connection: Some(2),
     };
 

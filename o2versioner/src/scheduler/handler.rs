@@ -22,17 +22,13 @@ use tracing::{debug, error, info};
 
 /// Main entrance for the Scheduler from appserver
 ///
-/// The incoming packet is checked:
-/// 1. Connection Phase, SSL off, compression off. Bypassed
-/// 2. Command Phase, Text Protocol. Deserialized and handled
-///   - `BEGIN {TRAN | TRANSACTION} [transaction_name] WITH MARK 'READ table_0 table_1 WRITE table_2' [;]`
-///   - UPDATE or SELECT
-///   - `COMMIT [{TRAN | TRANSACTION} [transaction_name]] [;]`
-///
-/// `{}` - Keyword list;
-/// `|`  - Or;
-/// `[]` - Optional
-///
+/// Three flavors:
+/// 1. Unlimited, the server will keep running forever.
+/// 2. Limit the total maximum number of input connections,
+/// once reaching that limit, no new connections are accepted.
+/// 3. Admin port, can send `kill`, `exit` or `quit` in raw bytes
+/// to the admin port, which will then force to not accept any new
+/// connections.
 pub async fn main(conf: Config) {
     // The current task completes as soon as start_tcplistener finishes,
     // which happens when it reaches the max_conn_till_dropped if not None,
