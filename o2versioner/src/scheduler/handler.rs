@@ -227,10 +227,14 @@ async fn process_msql(
             }
         }
         Msql::Query(_) => {
-            assert!(
-                conn_state_guard.current_txvn().is_some(),
-                "Does not support single un-transactioned query for now"
-            );
+            if conn_state_guard.current_txvn().is_none() {
+                error!(
+                    "<- [{}] Does not support single un-transactioned query for now",
+                    client_addr
+                );
+                panic!("Does not support single un-transactioned query for now");
+            }
+
             dispatcher_addr
                 .request(client_addr, msql, conn_state_guard.current_txvn().clone())
                 .map_ok_or_else(
