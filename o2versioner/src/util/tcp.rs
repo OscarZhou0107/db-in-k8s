@@ -146,10 +146,7 @@ where
         .await;
 
     let client_name = client_name.into();
-    debug!(
-        "[{}] {} TcpStream says current task finished",
-        local_addr, client_name
-    );
+    debug!("[{}] {} TcpStream says current task finished", local_addr, client_name);
 
     responses
 }

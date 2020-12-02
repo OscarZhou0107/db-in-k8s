@@ -90,7 +90,7 @@ where
                         .and_then(|_| line_reader.next_line())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap().trim().to_owned();
-                            info!("[{}] <- GOT RESPONSE: \"{:?}\"", local_addr, received_msg);
+                            info!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
                             received_msg
                         })
                         .await,
@@ -102,10 +102,7 @@ where
         .await;
 
     let client_name = client_name.into();
-    debug!(
-        "[{}] {} TcpStream says task done, have a good day",
-        local_addr, client_name
-    );
+    debug!("[{}] {} TcpStream says current task finished", local_addr, client_name);
 
     responses
 }
