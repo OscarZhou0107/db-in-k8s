@@ -147,7 +147,7 @@ where
 
     let client_name = client_name.into();
     debug!(
-        "[{}] {} TcpStream says task done, have a good day",
+        "[{}] {} TcpStream says current task finished",
         local_addr, client_name
     );
 
