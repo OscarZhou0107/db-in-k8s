@@ -1,8 +1,6 @@
-use crate::core::Msql;
 /// This module contains everything about the response
 /// to a Msql query.
-#[allow(unused_imports)]
-use crate::dbproxy::core::QueryResult;
+use crate::core::Msql;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
