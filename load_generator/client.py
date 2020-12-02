@@ -71,6 +71,17 @@ def generateRandomCountry():
     index = randint(0, len(countries)-1)
     return countries[index]
 
+def jsonToByte(serialized):
+    # input is a dictionary converted to string by json.dumps()
+    # first 4 bytes (big endian) need to be the length of the remaining message
+    msgLen = len(serialized).to_bytes(4, byteorder='big')
+    encoded = msgLen + serialized.encode('utf-8')
+    return encoded
+
+def byteToJson(raw):
+    return json.loads((raw[4:]).decode('utf-8'))
+
+
 class Client:
     def __init__(self, c_id, port, mix):
         self.c_id = c_id
@@ -99,14 +110,12 @@ class Client:
             if DEBUG:
                 print("### Sending data: BEGIN")
                 print(begin)
-            self.soc.sendall(begin.encode('utf-8'))
-            # TODO: check if we will get a response from backend
-            data = self.soc.recv(2**24).decode('utf-8')
-            #data = json.loads(self.soc.recv(2**24).decode('utf-8'))
+            self.soc.sendall(jsonToByte(begin))
+            data = byteToJson(self.soc.recv(2**24))
             if DEBUG:
                 print("### Receiving data: BEGIN")
                 print(data)
-            if self.isErr(data):
+            if OK not in data["reply"]["BeginTx"]:
                 print("Response contains error, terminating...")
                 return 0
             
@@ -142,16 +151,21 @@ class Client:
             if not okay:
                 print("Response contains error, terminating...")
                 crash = web_to_sql.getCrash(self.curr)
-                self.soc.sendall(crash.encode('utf-8'))
+                self.soc.sendall(jsonToByte(crash))
                 return 0
 
             commit = web_to_sql.getCommit()
             if DEBUG:
                 print("### Sending data: COMMIT")
                 print(commit)
-            self.soc.sendall(commit.encode('utf-8'))
-            # TODO: check if we will get a response from backend
-            data = json.loads(self.soc.recv(2**24).decode('utf-8'))
+            self.soc.sendall(jsonToByte(commit))
+            data = byteToJson(self.soc.recv(2**24))
+            if DEBUG:
+                print("### Receiving data: COMMIT")
+                print(data)
+            if OK not in data["reply"]["EndTx"]:
+                print("Response contains error, terminating...")
+                return 0
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
@@ -710,7 +724,7 @@ class Client:
             writeString = "WRITE " + " ".join(ops["WRITE"])
         opsString = readString + " " + writeString
 
-        '''
+
         serialized = json.dumps({
             "request_msql_text":{
                 "op":"query",
@@ -718,33 +732,21 @@ class Client:
                 "tableops":opsString
             }
         })
-        '''
-        serialized = json.dumps({
-            "request_msql_text":
-            {
-                "op":"query",
-                "query":"select",
-                "tableops":"read t"
-            }
-        })
+        
         if DEBUG:
             print("### Sending data: {}".format(name))
-            #print(query)
-            print(type(serialized))
+            print(query)
             print(serialized)
 
-        self.soc.sendall(serialized.encode('utf-8'))
-        response = self.soc.recv(2**24) # raw response
-        print("### raw response: {}".format(response))
-        
-        parsed = json.loads(response.decode(('utf-8')))["reply"]
+        self.soc.sendall(jsonToByte(serialized))
+        response = byteToJson(self.soc.recv(2**24))
         if DEBUG:
-            print("### Receiving data: {}".format(parsed))
+            print("### Receiving data: {}".format(response))
 
-        if OK not in parsed:
+        if OK not in response["reply"]["Query"]:
             return "Err"
 
-        csv = parsed[OK]
+        csv = response["reply"]["Query"][OK]
         if not csv:
             return "Empty"
 
