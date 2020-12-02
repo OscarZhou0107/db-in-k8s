@@ -161,7 +161,7 @@ def getBegin(url):
         writeString = "WRITE " + " ".join(revResult["WRITE"])
     resultString = "BEGIN TRAN WITH MARK '" + readString + " " + writeString + "'" 
 
-    # serialize
+    # serialize begin
     serialized = json.dumps({
         "request_msql_text":
         {
