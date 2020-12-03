@@ -182,162 +182,111 @@ fn prepare_query_result(
 
 #[cfg(test)]
 mod tests_dispatcher {
-    // use super::Dispatcher;
-    // use crate::core::RWOperation;
-    // use crate::core::transaction_version::TxTableVN;
-    // use crate::dbproxy::core::{DbVersion, Operation, PendingQueue, QueryResult, Task};
-    // use std::{collections::HashMap, sync::Arc};
-    // use tokio::sync::mpsc;
-    // use tokio::sync::Mutex;
+    use super::Dispatcher;
+    use crate::core::RWOperation;
+    use crate::core::*;
+    use crate::dbproxy::core::{DbVersion, PendingQueue, QueueMessage, QueryResult, Task};
+    use std::{collections::HashMap, net::IpAddr, net::SocketAddr, sync::Arc, net::Ipv4Addr};
+    use tokio::sync::mpsc;
+    use tokio::sync::Mutex;
 
-    // #[tokio::test]
-    // #[ignore]
-    // async fn test_receive_response_from_new_transactions() {
-    //     //Prepare - Network
-    //     let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>> = Arc::new(Mutex::new(HashMap::new()));
-    //     let transactions_2 = Arc::clone(&transactions);
+    #[tokio::test]
+    #[ignore]
+    async fn test_receive_response_from_new_transactions() {
+        //Prepare - Network
+        let transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
+        let transactions_2 = Arc::clone(&transactions);
 
-    //     //Global version//
-    //     let mut mock_db = HashMap::new();
-    //     mock_db.insert("table1".to_string(), 0);
-    //     mock_db.insert("table2".to_string(), 0);
-    //     let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
+        //Global version//
+        let mut mock_db = HashMap::new();
+        mock_db.insert("table1".to_string(), 0);
+        mock_db.insert("table2".to_string(), 0);
+        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
 
-    //     //PendingQueue
-    //     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-    //     let pending_queue_2 = Arc::clone(&pending_queue);
-    //     //Responder sender and receiver
-    //     let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
-    //         mpsc::channel(100);
-    //     Dispatcher::run(
-    //         pending_queue,
-    //         responder_sender,
-    //         "mysql://root:Rayh8768@localhost:3306/test".to_string(),
-    //         version,
-    //         transactions,
-    //     );
+        //PendingQueue
+        let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
+        let pending_queue_2 = Arc::clone(&pending_queue);
+        //Responder sender and receiver
+        let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
+            mpsc::channel(100);
+       
+        let mut mock_vs = Vec::new();
+        mock_vs.push(TxTableVN {
+            table: "table2".to_string(),
+            vn: 0,
+            op: RWOperation::R,
+        });
+        mock_vs.push(TxTableVN {
+            table: "table1".to_string(),
+            vn: 0,
+            op: RWOperation::R,
+        });
 
-    //     let mut mock_vs = Vec::new();
-    //     mock_vs.push(TxTableVN {
-    //         table: "table2".to_string(),
-    //         vn: 0,
-    //         op: RWOperation::R,
-    //     });
-    //     mock_vs.push(TxTableVN {
-    //         table: "table1".to_string(),
-    //         vn: 0,
-    //         op: RWOperation::R,
-    //     });
+        let mut mock_ops = Vec::new();
+        mock_ops.push(QueueMessage {
+            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type : Task::ABORT,
+            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            versions: None,
+        });
+        mock_ops.push(QueueMessage {
+            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type : Task::READ,
+            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            versions: None,
+        });
+        mock_ops.push(QueueMessage {
+            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type : Task::READ,
+            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            versions: None,
+        });
+        mock_ops.push(QueueMessage {
+            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type : Task::BEGIN,
+            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            versions: None,
+        });
 
-    //     let mut mock_ops = Vec::new();
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t1".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t2".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t3".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t4".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
+        helper_spawn_dispatcher(pending_queue, responder_sender, version, transactions);
+        helper_mock_client(pending_queue_2, mock_ops).await;
 
-    //     while !mock_ops.is_empty() {
-    //         pending_queue_2.lock().await.push(mock_ops.pop().unwrap());
-    //     }
+        let mut task_num: u64 = 0;
+        while let Some(q) = responder_receiver.recv().await {
+            task_num += 1;
+            //println!("{}", q.result);
+            if task_num == 4 {
+                break;
+            }
+        }
 
-    //     let mut task_num: u64 = 0;
-    //     while let Some(_) = responder_receiver.recv().await {
-    //         task_num += 1;
-    //         if task_num == 4 {
-    //             break;
-    //         }
-    //     }
-    //     assert!(transactions_2.lock().await.len() == 4);
-    // }
+        //Only one unique transaction
+        assert!(transactions_2.lock().await.len() == 1);
+    }
+    fn helper_spawn_worker(){
 
-    // #[tokio::test]
-    // #[ignore]
-    // async fn test_receive_response_from_same_transactions() {
-    //     //Prepare - Network
-    //     let transactions: Arc<Mutex<HashMap<String, mpsc::Sender<Operation>>>> = Arc::new(Mutex::new(HashMap::new()));
-    //     let transactions_2 = Arc::clone(&transactions);
+    }
 
-    //     //Global version//
-    //     let mut mock_db = HashMap::new();
-    //     mock_db.insert("table1".to_string(), 0);
-    //     mock_db.insert("table2".to_string(), 0);
-    //     let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
+    fn helper_spawn_dispatcher(pending_queue : Arc<Mutex<PendingQueue>>, sender : mpsc::Sender<QueryResult>, version : Arc<Mutex<DbVersion>>, transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>){
+       
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
+    
+        Dispatcher::run(
+            pending_queue,
+            sender,
+            config,
+            version,
+            transactions)
+    }
 
-    //     //PendingQueue
-    //     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-    //     let pending_queue_2 = Arc::clone(&pending_queue);
-
-    //     //Responder sender and receiver
-    //     let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
-    //         mpsc::channel(100);
-    //     Dispatcher::run(
-    //         pending_queue,
-    //         responder_sender,
-    //         "mysql://root:Rayh8768@localhost:3306/test".to_string(),
-    //         version,
-    //         transactions,
-    //     );
-
-    //     let mut mock_vs = Vec::new();
-    //     mock_vs.push(TxTableVN {
-    //         table: "table2".to_string(),
-    //         vn: 0,
-    //         op: RWOperation::R,
-    //     });
-    //     mock_vs.push(TxTableVN {
-    //         table: "table1".to_string(),
-    //         vn: 0,
-    //         op: RWOperation::R,
-    //     });
-
-    //     let mut mock_ops = Vec::new();
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t1".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t2".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t3".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-    //     mock_ops.push(Operation {
-    //         transaction_id: "t1".to_string(),
-    //         task: Task::READ,
-    //         txtablevns: mock_vs.clone(),
-    //     });
-
-    //     while !mock_ops.is_empty() {
-    //         pending_queue_2.lock().await.push(mock_ops.pop().unwrap());
-    //     }
-
-    //     let mut task_num: u64 = 0;
-    //     while let Some(_) = responder_receiver.recv().await {
-    //         task_num += 1;
-    //         if task_num == 4 {
-    //             break;
-    //         }
-    //     }
-    //     assert!(transactions_2.lock().await.len() == 3);
-    // }
+    async fn helper_mock_client(pending_queue : Arc<Mutex<PendingQueue>>, mut messages : Vec<QueueMessage>){
+        while !messages.is_empty() {
+            pending_queue.lock().await.push(messages.pop().unwrap());
+        }
+    }
 }

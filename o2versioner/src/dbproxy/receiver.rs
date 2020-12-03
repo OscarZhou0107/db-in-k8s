@@ -35,119 +35,101 @@ impl Receiver {
 
 #[cfg(test)]
 mod tests_receiver {
-    // use super::Receiver;
-    // use crate::comm::scheduler_dbproxy::Message;
-    // use crate::core::RWOperation;
-    // use crate::core::TxTableVN;
-    // use crate::dbproxy::core::{Operation, PendingQueue, Task};
-    // use futures::prelude::*;
-    // use std::sync::Arc;
-    // use tokio::net::{TcpListener, TcpStream};
-    // use tokio::sync::Mutex;
-    // use tokio_serde::formats::SymmetricalJson;
-    // use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
+    use super::Receiver;
+    use crate::comm::scheduler_dbproxy::Message;
+    use crate::core::*;
+    use crate::dbproxy::core::{PendingQueue, Task};
+    use futures::SinkExt;
+    use std::net::*;
+    use std::sync::Arc;
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio::sync::Mutex;
+    use tokio_serde::formats::SymmetricalJson;
+    use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
-    // #[tokio::test]
-    // async fn test_send_single_item_to_receiver() {
-    //     //Prepare - Network
-    //     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-    //     let pending_queue_2 = Arc::clone(&pending_queue);
+    #[tokio::test]
+    async fn test_send_single_item_to_receiver() {
+        //Prepare - Data
+        let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
+        let pending_queue_2 = Arc::clone(&pending_queue);
 
-    //     //Prepare - Receiver
-    //     tokio::spawn(async {
-    //         let addr = "127.0.0.1:2345";
-    //         let listener = TcpListener::bind(addr).await.unwrap();
-    //         let (tcp_stream, _) = listener.accept().await.unwrap();
-    //         let (tcp_read, _) = tcp_stream.into_split();
+        let v: Vec<TableOps> = Vec::new();
+        let item = Message::MsqlRequest(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
+            None,
+        );
 
-    //         Receiver::run(pending_queue, tcp_read);
-    //     });
+        let mut items : Vec<Message> = Vec::new();
+        for _ in 0..1 {
+            items.push(item.clone());
+        };
 
-    //     //Action - Send item
-    //     tokio::spawn(async {
-    //         let addr = "127.0.0.1:2345";
-    //         let mock_table_vs = vec![
-    //             TxTableVN {
-    //                 table: "table1".to_string(),
-    //                 vn: 0,
-    //                 op: RWOperation::R,
-    //             },
-    //             TxTableVN {
-    //                 table: "table2".to_string(),
-    //                 vn: 0,
-    //                 op: RWOperation::R,
-    //             },
-    //         ];
-    //         let socket = TcpStream::connect(addr).await.unwrap();
-    //         let length_delimited = FramedWrite::new(socket, LengthDelimitedCodec::new());
-    //         let mut serialized = tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
+        //Prepare - Receiver
+        helper_spawn_receiver(pending_queue);
+        helper_spawn_mock_client(items);
 
-    //         let item = Message::SqlRequest(Operation {
-    //             transaction_id: "t1".to_string(),
-    //             txtablevns: mock_table_vs.clone(),
-    //             task: Task::READ,
-    //         });
-    //         //Action
-    //         serialized.send(item).await.unwrap();
-    //     });
+        //Assert
+        loop {
+            if pending_queue_2.lock().await.queue.len() == 1 {
+                break;
+            }
+        }
+        assert!(true);
+    }
 
-    //     //Assert
-    //     loop {
-    //         if pending_queue_2.lock().await.queue.len() == 1 {
-    //             break;
-    //         }
-    //     }
-    //     assert!(true);
-    // }
+    #[tokio::test]
+    async fn test_send_ten_items_to_receiver() {
+        //Prepare - Data
+        let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
+        let pending_queue_2 = Arc::clone(&pending_queue);
 
-    // #[tokio::test]
-    // #[ignore]
-    // async fn test_send_an_invalid_item_to_receiver_should_panic() {
-    //     //Prepare - Network
-    //     //PendingQueue
-    //     let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-    //     let pending_queue_2 = Arc::clone(&pending_queue);
+        let v: Vec<TableOps> = Vec::new();
+        let item = Message::MsqlRequest(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
+            None,
+        );
 
-    //     //Prepare - Receiver
-    //     tokio::spawn(async {
-    //         let addr = "127.0.0.1:2345";
-    //         let listener = TcpListener::bind(addr).await.unwrap();
-    //         let (tcp_stream, _) = listener.accept().await.unwrap();
-    //         let (tcp_read, _) = tcp_stream.into_split();
+        let mut items : Vec<Message> = Vec::new();
+        for _ in 0..10 {
+            items.push(item.clone());
+        };
 
-    //         Receiver::run(pending_queue, tcp_read);
-    //     });
+        //Prepare - Receiver
+        helper_spawn_receiver(pending_queue);
+        helper_spawn_mock_client(items);
 
-    //     //Action - Send item
-    //     tokio::spawn(async {
-    //         let addr = "127.0.0.1:2345";
-    //         let mock_table_vs = vec![
-    //             TxTableVN {
-    //                 table: "table1".to_string(),
-    //                 vn: 0,
-    //                 op: RWOperation::R,
-    //             },
-    //             TxTableVN {
-    //                 table: "table2".to_string(),
-    //                 vn: 0,
-    //                 op: RWOperation::R,
-    //             },
-    //         ];
+        //Assert
+        loop {
+            if pending_queue_2.lock().await.queue.len() == 10 {
+                break;
+            }
+        }
+        assert!(true);
+    }
 
-    //         let socket = TcpStream::connect(addr).await.unwrap();
-    //         let length_delimited = FramedWrite::new(socket, LengthDelimitedCodec::new());
-    //         let mut serialized = tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
+    fn helper_spawn_receiver(pending_queue: Arc<Mutex<PendingQueue>>) {
+        tokio::spawn(async {
+            let addr = "127.0.0.1:2345";
+            let listener = TcpListener::bind(addr).await.unwrap();
+            let (tcp_stream, _) = listener.accept().await.unwrap();
+            let (tcp_read, _) = tcp_stream.into_split();
 
-    //         let item = Operation {
-    //             transaction_id: "t1".to_string(),
-    //             txtablevns: mock_table_vs.clone(),
-    //             task: Task::READ,
-    //         };
-    //         //Action
-    //         serialized.send(item).await.unwrap();
-    //     });
+            Receiver::run(pending_queue, tcp_read);
+        });
+    }
 
-    //     //Assert
-    //     assert!(pending_queue_2.lock().await.queue.len() == 0);
-    // }
+    fn helper_spawn_mock_client(mut items: Vec<Message>) {
+        tokio::spawn(async move {
+            let addr = "127.0.0.1:2345";
+            let socket = TcpStream::connect(addr).await.unwrap();
+            let length_delimited = FramedWrite::new(socket, LengthDelimitedCodec::new());
+            let mut serialized = tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
+            //Action
+            while !items.is_empty() {
+                serialized.send(items.pop().unwrap()).await.unwrap();
+            };
+        });
+    }
 }
