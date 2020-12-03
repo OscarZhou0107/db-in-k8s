@@ -348,7 +348,7 @@ mod tests_dispatcher {
         let (dispatcher_addr, dispatcher) = Dispatcher::new(
             10,
             Arc::new(RwLock::new(DbVNManager::from_iter(vec![]))),
-            DbproxyManager::from_iter(vec![], 1).await,
+            DbproxyManager::from_iter(vec![]).await,
         );
 
         let dispatcher_handler = tokio::spawn(dispatcher.run());

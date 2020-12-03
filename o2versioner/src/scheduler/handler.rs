@@ -46,7 +46,7 @@ pub async fn main(conf: Config) {
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
         Arc::new(RwLock::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()))),
-        DbproxyManager::from_iter(conf.to_dbproxy_addrs(), conf.scheduler.dbproxy_pool_size).await,
+        DbproxyManager::from_iter(conf.to_dbproxy_addrs()).await,
     );
 
     // Launch dispatcher as a new task

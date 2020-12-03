@@ -19,7 +19,6 @@ async fn test_scheduler() {
             admin_addr: None,
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
-            dbproxy_pool_size: 1,
             dispatcher_queue_size: 1,
         },
         sequencer: SequencerConfig {
@@ -88,7 +87,6 @@ async fn test_scheduler_with_admin() {
             admin_addr: Some(String::from(scheduler_admin_addr)),
             max_connection: None,
             sequencer_pool_size: sequencer_max_connection,
-            dbproxy_pool_size: 1,
             dispatcher_queue_size: 1,
         },
         sequencer: SequencerConfig {
@@ -182,7 +180,6 @@ async fn test_scheduler_with_request_crash() {
             admin_addr: None,
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
-            dbproxy_pool_size: 1,
             dispatcher_queue_size: 1,
         },
         sequencer: SequencerConfig {

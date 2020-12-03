@@ -1,6 +1,5 @@
 [scheduler]
 addr = "127.0.0.1:1077"
-dbproxy_pool_size = 10
 dispatcher_queue_size = 500
 max_connection = 50
 sequencer_pool_size = 20

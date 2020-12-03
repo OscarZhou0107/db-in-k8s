@@ -100,8 +100,8 @@ impl DbVNManager {
 pub struct DbproxyManager(HashMap<SocketAddr, Pool<TcpStreamConnectionManager>>);
 
 impl DbproxyManager {
-    /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` with `max_conn: u32` 'into `DbproxyManager`
-    pub async fn from_iter<I>(iter: I, max_conn: u32) -> Self
+    /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` into `DbproxyManager`
+    pub async fn from_iter<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = SocketAddr>,
     {
@@ -111,7 +111,7 @@ impl DbproxyManager {
                     (
                         dbproxy_port.clone(),
                         Pool::builder()
-                            .max_size(max_conn)
+                            .max_size(1)
                             .build(TcpStreamConnectionManager::new(dbproxy_port).await)
                             .await
                             .unwrap(),

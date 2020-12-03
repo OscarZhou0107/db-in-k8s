@@ -28,7 +28,6 @@ async fn test_double_s() {
             admin_addr: None,
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
-            dbproxy_pool_size: 1,
             dispatcher_queue_size: 1,
         },
         sequencer: SequencerConfig {
@@ -94,7 +93,6 @@ async fn run_double_s() {
             admin_addr: None,
             max_connection: None,
             sequencer_pool_size: 10,
-            dbproxy_pool_size: 10,
             dispatcher_queue_size: 1,
         },
         sequencer: SequencerConfig {

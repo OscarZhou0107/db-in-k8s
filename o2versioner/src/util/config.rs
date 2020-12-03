@@ -29,7 +29,6 @@ pub struct SchedulerConfig {
     #[serde(default)]
     pub max_connection: Option<u32>,
     pub sequencer_pool_size: u32,
-    pub dbproxy_pool_size: u32,
     pub dispatcher_queue_size: usize,
 }
 
@@ -81,7 +80,6 @@ mod tests_config {
                     admin_addr: None,
                     max_connection: Some(50),
                     sequencer_pool_size: 20,
-                    dbproxy_pool_size: 10,
                     dispatcher_queue_size: 500
                 },
                 sequencer: SequencerConfig {
