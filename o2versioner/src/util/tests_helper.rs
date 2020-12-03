@@ -1,11 +1,14 @@
 use super::tcp;
 use futures::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tracing::dispatcher::DefaultGuard;
-use tracing::{debug, error, info};
+use tracing::{debug, error, field, info, instrument, Span};
 
 #[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_logger() -> DefaultGuard {
@@ -19,6 +22,7 @@ pub fn init_logger() -> DefaultGuard {
 }
 
 /// A mock echo server for testing
+#[instrument(name="echo(mock)" skip(addr, max_connection, server_name))]
 pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: S)
 where
     A: ToSocketAddrs,
@@ -47,7 +51,19 @@ where
     .await;
 }
 
-pub use tcp::send_and_receive_as_json as mock_json_client;
+#[instrument(name = "client(mock)", skip(tcp_stream, msgs, client_name))]
+pub async fn mock_json_client<Msgs, S>(
+    tcp_stream: &mut TcpStream,
+    msgs: Msgs,
+    client_name: S,
+) -> Vec<std::io::Result<Msgs::Item>>
+where
+    Msgs: IntoIterator,
+    for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
+    S: Into<String>,
+{
+    tcp::send_and_receive_as_json(tcp_stream, msgs, client_name).await
+}
 
 /// Send a collection of msg through the argument `TcpStream`, and expecting a reply for each of the msg sent.
 /// The msgs are send received using a newline-delimited ascii encoding.
@@ -56,6 +72,7 @@ pub use tcp::send_and_receive_as_json as mock_json_client;
 /// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
 /// 2. The sent message must not contain any newline characters
 /// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
+#[instrument(name="ascii(mock):chat" skip(tcp_stream, msgs, client_name) fields(message=field::Empty, to=field::Empty))]
 pub async fn mock_ascii_client<Msgs, S, MS>(
     tcp_stream: &mut TcpStream,
     msgs: Msgs,
@@ -67,6 +84,10 @@ where
     MS: Into<String>,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
+    let peer_addr = tcp_stream.peer_addr().unwrap();
+    Span::current().record("message", &&local_addr.to_string()[..]);
+    Span::current().record("to", &&peer_addr.to_string()[..]);
+
     let (tcp_read, tcp_write) = tcp_stream.split();
     // Must send this line_reader as a mut ref into the closure for fold,
     // moving this line_reader into the closure will make its owner to be the closure,
