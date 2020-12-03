@@ -13,7 +13,7 @@ use std::iter::FromIterator;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
@@ -42,13 +42,11 @@ pub async fn main(conf: Config) {
         .await
         .unwrap();
 
-    // prepare dispatcher
+    // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
-        State::new(
-            DbVNManager::from_iter(conf.to_dbproxy_addrs()),
-            DbproxyManager::from_iter(conf.to_dbproxy_addrs(), conf.scheduler.dbproxy_pool_size).await,
-        ),
+        Arc::new(RwLock::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()))),
+        DbproxyManager::from_iter(conf.to_dbproxy_addrs(), conf.scheduler.dbproxy_pool_size).await,
     );
 
     // Launch dispatcher as a new task

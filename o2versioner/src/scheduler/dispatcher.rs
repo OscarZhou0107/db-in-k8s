@@ -35,18 +35,18 @@ struct Request {
     reply: Option<oneshot::Sender<DispatcherReply>>,
 }
 
-/// A state containing shareed variables
+/// A state containing shared variables
 #[derive(Clone)]
-pub struct State {
+struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     dbvn_manager_notify: Arc<Notify>,
     dbproxy_manager: DbproxyManager,
 }
 
 impl State {
-    pub fn new(dbvn_manager: DbVNManager, dbproxy_manager: DbproxyManager) -> Self {
+    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager: DbproxyManager) -> Self {
         Self {
-            dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
+            dbvn_manager,
             dbvn_manager_notify: Arc::new(Notify::new()),
             dbproxy_manager,
         }
@@ -255,7 +255,12 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(queue_size: usize, state: State) -> (DispatcherAddr, Dispatcher) {
+    pub fn new(
+        queue_size: usize,
+        dbvn_manager: Arc<RwLock<DbVNManager>>,
+        dbproxy_manager: DbproxyManager,
+    ) -> (DispatcherAddr, Dispatcher) {
+        let state = State::new(dbvn_manager, dbproxy_manager);
         let (request_tx, request_rx) = mpsc::channel(queue_size);
         (DispatcherAddr { request_tx }, Dispatcher { state, request_rx })
     }
@@ -342,10 +347,8 @@ mod tests_dispatcher {
         let _guard = init_logger();
         let (dispatcher_addr, dispatcher) = Dispatcher::new(
             10,
-            State::new(
-                DbVNManager::from_iter(vec![]),
-                DbproxyManager::from_iter(vec![], 1).await,
-            ),
+            Arc::new(RwLock::new(DbVNManager::from_iter(vec![]))),
+            DbproxyManager::from_iter(vec![], 1).await,
         );
 
         let dispatcher_handler = tokio::spawn(dispatcher.run());
