@@ -112,7 +112,7 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
 
             async {
                 process_req
-                    .instrument(info_span!("sequencer", req = field::Empty, client_meta = field::Empty,))
+                    .instrument(info_span!("sequencer", req = field::Empty, client_meta = field::Empty))
                     .await
             }
         })

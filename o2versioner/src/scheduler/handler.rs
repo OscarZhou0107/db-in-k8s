@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, error, field, info, info_span, warn, Instrument, Span};
+use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -109,6 +109,7 @@ pub async fn main(conf: Config) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
+#[instrument(name="client", skip(socket, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
 async fn process_connection(
     mut socket: TcpStream,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
@@ -116,6 +117,9 @@ async fn process_connection(
 ) {
     let client_addr = socket.peer_addr().unwrap();
     let local_addr = socket.local_addr().unwrap();
+
+    Span::current().record("message", &&client_addr.to_string()[..]);
+
     let (tcp_read, tcp_write) = socket.split();
 
     // Delimit frames from bytes using a length header
@@ -155,13 +159,6 @@ async fn process_connection(
                     sequencer_socket_pool_cloned,
                     dispatcher_addr_cloned,
                 )
-                .instrument(info_span!(
-                    "scheduler",
-                    client = field::Empty,
-                    req = field::Empty,
-                    tx_id = field::Empty,
-                    req_type = field::Empty
-                ))
                 .await)
             }
         })
@@ -175,6 +172,7 @@ async fn process_connection(
     info!("[{}] <- [{}] connection disconnected", local_addr, client_addr);
 }
 
+#[instrument(name="handler", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(req=field::Empty, tx_id=field::Empty, req_type=field::Empty))]
 async fn process_request(
     msg: scheduler_api::Message,
     local_addr: SocketAddr,
@@ -184,7 +182,6 @@ async fn process_request(
 ) -> scheduler_api::Message {
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
-    Span::current().record("client", &&conn_state_guard.client_meta().client_addr().to_string()[..]);
     Span::current().record("req", &msg.as_ref());
 
     let response = match msg {

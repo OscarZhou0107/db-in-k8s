@@ -8,7 +8,7 @@ use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Response sent from `Dispatcher` to `DispatcherAddr`
 #[derive(Debug)]
@@ -267,16 +267,16 @@ impl Dispatcher {
         (DispatcherAddr { request_tx }, Dispatcher { state, request_rx })
     }
 
+    #[instrument(name="dispatcher", skip(self), fields(DbVNManager=field::Empty, DbproxyManager=field::Empty))]
     pub async fn run(mut self) {
-        info!(
-            "Scheduler dispatcher running with {} DbVNManager and {} DbproxyManager dbproxy targets!",
-            Arc::get_mut(&mut self.state.dbvn_manager)
-                .unwrap()
-                .get_mut()
-                .inner()
-                .len(),
-            self.state.dbproxy_manager.inner().len()
-        );
+        let num_dbvn_manager = Arc::get_mut(&mut self.state.dbvn_manager)
+            .unwrap()
+            .get_mut()
+            .inner()
+            .len();
+        let num_dbproxy_manager = self.state.dbproxy_manager.inner().len();
+        Span::current().record("DbVNManager", &num_dbvn_manager);
+        Span::current().record("DbproxyManager", &num_dbproxy_manager);
 
         // Handle each Request concurrently
         let Dispatcher { state, request_rx } = self;
