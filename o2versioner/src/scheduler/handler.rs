@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, field, info, info_span, warn, Instrument, Span};
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -145,48 +145,20 @@ async fn process_connection(
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr.clone();
             let client_addr_cloned = peer_addr.clone();
+            let local_addr_cloned = local_addr.clone();
+            debug!("<- [{}] Received {:?}", peer_addr, msg);
+
             async move {
-                debug!("<- [{}] Received {:?}", peer_addr, msg);
-                let response = match msg {
-                    scheduler_api::Message::RequestMsql(msql) => {
-                        process_msql(
-                            msql,
-                            client_addr_cloned,
-                            conn_state_cloned,
-                            sequencer_socket_pool_cloned,
-                            dispatcher_addr_cloned,
-                        )
-                        .await
-                    }
-                    scheduler_api::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
-                        // Try to convert MsqlText to Msql first
-                        Ok(msql) => {
-                            process_msql(
-                                msql,
-                                client_addr_cloned,
-                                conn_state_cloned,
-                                sequencer_socket_pool_cloned,
-                                dispatcher_addr_cloned,
-                            )
-                            .await
-                        }
-                        Err(e) => scheduler_api::Message::InvalidMsqlText(e.to_owned()),
-                    },
-                    scheduler_api::Message::RequestCrash(reason) => {
-                        error!(
-                            "[{}] <- [{}] Requested for a soft crash because of {}",
-                            local_addr, peer_addr, reason
-                        );
-                        error!(
-                            "[{}] -- [{}] Current connection state: {:?}",
-                            local_addr, peer_addr, conn_state_cloned
-                        );
-                        panic!("Received a soft crash request");
-                    }
-                    _ => scheduler_api::Message::InvalidRequest,
-                };
-                debug!("-> [{}] Reply {:?}", peer_addr, response);
-                Ok(response)
+                Ok(process_request(
+                    msg,
+                    client_addr_cloned.clone(),
+                    local_addr_cloned,
+                    conn_state_cloned,
+                    sequencer_socket_pool_cloned,
+                    dispatcher_addr_cloned,
+                )
+                .instrument(info_span!("scheduler", client = %client_addr_cloned, req = field::Empty))
+                .await)
             }
         })
         .inspect_err(|err| {
@@ -197,6 +169,42 @@ async fn process_connection(
         .await;
 
     info!("[{}] <- [{}] connection disconnected", local_addr, peer_addr);
+}
+
+async fn process_request(
+    msg: scheduler_api::Message,
+    client_addr: SocketAddr,
+    local_addr: SocketAddr,
+    conn_state: Arc<Mutex<ConnectionState>>,
+    sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
+    dispatcher_addr: Arc<DispatcherAddr>,
+) -> scheduler_api::Message {
+    Span::current().record("req", &msg.as_ref());
+    let response = match msg {
+        scheduler_api::Message::RequestMsql(msql) => {
+            process_msql(msql, client_addr, conn_state, sequencer_socket_pool, dispatcher_addr).await
+        }
+        scheduler_api::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
+            // Try to convert MsqlText to Msql first
+            Ok(msql) => process_msql(msql, client_addr, conn_state, sequencer_socket_pool, dispatcher_addr).await,
+            Err(e) => scheduler_api::Message::InvalidMsqlText(e.to_owned()),
+        },
+        scheduler_api::Message::RequestCrash(reason) => {
+            error!(
+                "[{}] <- [{}] Requested for a soft crash because of {}",
+                local_addr, client_addr, reason
+            );
+            error!(
+                "[{}] -- [{}] Current connection state: {:?}",
+                local_addr, client_addr, conn_state
+            );
+            panic!("Received a soft crash request");
+        }
+        _ => scheduler_api::Message::InvalidRequest,
+    };
+    debug!("-> [{}] Reply {:?}", client_addr, response);
+
+    response
 }
 
 async fn process_msql(
