@@ -10,9 +10,10 @@ use tracing::{debug, error, info};
 #[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_logger() -> DefaultGuard {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(tracing::Level::DEBUG)
-        .without_time()
         .with_test_writer()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_target(false)
+        .without_time()
         .finish();
     tracing::subscriber::set_default(subscriber)
 }
