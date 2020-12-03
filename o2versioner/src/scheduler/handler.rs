@@ -256,9 +256,13 @@ async fn process_begintx(
         .and_then(|res| async {
             match res {
                 scheduler_sequencer::Message::ReplyTxVN(txvn) => {
-                    let existing = conn_state.replace_txvn(Some(txvn));
-                    assert!(existing.is_none());
-                    Ok(())
+                    if let Some(txvn) = txvn {
+                        let existing = conn_state.replace_txvn(Some(txvn));
+                        assert!(existing.is_none());
+                        Ok(())
+                    } else {
+                        Err(String::from("Can't get a TxVN from Sequencer"))
+                    }
                 }
                 _ => Err(String::from("Invalid response from Sequencer")),
             }

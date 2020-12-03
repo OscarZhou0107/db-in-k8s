@@ -81,6 +81,29 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
                         debug!("-> {:?}", txvn);
                         Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
                     }
+                    scheduler_sequencer::Message::RequestBlock => {
+                        let prev_is_blocked = state_cloned.lock().await.set_vn_record_blocked(true);
+                        let status = if prev_is_blocked {
+                            "is already blocked"
+                        } else {
+                            "set blocked successfully"
+                        };
+
+                        warn!("{}", status);
+                        Ok(scheduler_sequencer::Message::ReplyBlockUnblock(String::from(status)))
+                    }
+                    scheduler_sequencer::Message::RequestUnblock => {
+                        let prev_is_blocked = state_cloned.lock().await.set_vn_record_blocked(false);
+
+                        let status = if prev_is_blocked {
+                            "set unblocked successfully"
+                        } else {
+                            "is already unblocked"
+                        };
+
+                        warn!("{}", status);
+                        Ok(scheduler_sequencer::Message::ReplyBlockUnblock(String::from(status)))
+                    }
                     other => {
                         warn!("<- Unsupported: {:?}", other);
                         Ok(scheduler_sequencer::Message::Invalid)

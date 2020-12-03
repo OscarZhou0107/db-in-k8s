@@ -5,5 +5,8 @@ use serde::{Deserialize, Serialize};
 pub enum Message {
     Invalid,
     RequestTxVN(ClientMeta, MsqlBeginTx),
-    ReplyTxVN(TxVN),
+    ReplyTxVN(Option<TxVN>),
+    RequestBlock,
+    RequestUnblock,
+    ReplyBlockUnblock(String),
 }
