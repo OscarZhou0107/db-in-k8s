@@ -145,11 +145,12 @@ async fn process_connection(
     // At any given point, there is at most one transaction.
     // Connection/session specific storage
     let conn_state = Arc::new(Mutex::new(ConnectionState::new(client_addr)));
+    let conn_state_cloned = conn_state.clone();
 
     // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(move |msg| {
-            let conn_state_cloned = conn_state.clone();
+            let conn_state_cloned = conn_state_cloned.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr.clone();
             debug!("<- {:?}", msg);
@@ -171,7 +172,16 @@ async fn process_connection(
         .map(|_| ())
         .await;
 
-    info!("Connection dropped");
+    let conn_state = Arc::try_unwrap(conn_state).unwrap().into_inner();
+    info!("Connection dropped. {:?}", conn_state);
+
+    if conn_state.current_txvn().is_some() {
+        error!("Unclosed transaction. {:?}", conn_state.current_txvn());
+        panic!(
+            "Connection dropped with unclosed transaction. {:?}",
+            conn_state.current_txvn()
+        );
+    }
 }
 
 #[instrument(name="request", skip(msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, txid=field::Empty, cmd=field::Empty))]
@@ -229,6 +239,11 @@ async fn process_begintx(
     sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
 ) -> scheduler_api::Message {
     if conn_state.current_txvn().is_some() {
+        warn!(
+            "Cannot begin new transaction because previous transaction not finished yet. {:?} {:?}",
+            msqlbegintx,
+            conn_state.current_txvn()
+        );
         scheduler_api::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
     } else {
         let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
@@ -262,10 +277,7 @@ async fn process_query(
     dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     if conn_state.current_txvn().is_none() {
-        error!(
-            "<- [{}] Does not support single un-transactioned query for now",
-            conn_state.client_meta().client_addr()
-        );
+        error!("Does not support single un-transactioned query for now. {:?}", msql);
         panic!("Does not support single un-transactioned query for now");
     }
 
@@ -293,6 +305,7 @@ async fn process_endtx(
 ) -> scheduler_api::Message {
     let txvn = conn_state.replace_txvn(None);
     if txvn.is_none() {
+        warn!("There is not transaction to end. {:?}", msql);
         scheduler_api::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
     } else {
         dispatcher_addr

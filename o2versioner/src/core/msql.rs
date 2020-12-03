@@ -393,7 +393,7 @@ impl TryFrom<MsqlText> for Msql {
 ///     }
 /// );
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum MsqlText {
     BeginTx {
