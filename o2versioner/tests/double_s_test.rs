@@ -8,12 +8,13 @@ use o2versioner::sequencer_main;
 use o2versioner::util::config::*;
 use o2versioner::util::tcp::*;
 use o2versioner::util::tests_helper;
-use tokio::net::TcpStream;
+use rand::Rng;
+use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio::time::{sleep, Duration};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::debug;
+use tracing::{debug, info};
 
 #[tokio::test]
 async fn test_double_s() {
@@ -82,7 +83,8 @@ async fn run_double_s() {
     let _guard = tests_helper::init_logger();
 
     let scheduler_addr = "127.0.0.1:56728";
-    let dbproxy_addr = "127.0.0.1:32223";
+    let dbproxy0_addr = "127.0.0.1:32223";
+    let dbproxy1_addr = "127.0.0.1:32224";
     let conf = Config {
         scheduler: SchedulerConfig {
             addr: String::from(scheduler_addr),
@@ -97,17 +99,63 @@ async fn run_double_s() {
             admin_addr: None,
             max_connection: None,
         },
-        dbproxy: vec![DbProxyConfig {
-            addr: String::from(dbproxy_addr),
-            sql_addr: String::from("THIS IS NOT NEEDED"),
-        }],
+        dbproxy: vec![
+            DbProxyConfig {
+                addr: String::from(dbproxy0_addr),
+                sql_addr: String::from("THIS IS NOT NEEDED"),
+            },
+            DbProxyConfig {
+                addr: String::from(dbproxy1_addr),
+                sql_addr: String::from("THIS IS NOT NEEDED"),
+            },
+        ],
     };
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy_handle = tokio::spawn(start_tcplistener(
-        dbproxy_addr,
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, "Mock dbproxy 0"));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, "Mock dbproxy 1"));
+
+    sleep(Duration::from_millis(300)).await;
+
+    // let tester_handle_0 = tokio::spawn(async move {
+    //     let msgs = vec![
+    //         Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
+    //         Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
+    //         Message::RequestMsqlText(MsqlText::query("update w1 set name=\"ray\" where id = 20;", "write w1")),
+    //         Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
+    //         Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 22;", "write w2")),
+    //         Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+    //     ];
+
+    //     let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+    //     tests_helper::mock_json_client(&mut tcp_stream, msgs, "Client Tester 0").await;
+
+    //     println!("tester_handle_0 DONE");
+    // });
+
+    // Must run, otherwise it won't do the work
+    tokio::try_join!(
+        scheduler_handle,
+        sequencer_handle,
+        dbproxy0_handle,
+        dbproxy1_handle,
+        //tester_handle_0
+    )
+    .unwrap();
+}
+
+pub async fn mock_dbproxy<A, S>(addr: A, server_name: S)
+where
+    A: ToSocketAddrs,
+    S: Into<String>,
+{
+    let server_name = server_name.into();
+    let server_name_clone = server_name.clone();
+    start_tcplistener(
+        addr,
         move |mut tcp_stream| {
+            let server_name = server_name_clone.clone();
             async move {
                 let _peer_addr = tcp_stream.peer_addr().unwrap();
                 let (tcp_read, tcp_write) = tcp_stream.split();
@@ -128,17 +176,28 @@ async fn run_double_s() {
 
                 // Process a stream of incoming messages from a single tcp connection
                 serded_read
-                    .and_then(move |msg| async move {
-                        debug!("dbproxy mock receives {:?}", msg);
-                        match msg {
-                            scheduler_dbproxy::Message::MsqlRequest(_client, msql, _txvn) => {
-                                Ok(scheduler_dbproxy::Message::MsqlResponse(match msql {
-                                    Msql::BeginTx(_) => MsqlResponse::begintx_err("Dbproxy does not handle BeginTx"),
-                                    Msql::Query(_) => MsqlResponse::query_ok("QUERY GOOD"),
-                                    Msql::EndTx(_) => MsqlResponse::endtx_ok("ENDTX GOOD"),
-                                }))
+                    .and_then(move |msg| {
+                        let server_name = server_name.clone();
+                        async move {
+                            debug!("{} receives {:?}", server_name, msg);
+
+                            // Simulate some load
+                            let sleep_time = rand::rngs::OsRng::default().gen_range(20, 400);
+                            info!("{} works for {} ms", server_name, sleep_time);
+                            sleep(Duration::from_millis(sleep_time)).await;
+
+                            match msg {
+                                scheduler_dbproxy::Message::MsqlRequest(_client, msql, _txvn) => {
+                                    Ok(scheduler_dbproxy::Message::MsqlResponse(match msql {
+                                        Msql::BeginTx(_) => {
+                                            MsqlResponse::begintx_err("Dbproxy does not handle BeginTx")
+                                        }
+                                        Msql::Query(_) => MsqlResponse::query_ok("QUERY GOOD"),
+                                        Msql::EndTx(_) => MsqlResponse::endtx_ok("ENDTX GOOD"),
+                                    }))
+                                }
+                                _ => Ok(scheduler_dbproxy::Message::Invalid),
                             }
-                            _ => Ok(scheduler_dbproxy::Message::Invalid),
                         }
                     })
                     .inspect_ok(|m| debug!("dbproxy mock rpelies {:?}", m))
@@ -148,26 +207,8 @@ async fn run_double_s() {
             }
         },
         None,
-        "Mock dbproxy",
+        server_name,
         None,
-    ));
-
-    sleep(Duration::from_millis(300)).await;
-
-    // let tester_handle_0 = tokio::spawn(async move {
-    //     let msgs = vec![
-    //         Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-    //         Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
-    //         Message::RequestMsqlText(MsqlText::query("update w1 set name=\"ray\" where id = 20;", "write w1")),
-    //         Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
-    //         Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 22;", "write w2")),
-    //         Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    //     ];
-
-    //     let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-    //     tests_helper::mock_json_client(&mut tcp_stream, msgs, "Client Tester 0").await;
-    // });
-
-    // Must run, otherwise it won't do the work
-    tokio::try_join!(scheduler_handle, sequencer_handle, dbproxy_handle).unwrap();
+    )
+    .await;
 }
