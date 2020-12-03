@@ -1,9 +1,17 @@
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::net::SocketAddr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientMeta {
     client_addr: SocketAddr,
     cur_txid: usize,
+}
+
+impl fmt::Display for ClientMeta {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(client_addr={}, cur_txid={})", self.client_addr, self.cur_txid)
+    }
 }
 
 impl ClientMeta {

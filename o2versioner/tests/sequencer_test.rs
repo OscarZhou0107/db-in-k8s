@@ -24,10 +24,12 @@ async fn test_sequencer() {
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from("table0 read table1 read write table2 table3 read"))
                     .set_name(Some("tx0")),
             ),
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from(
                     "table0 read table1 read write table2 table3 read table 2",
                 ))
@@ -59,10 +61,12 @@ async fn test_sequencer() {
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from("table0 read table1 read write table2 table3 read"))
                     .set_name(Some("tx0")),
             ),
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from(
                     "table0 read table1 read write table2 table3 read table 2",
                 ))
@@ -117,10 +121,12 @@ async fn test_sequencer_with_admin() {
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from("table0 read table1 read write table2 table3 read"))
                     .set_name(Some("tx0")),
             ),
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from(
                     "table0 read table1 read write table2 table3 read table 2",
                 ))
@@ -153,10 +159,12 @@ async fn test_sequencer_with_admin() {
     let tester_handle_1 = tokio::spawn(async move {
         let msgs = vec![
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from("table0 read table1 read write table2 table3 read"))
                     .set_name(Some("tx0")),
             ),
             Message::RequestTxVN(
+                ClientMeta::new("127.0.0.1:8080".parse().unwrap()),
                 MsqlBeginTx::from(TableOps::from(
                     "table0 read table1 read write table2 table3 read table 2",
                 ))

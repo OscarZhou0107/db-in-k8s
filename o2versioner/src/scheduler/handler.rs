@@ -248,7 +248,7 @@ async fn process_begintx(
         scheduler_api::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
     } else {
         let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
-        let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
+        let msg = scheduler_sequencer::Message::RequestTxVN(conn_state.client_meta().clone(), msqlbegintx);
 
         tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg, "Scheduler handler")
             .map_err(|e| e.to_string())

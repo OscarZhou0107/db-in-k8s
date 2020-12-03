@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info, warn};
+use tracing::{debug, field, info, info_span, warn, Instrument, Span};
 
 /// Main entrance for Sequencer
 ///
@@ -92,19 +92,28 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
     serded_read
         .and_then(move |msg| {
             let state_cloned = state.clone();
-            async move {
+
+            let process_req = async move {
+                Span::current().record("req", &msg.as_ref());
                 match msg {
-                    scheduler_sequencer::Message::RequestTxVN(sqlbegintx) => {
-                        debug!("<- [{}] RequestTxVN on {:?}", peer_addr, sqlbegintx);
+                    scheduler_sequencer::Message::RequestTxVN(client_meta, sqlbegintx) => {
+                        Span::current().record("client_meta", &&client_meta.to_string()[..]);
+                        debug!("<- [{}] {:?}", peer_addr, sqlbegintx);
                         let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
-                        debug!("-> [{}] Reply {:?}", peer_addr, txvn);
+                        debug!("-> [{}] {:?}", peer_addr, txvn);
                         Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
                     }
                     other => {
-                        warn!("<- [{}] Unsupported message {:?}", peer_addr, other);
+                        warn!("<- [{}] Unsupported: {:?}", peer_addr, other);
                         Ok(scheduler_sequencer::Message::Invalid)
                     }
                 }
+            };
+
+            async {
+                process_req
+                    .instrument(info_span!("sequencer", req = field::Empty, client_meta = field::Empty,))
+                    .await
             }
         })
         .forward(serded_write)
