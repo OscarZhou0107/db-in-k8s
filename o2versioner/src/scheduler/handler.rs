@@ -29,6 +29,7 @@ use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument
 /// 3. Admin port, can send `kill`, `exit` or `quit` in raw bytes
 /// to the admin port, which will then force to not accept any new
 /// connections.
+#[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Config) {
     // The current task completes as soon as start_tcplistener finishes,
     // which happens when it reaches the max_conn_till_dropped if not None,
@@ -52,7 +53,7 @@ pub async fn main(conf: Config) {
     );
 
     // Launch dispatcher as a new task
-    let dispatcher_handle = tokio::spawn(dispatcher.run());
+    let dispatcher_handle = tokio::spawn(dispatcher.run().in_current_span());
 
     // Create a stop_signal channel if admin mode is turned on
     let (stop_tx, stop_rx) = if conf.scheduler.admin_addr.is_some() {
@@ -63,22 +64,25 @@ pub async fn main(conf: Config) {
     };
 
     // Launch main handler as a new task
-    let handler_handle = tokio::spawn(tcp::start_tcplistener(
-        conf.scheduler.to_addr(),
-        move |tcp_stream| {
-            let sequencer_socket_pool = sequencer_socket_pool.clone();
-            // Connection/session specific storage
-            // Note: this closure contains one copy of dispatcher_addr
-            // Then, for each connection, a new dispatcher_addr is cloned
-            let dispatcher_addr = Arc::new(dispatcher_addr.clone());
-            async move {
-                process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
-            }
-        },
-        conf.scheduler.max_connection,
-        "Scheduler",
-        stop_rx,
-    ));
+    let handler_handle = tokio::spawn(
+        tcp::start_tcplistener(
+            conf.scheduler.to_addr(),
+            move |tcp_stream| {
+                let sequencer_socket_pool = sequencer_socket_pool.clone();
+                // Connection/session specific storage
+                // Note: this closure contains one copy of dispatcher_addr
+                // Then, for each connection, a new dispatcher_addr is cloned
+                let dispatcher_addr = Arc::new(dispatcher_addr.clone());
+                async move {
+                    process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
+                }
+            },
+            conf.scheduler.max_connection,
+            "Scheduler",
+            stop_rx,
+        )
+        .instrument(info_span!("handler", message = %conf.scheduler.to_addr())),
+    );
 
     // Combine the dispatcher handle and main handler handle into a main_handle
     let main_handle = future::try_join(dispatcher_handle, handler_handle);
@@ -169,10 +173,10 @@ async fn process_connection(
         .map(|_| ())
         .await;
 
-    info!("[{}] <- [{}] connection disconnected", local_addr, client_addr);
+    info!("connection dropped");
 }
 
-#[instrument(name="handler", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(req=field::Empty, tx_id=field::Empty, req_type=field::Empty))]
+#[instrument(name="request", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(r=field::Empty, txid=field::Empty, cmd=field::Empty))]
 async fn process_request(
     msg: scheduler_api::Message,
     local_addr: SocketAddr,
@@ -182,7 +186,7 @@ async fn process_request(
 ) -> scheduler_api::Message {
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
-    Span::current().record("req", &msg.as_ref());
+    Span::current().record("r", &msg.as_ref());
 
     let response = match msg {
         scheduler_api::Message::RequestMsql(msql) => {
@@ -226,8 +230,8 @@ async fn process_msql(
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
-    Span::current().record("req_type", &msql.as_ref());
-    Span::current().record("tx_id", &conn_state.client_meta().current_txid());
+    Span::current().record("cmd", &msql.as_ref());
+    Span::current().record("txid", &conn_state.client_meta().current_txid());
 
     match msql {
         Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,

@@ -11,7 +11,7 @@ use tokio::sync::oneshot;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, warn, Instrument};
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -62,7 +62,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
                         );
 
                         // Spawn a new thread for each tcp connection
-                        spawned_tasks.push(tokio::spawn(connection_handler(tcp_stream)));
+                        spawned_tasks.push(tokio::spawn(connection_handler(tcp_stream).in_current_span()));
                     }
                     Err(e) => {
                         warn!(
