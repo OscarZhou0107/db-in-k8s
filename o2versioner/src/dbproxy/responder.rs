@@ -108,7 +108,7 @@ mod tests_test {
 
     fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>) {
         tokio::spawn(async move {
-            let addr = "127.0.0.1:2345";
+            let addr = "127.0.0.1:2346";
             let listener = TcpListener::bind(addr).await.unwrap();
             let (tcp_stream, _) = listener.accept().await.unwrap();
             let (_, tcp_write) = tcp_stream.into_split();
@@ -119,7 +119,7 @@ mod tests_test {
 
     fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>) {
         tokio::spawn(async move {
-            let addr = "127.0.0.1:2345";
+            let addr = "127.0.0.1:2346";
             let socket = TcpStream::connect(addr).await.unwrap();
             let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
             let mut deserialize = tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());

@@ -73,7 +73,7 @@ async fn test_dbproxy_end_to_end() {
 
     sleep(Duration::from_millis(1000)).await;
     
-    let tcp_stream = TcpStream::connect("127.0.0.1:2345").await.unwrap();
+    let tcp_stream = TcpStream::connect("127.0.0.1:2347").await.unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
     let mut deserializer = SymmetricallyFramed::new(
@@ -130,6 +130,6 @@ fn helper_spawn_proxy() {
         config.port(5432);
         config.dbname("Test");
 
-        dbproxy::main("127.0.0.1:2345", config).await;
+        dbproxy::main("127.0.0.1:2347", config).await;
     });
 }
