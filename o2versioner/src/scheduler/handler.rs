@@ -176,7 +176,7 @@ async fn process_connection(
     info!("connection dropped");
 }
 
-#[instrument(name="request", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(r=field::Empty, txid=field::Empty, cmd=field::Empty))]
+#[instrument(name="request", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, txid=field::Empty, cmd=field::Empty))]
 async fn process_request(
     msg: scheduler_api::Message,
     local_addr: SocketAddr,
@@ -186,7 +186,7 @@ async fn process_request(
 ) -> scheduler_api::Message {
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
-    Span::current().record("r", &msg.as_ref());
+    Span::current().record("message", &msg.as_ref());
 
     let response = match msg {
         scheduler_api::Message::RequestMsql(msql) => {

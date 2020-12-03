@@ -10,7 +10,7 @@ pub struct ClientMeta {
 
 impl fmt::Display for ClientMeta {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "(client={}, txid={})", self.client_addr, self.cur_txid)
+        write!(f, "(client={} txid={})", self.client_addr, self.cur_txid)
     }
 }
 

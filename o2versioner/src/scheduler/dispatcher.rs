@@ -52,13 +52,11 @@ impl State {
         }
     }
 
+    #[instrument(name="execute", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
     async fn execute(&self, request: Request) {
-        debug!(
-            "Scheduler dispatcher received from handler: {:?} {:?} {:?}",
-            request.client_meta.client_addr(),
-            request.command,
-            request.txvn
-        );
+        Span::current().record("message", &&request.client_meta.to_string()[..]);
+        Span::current().record("cmd", &request.command.as_ref());
+        debug!("{:?} {:?}", request.command, request.txvn);
 
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
@@ -79,18 +77,25 @@ impl State {
 
         let (is_endtx, op_str, dbproxy_addrs) = match &request.command {
             Msql::BeginTx(_) => panic!("Dispatcher does not support Msql::BeginTx command"),
-            Msql::Query(msqlquery) => match msqlquery.tableops().access_pattern() {
-                AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
-                AccessPattern::ReadOnly => (
-                    false,
-                    "query",
-                    vec![self.wait_on_version(msqlquery, &request.txvn).await],
-                ),
-                AccessPattern::WriteOnly => (false, "query", self.dbproxy_manager.to_vec()),
-            },
-            Msql::EndTx(_) => (true, "endtx", self.dbproxy_manager.to_vec()),
+            Msql::Query(msqlquery) => {
+                Span::current().record("op", &&format!("{:?}", msqlquery.tableops().access_pattern())[..]);
+                match msqlquery.tableops().access_pattern() {
+                    AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
+                    AccessPattern::ReadOnly => (
+                        false,
+                        "query",
+                        vec![self.wait_on_version(msqlquery, &request.txvn).await],
+                    ),
+                    AccessPattern::WriteOnly => (false, "query", self.dbproxy_manager.to_vec()),
+                }
+            }
+            Msql::EndTx(msqlendtx) => {
+                Span::current().record("op", &&format!("{:?}", msqlendtx.mode())[..]);
+                (true, "endtx", self.dbproxy_manager.to_vec())
+            }
         };
 
+        let num_dbproxy = dbproxy_addrs.len();
         let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
 
         let Request {
@@ -109,7 +114,8 @@ impl State {
                 let msg_cloned = msg.clone();
                 let txvn_cloned = txvn.clone();
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
-                async move {
+                let process = async move {
+                    Span::current().record("message", &&dbproxy_addr.to_string()[..]);
                     debug!(
                         "Scheduler dispatcher send {:?} to dbproxy {:?}",
                         msg_cloned, dbproxy_addr
@@ -168,8 +174,15 @@ impl State {
                             dbproxy_addr, op_str, msqlresponse
                         );
                     }
+                };
+
+                async {
+                    process
+                        .instrument(info_span!("<->dbproxy", message = field::Empty))
+                        .await
                 }
             })
+            .instrument(info_span!("dbproxies", message = num_dbproxy))
             .await;
     }
 
