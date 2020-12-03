@@ -64,22 +64,25 @@ pub async fn main(conf: Config) {
     };
 
     // Launch main handler as a new task
-    let handler_handle = tokio::spawn(tcp::start_tcplistener(
-        conf.scheduler.to_addr(),
-        move |tcp_stream| {
-            let sequencer_socket_pool = sequencer_socket_pool.clone();
-            // Connection/session specific storage
-            // Note: this closure contains one copy of dispatcher_addr
-            // Then, for each connection, a new dispatcher_addr is cloned
-            let dispatcher_addr = Arc::new(dispatcher_addr.clone());
-            async move {
-                process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
-            }
-        },
-        conf.scheduler.max_connection,
-        "Scheduler",
-        stop_rx,
-    ));
+    let handler_handle = tokio::spawn(
+        tcp::start_tcplistener(
+            conf.scheduler.to_addr(),
+            move |tcp_stream| {
+                let sequencer_socket_pool = sequencer_socket_pool.clone();
+                // Connection/session specific storage
+                // Note: this closure contains one copy of dispatcher_addr
+                // Then, for each connection, a new dispatcher_addr is cloned
+                let dispatcher_addr = Arc::new(dispatcher_addr.clone());
+                async move {
+                    process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
+                }
+            },
+            conf.scheduler.max_connection,
+            "Scheduler",
+            stop_rx,
+        )
+        .in_current_span(),
+    );
 
     // Combine the dispatcher handle and main handler handle into a main_handle
     let main_handle = future::try_join(dispatcher_handle, handler_handle);
@@ -110,7 +113,7 @@ pub async fn main(conf: Config) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-#[instrument(name="client", skip(socket, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
+#[instrument(name="conn", skip(socket, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
 async fn process_connection(
     mut socket: TcpStream,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,

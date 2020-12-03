@@ -14,7 +14,7 @@ use tokio::time::{sleep, Duration};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info};
+use tracing::{debug, info, info_span, instrument, Instrument};
 
 #[tokio::test]
 async fn test_double_s() {
@@ -55,7 +55,9 @@ async fn test_double_s() {
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2").await;
+        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2")
+            .instrument(info_span!("tester0"))
+            .await;
     });
 
     let tester_handle_1 = tokio::spawn(async move {
@@ -69,7 +71,9 @@ async fn test_double_s() {
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await;
+        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1")
+            .instrument(info_span!("tester1"))
+            .await;
     });
 
     // Must run, otherwise it won't do the work
@@ -129,7 +133,9 @@ async fn run_double_s() {
     //     ];
 
     //     let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-    //     tests_helper::mock_json_client(&mut tcp_stream, msgs, "Client Tester 0").await;
+    //     tests_helper::mock_json_client(&mut tcp_stream, msgs, "Client Tester 0")
+    //         .instrument(info_span!("tester0"))
+    //         .await;
 
     //     println!("tester_handle_0 DONE");
     // });
@@ -140,11 +146,12 @@ async fn run_double_s() {
         sequencer_handle,
         dbproxy0_handle,
         dbproxy1_handle,
-        //tester_handle_0
+        // tester_handle_0
     )
     .unwrap();
 }
 
+#[instrument(name="dbproxy(mock)" skip(addr, server_name))]
 pub async fn mock_dbproxy<A, S>(addr: A, server_name: S)
 where
     A: ToSocketAddrs,

@@ -20,7 +20,7 @@ use tracing::{debug, field, info, instrument, warn, Instrument, Span};
 /// 2. `connection_handler` is a `FnMut` closure takes in `TcpStream` and returns `Future<Output=()>`
 /// 3. `max_connection` can be specified to limit the max number of connections allowed. Server will shutdown immediately once `max_connection` connections are all dropped.
 /// 4. `server_name` is a name to be used for output
-#[instrument(name="listener", skip(addr, connection_handler, max_connection, server_name, stop_rx), fields(message=field::Empty))]
+#[instrument(name="listen", skip(addr, connection_handler, max_connection, server_name, stop_rx), fields(message=field::Empty))]
 pub async fn start_tcplistener<A, C, Fut, S>(
     addr: A,
     mut connection_handler: C,
@@ -120,7 +120,7 @@ where
 /// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
 /// 2. `msgs: Msgs` must be an owned collection that contains owned data types.
 /// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
-#[instrument(name="sender", skip(tcp_stream, msgs, client_name), fields(message=field::Empty, to=field::Empty))]
+#[instrument(name="chat", skip(tcp_stream, msgs, client_name), fields(message=field::Empty, to=field::Empty))]
 pub async fn send_and_receive_as_json<Msgs, S>(
     tcp_stream: &mut TcpStream,
     msgs: Msgs,

@@ -11,7 +11,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, info_span, warn, Instrument, Span};
+use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Main entrance for Sequencer
 ///
@@ -22,6 +22,7 @@ use tracing::{debug, field, info, info_span, warn, Instrument, Span};
 /// 3. Admin port, can send `kill`, `exit` or `quit` in raw bytes
 /// to the admin port, which will then force to not accept any new
 /// connections.
+#[instrument(name = "sequencer", skip(conf))]
 pub async fn main(conf: SequencerConfig) {
     let state = Arc::new(Mutex::new(State::new()));
 
@@ -33,16 +34,19 @@ pub async fn main(conf: SequencerConfig) {
         (None, None)
     };
 
-    let handler_handle = tokio::spawn(tcp::start_tcplistener(
-        conf.to_addr(),
-        move |tcp_stream| {
-            let state_cloned = state.clone();
-            process_connection(tcp_stream, state_cloned)
-        },
-        conf.max_connection,
-        "Sequencer",
-        stop_rx,
-    ));
+    let handler_handle = tokio::spawn(
+        tcp::start_tcplistener(
+            conf.to_addr(),
+            move |tcp_stream| {
+                let state_cloned = state.clone();
+                process_connection(tcp_stream, state_cloned)
+            },
+            conf.max_connection,
+            "Sequencer",
+            stop_rx,
+        )
+        .in_current_span(),
+    );
 
     // Allow sequencer to be terminated by admin
     if let Some(admin_addr) = &conf.admin_addr {
@@ -94,10 +98,10 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
             let state_cloned = state.clone();
 
             let process_req = async move {
-                Span::current().record("req", &msg.as_ref());
+                Span::current().record("message", &msg.as_ref());
                 match msg {
                     scheduler_sequencer::Message::RequestTxVN(client_meta, sqlbegintx) => {
-                        Span::current().record("client_meta", &&client_meta.to_string()[..]);
+                        Span::current().record("client", &&client_meta.to_string()[..]);
                         debug!("<- [{}] {:?}", peer_addr, sqlbegintx);
                         let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
                         debug!("-> [{}] {:?}", peer_addr, txvn);
@@ -112,7 +116,7 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
 
             async {
                 process_req
-                    .instrument(info_span!("sequencer", req = field::Empty, client_meta = field::Empty))
+                    .instrument(info_span!("request", message = field::Empty, client = field::Empty))
                     .await
             }
         })
