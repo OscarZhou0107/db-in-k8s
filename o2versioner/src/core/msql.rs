@@ -259,7 +259,7 @@ impl MsqlEndTx {
 /// The main user interface for Msql.
 ///
 /// `Msql` can be constructed directly, or converted from `MsqlText`
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, strum::AsRefStr, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Msql {
     BeginTx(MsqlBeginTx),
     Query(MsqlQuery),
