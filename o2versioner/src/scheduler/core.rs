@@ -10,16 +10,30 @@ use tracing::warn;
 
 #[derive(Debug)]
 pub struct ConnectionState {
+    client_addr: SocketAddr,
+    cur_txid: usize,
     cur_txvn: Option<TxVN>,
 }
 
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self { cur_txvn: None }
+impl ConnectionState {
+    pub fn new(client_addr: SocketAddr) -> Self {
+        Self {
+            client_addr,
+            cur_txid: 0,
+            cur_txvn: None,
+        }
     }
 }
 
 impl ConnectionState {
+    pub fn client_addr(&self) -> SocketAddr {
+        self.client_addr
+    }
+
+    pub fn current_txid(&self) -> usize {
+        self.cur_txid
+    }
+
     pub fn current_txvn(&self) -> &Option<TxVN> {
         &self.cur_txvn
     }
@@ -28,6 +42,10 @@ impl ConnectionState {
         let old_txvn = self.cur_txvn.take();
         self.cur_txvn = new_txvn;
         old_txvn
+    }
+
+    pub fn transaction_finished(&mut self) {
+        self.cur_txid += 1;
     }
 }
 
@@ -133,12 +151,20 @@ mod tests_connection_state {
 
     #[test]
     fn test_replace_txvn() {
-        let mut conn_state = ConnectionState::default();
+        let mut conn_state = ConnectionState::new("127.0.0.1:6666".parse().unwrap());
         assert_eq!(*conn_state.current_txvn(), None);
         assert_eq!(conn_state.replace_txvn(Some(TxVN::default())), None);
         assert_eq!(*conn_state.current_txvn(), Some(TxVN::default()));
         assert_eq!(conn_state.replace_txvn(None), Some(TxVN::default()));
         assert_eq!(*conn_state.current_txvn(), None);
+    }
+
+    #[test]
+    fn test_transaction_finished() {
+        let mut conn_state = ConnectionState::new("127.0.0.1:6666".parse().unwrap());
+        assert_eq!(0, conn_state.current_txid());
+        conn_state.transaction_finished();
+        assert_eq!(1, conn_state.current_txid());
     }
 }
 
