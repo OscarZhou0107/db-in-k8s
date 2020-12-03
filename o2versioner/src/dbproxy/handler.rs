@@ -1,4 +1,4 @@
-use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage};
+use super::core::{DbVersion, PendingQueue, QueryResult};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;

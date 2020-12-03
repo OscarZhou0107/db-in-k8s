@@ -1,14 +1,14 @@
 use super::core::{
-    DbVersion, PendingQueue, PostgreToCsvWriter, PostgresSqlConnPool, QueryResult, QueryResultType, QueueMessage, Task,
+    DbVersion, PendingQueue, QueryResult, QueueMessage, Task,
 };
-use crate::core::{TxTableVN, TxVN};
+
 use std::collections::HashMap;
 use std::sync::Arc;
 //use mysql_async::Pool;
 use std::net::SocketAddr;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use tokio::{stream, sync::mpsc};
+use tokio::sync::mpsc;
 
 use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
 use mpsc::*;
@@ -216,7 +216,7 @@ mod tests_dispatcher {
         //Only one unique transaction
         assert!(transactions_2.lock().await.len() == 1);
     }
-    
+
     fn helper_spawn_dispatcher(pending_queue : Arc<Mutex<PendingQueue>>, sender : mpsc::Sender<QueryResult>, version : Arc<Mutex<DbVersion>>, transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>){
        
         let mut config = tokio_postgres::Config::new();

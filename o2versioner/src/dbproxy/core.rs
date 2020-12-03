@@ -1,9 +1,8 @@
-use crate::comm::scheduler_dbproxy::Message;
 use crate::comm::MsqlResponse;
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RWOperation, TxTableVN, TxVN};
+use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxTableVN, TxVN};
 use async_trait::async_trait;
 use bb8_postgres::{
-    bb8::{ManageConnection, Pool, PooledConnection},
+    bb8::{Pool, PooledConnection},
     PostgresConnectionManager,
 };
 use csv::Writer;
@@ -14,7 +13,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use tokio_postgres::{Client, Error, Config, Connection, NoTls, SimpleQueryMessage, Socket, tls::NoTlsStream};
+use tokio_postgres::{Config, NoTls, SimpleQueryMessage};
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -84,7 +83,7 @@ impl QueueMessage {
                 result = writer.to_csv(message);
                 succeed = true;
             }
-            Err(err) => {
+            Err(_) => {
                 result = "There was an error".to_string();
                 succeed = false;
             }
@@ -264,7 +263,7 @@ impl PostgreToCsvWriter {
         Self { mode: mode, wrt: wrt }
     }
 
-    pub fn to_csv(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
+    pub fn to_csv(self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
         match self.mode {
             Task::BEGIN => return "".to_string(),
             Task::READ => return self.convert_result_to_csv_string(message),

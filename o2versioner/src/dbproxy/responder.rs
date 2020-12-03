@@ -1,6 +1,5 @@
 use super::core::{DbVersion, QueryResult, QueryResultType};
 use crate::comm::scheduler_dbproxy::Message;
-use crate::comm::MsqlResponse;
 use futures::SinkExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;

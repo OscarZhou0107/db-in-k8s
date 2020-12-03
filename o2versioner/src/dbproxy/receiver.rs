@@ -1,6 +1,5 @@
-use super::core::{PendingQueue, QueueMessage, Task};
+use super::core::{PendingQueue, QueueMessage};
 use crate::comm::scheduler_dbproxy::Message;
-use crate::core::{Msql, MsqlEndTxMode};
 use std::sync::Arc;
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::stream::StreamExt;
