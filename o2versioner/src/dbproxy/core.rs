@@ -437,7 +437,7 @@ pub enum Task {
 #[test]
 #[ignore]
 fn postgres_write_test() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.block_on(async move {
         let mut config = tokio_postgres::Config::new();
@@ -482,7 +482,7 @@ fn postgres_write_test() {
 #[test]
 #[ignore]
 fn postgres_read_test() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.block_on(async move {
         let mut config = tokio_postgres::Config::new();
@@ -520,11 +520,5 @@ fn postgres_read_test() {
 
         println!("Converted string is: {}", csv);
     });
-
-#[test]
-fn convert_message_to_queuemessage_test(){
-    //QueueMessage::new(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080))
-}
 }
 
-//}

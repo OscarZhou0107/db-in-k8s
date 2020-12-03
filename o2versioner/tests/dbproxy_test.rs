@@ -114,7 +114,7 @@ async fn test_dbproxy_end_to_end() {
 #[ignore]
 async fn test_dbproxy_end_to_end_2() {
     let details = "127.0.0.1:2348";
-    let addr : SocketAddr = details.parse().expect("Unable to parse socket address");;
+    let addr : SocketAddr = details.parse().expect("Unable to parse socket address");
     helper_spawn_proxy(addr.clone());
 
     let mut messages = Vec::new();

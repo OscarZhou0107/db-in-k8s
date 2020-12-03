@@ -205,7 +205,7 @@ mod tests_dispatcher {
         helper_mock_client(pending_queue_2, mock_ops).await;
 
         let mut task_num: u64 = 0;
-        while let Some(q) = responder_receiver.recv().await {
+        while let Some(_) = responder_receiver.recv().await {
             task_num += 1;
             //println!("{}", q.result);
             if task_num == 4 {
