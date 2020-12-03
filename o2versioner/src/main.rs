@@ -7,6 +7,7 @@ use tracing::info;
 pub fn init_logger() {
     let collector = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
+        .with_target(false)
         .without_time()
         .finish();
     tracing::subscriber::set_global_default(collector).unwrap();
