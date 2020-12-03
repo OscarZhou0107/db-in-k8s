@@ -22,7 +22,15 @@ async fn main() {
     info!("{:?}", conf);
 
     if matches.is_present("dbproxy") {
-        dbproxy::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await
+
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
+
+        dbproxy::main("127.0.0.1:2345", config).await
     } else if matches.is_present("scheduler") {
         scheduler_main(conf).await
     } else if matches.is_present("sequencer") {

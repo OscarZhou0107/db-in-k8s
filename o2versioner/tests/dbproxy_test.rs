@@ -1,80 +1,135 @@
-// use futures::prelude::*;
-// use o2versioner::core::RWOperation;
-// use o2versioner::dbproxy;
-// use o2versioner::dbproxy::core::{Operation, Task};
-// use o2versioner::{comm::scheduler_dbproxy::Message, core::transaction_version::TxTableVN};
-// use std::sync::Arc;
-// use tokio::net::TcpStream;
-// use tokio::sync::Mutex;
-// use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
-// use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use o2versioner::core::*;
+use futures::prelude::*;
+use o2versioner::{core::MsqlQuery, dbproxy};
+use o2versioner::{comm::scheduler_dbproxy::Message};
+use o2versioner::{
+    comm::MsqlResponse,
+    core::{Msql, MsqlBeginTx, RWOperation, TableOps},
+};
+use std::{time::Duration, net::IpAddr, net::Ipv4Addr, net::SocketAddr};
+use tokio::{net::{tcp::OwnedWriteHalf, TcpStream}, time::sleep};
+use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-// #[tokio::test]
-// #[ignore]
-// async fn test_dbproxy_end_to_end() {
-//     tokio::spawn(async {
-//         dbproxy::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await;
-//     });
+#[tokio::test]
+#[ignore]
+async fn test_dbproxy_end_to_end() {
+    helper_spawn_proxy();
 
-//     let result = Arc::new(Mutex::new(Vec::new()));
-//     let result_2 = Arc::clone(&result);
+    let mut messages = Vec::new();
+    let _mock_table_vs = vec![
+        TxTableVN {
+            table: "table1".to_string(),
+            vn: 0,
+            op: RWOperation::R,
+        },
+        TxTableVN {
+            table: "table2".to_string(),
+            vn: 0,
+            op: RWOperation::R,
+        },
+    ];
+    let item = Message::MsqlRequest(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)), 8080),
+        Msql::BeginTx(
+            MsqlBeginTx::default()
+                .set_name(Some("tx3"))
+                .set_tableops(TableOps::from("READ WRIte")),
+        ),
+        None,
+    );
+    messages.push(item);
 
-//     tokio::spawn(async {
-//         let tcp_stream = TcpStream::connect("127.0.0.1:2345").await.unwrap();
-//         let (tcp_read, tcp_write) = tcp_stream.into_split();
+    let item = Message::MsqlRequest(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        Msql::Query(
+            MsqlQuery::new("SELECT name, age, designation, salary FROM public.tbltest;".to_string(), TableOps::from("READ T1")).unwrap()
+        ),
+        None
+    );
+    messages.push(item);
 
-//         let mut deserializer = SymmetricallyFramed::new(
-//             FramedRead::new(tcp_read, LengthDelimitedCodec::new()),
-//             SymmetricalJson::<Message>::default(),
-//         );
+    let item = Message::MsqlRequest(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        Msql::BeginTx(
+            MsqlBeginTx::default()
+                .set_name(Some("tx2"))
+                .set_tableops(TableOps::from("READ WRIte")),
+        ),
+        None,
+    );
+    messages.push(item);
 
-//         let mut serializer = SymmetricallyFramed::new(
-//             FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
-//             SymmetricalJson::<Message>::default(),
-//         );
+    let item = Message::MsqlRequest(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        Msql::BeginTx(
+            MsqlBeginTx::default()
+                .set_name(Some("tx1"))
+                .set_tableops(TableOps::from("READ WRIte")),
+        ),
+        None,
+    );
+    messages.push(item);
 
-//         tokio::spawn(async move {
-//             let mock_table_vs = vec![
-//                 TxTableVN {
-//                     table: "table1".to_string(),
-//                     vn: 0,
-//                     op: RWOperation::R,
-//                 },
-//                 TxTableVN {
-//                     table: "table2".to_string(),
-//                     vn: 0,
-//                     op: RWOperation::R,
-//                 },
-//             ];
-//             let item = Message::SqlRequest(Operation {
-//                 transaction_id: "t1".to_string(),
-//                 txtablevns: mock_table_vs.clone(),
-//                 task: Task::READ,
-//             });
-//             //Action
-//             serializer.send(item).await.unwrap();
-//         });
+    sleep(Duration::from_millis(1000)).await;
+    
+    let tcp_stream = TcpStream::connect("127.0.0.1:2345").await.unwrap();
+    let (tcp_read, tcp_write) = tcp_stream.into_split();
 
-//         tokio::spawn(async move {
-//             while let Some(msg) = deserializer.try_next().await.unwrap() {
-//                 match msg {
-//                     Message::SqlResponse(op) => {
-//                         println!("{}", op.result);
-//                         result.lock().await.push(op);
-//                     }
-//                     _other => {
-//                         println!("nope");
-//                     }
-//                 }
-//             }
-//         });
-//     });
+    let mut deserializer = SymmetricallyFramed::new(
+        FramedRead::new(tcp_read, LengthDelimitedCodec::new()),
+        SymmetricalJson::<Message>::default(),
+    );
 
-//     loop {
-//         if result_2.lock().await.len() == 1 {
-//             break;
-//         }
-//     }
 
-//     assert!(true);
-// }
+    helper_spawn_client_sender(tcp_write, messages);
+
+    let mut begin_count:u32 = 0;
+    let mut query_count:u32 = 0;
+    let mut end_count:u32 = 0;
+
+        while let Some(msg) = deserializer.try_next().await.unwrap() {
+            match msg {
+                Message::MsqlResponse(res) => match res {
+                    MsqlResponse::BeginTx(_b) => {begin_count += 1;}
+                    MsqlResponse::Query(_q) => {query_count += 1;}
+                    MsqlResponse::EndTx(_e) => {end_count += 1;}
+                },
+                _other => {
+                    println!("nope");
+                }
+            }
+
+            if begin_count == 3 && query_count == 1 && end_count == 0 {
+                break;
+            }
+        }
+
+    assert!(true);
+}
+
+fn helper_spawn_client_sender(tcp_write: OwnedWriteHalf, mut messages: Vec<Message>) {
+    tokio::spawn(async move {
+        let mut serializer = SymmetricallyFramed::new(
+            FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
+            SymmetricalJson::<Message>::default(),
+        );
+
+        while !messages.is_empty() {
+            serializer.send(messages.pop().unwrap()).await.unwrap();
+        }
+    });
+}
+
+fn helper_spawn_proxy() {
+    tokio::spawn(async {
+        let mut config = tokio_postgres::Config::new();
+        config.user("postgres");
+        config.password("Rayh8768");
+        config.host("localhost");
+        config.port(5432);
+        config.dbname("Test");
+
+        dbproxy::main("127.0.0.1:2345", config).await;
+    });
+}

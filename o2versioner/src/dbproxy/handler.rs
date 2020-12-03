@@ -7,8 +7,9 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use tokio_postgres::Config;
 
-pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
+pub async fn main<A: ToSocketAddrs>(addr: A, config: Config) {
     //=====================================Continue an ongoing transaction=======================================//
     //Map that holds all ongoing transactions
     let transactions = Arc::new(Mutex::new(HashMap::new()));
@@ -31,13 +32,6 @@ pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     let listener = TcpListener::bind(addr).await.unwrap();
     let (tcp_stream, _) = listener.accept().await.unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
-
-    let mut config = tokio_postgres::Config::new();
-    config.user("postgres");
-    config.password("Rayh8768");
-    config.host("localhost");
-    config.port(5432);
-    config.dbname("Test");
 
     Dispatcher::run(
         pending_queue,

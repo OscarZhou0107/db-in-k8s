@@ -494,6 +494,11 @@ fn postgres_read_test() {
 
         println!("Converted string is: {}", csv);
     });
+
+#[test]
+fn convert_message_to_queuemessage_test(){
+    //QueueMessage::new(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080))
+}
 }
 
 //}
