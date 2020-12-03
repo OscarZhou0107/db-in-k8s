@@ -184,7 +184,7 @@ async fn process_request(
 ) -> scheduler_api::Message {
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
-    Span::current().record("client", &&conn_state_guard.client_addr().to_string()[..]);
+    Span::current().record("client", &&conn_state_guard.client_meta().client_addr().to_string()[..]);
     Span::current().record("req", &msg.as_ref());
 
     let response = match msg {
@@ -200,20 +200,24 @@ async fn process_request(
             error!(
                 "[{}] <- [{}] Requested for a soft crash because of {}",
                 local_addr,
-                conn_state_guard.client_addr(),
+                conn_state_guard.client_meta().client_addr(),
                 reason
             );
             error!(
                 "[{}] -- [{}] Current connection state: {:?}",
                 local_addr,
-                conn_state_guard.client_addr(),
+                conn_state_guard.client_meta().client_addr(),
                 conn_state_guard
             );
             panic!("Received a soft crash request");
         }
         _ => scheduler_api::Message::InvalidRequest,
     };
-    debug!("-> [{}] Reply {:?}", conn_state_guard.client_addr(), response);
+    debug!(
+        "-> [{}] Reply {:?}",
+        conn_state_guard.client_meta().client_addr(),
+        response
+    );
 
     response
     // conn_state_guard should be dropped here
@@ -226,7 +230,7 @@ async fn process_msql(
     dispatcher_addr: Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     Span::current().record("req_type", &msql.as_ref());
-    Span::current().record("tx_id", &conn_state.current_txid());
+    Span::current().record("tx_id", &conn_state.client_meta().current_txid());
 
     match msql {
         Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
@@ -245,11 +249,7 @@ async fn process_begintx(
     } else {
         let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
         let msg = scheduler_sequencer::Message::RequestTxVN(msqlbegintx);
-        debug!(
-            "[{}] -> Request to Sequencer: {:?}",
-            sequencer_socket.local_addr().unwrap(),
-            msg
-        );
+
         tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg, "Scheduler handler")
             .map_err(|e| e.to_string())
             .and_then(|res| async {
@@ -266,6 +266,7 @@ async fn process_begintx(
                 |e| scheduler_api::Message::Reply(MsqlResponse::begintx_err(e)),
                 |_| scheduler_api::Message::Reply(MsqlResponse::begintx_ok()),
             )
+            .instrument(info_span!("<->sequencer"))
             .await
     }
 }
@@ -279,13 +280,17 @@ async fn process_query(
     if conn_state.current_txvn().is_none() {
         error!(
             "<- [{}] Does not support single un-transactioned query for now",
-            conn_state.client_addr()
+            conn_state.client_meta().client_addr()
         );
         panic!("Does not support single un-transactioned query for now");
     }
 
     dispatcher_addr
-        .request(conn_state.client_addr(), msql, conn_state.current_txvn().clone())
+        .request(
+            conn_state.client_meta().client_addr(),
+            msql,
+            conn_state.current_txvn().clone(),
+        )
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::query_err(e)),
             |res| {
@@ -307,14 +312,14 @@ async fn process_endtx(
         scheduler_api::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
     } else {
         dispatcher_addr
-            .request(conn_state.client_addr(), msql, txvn)
+            .request(conn_state.client_meta().client_addr(), msql, txvn)
             .map_ok_or_else(
                 |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
                 |res| {
                     let DispatcherReply { msql_res, txvn_res } = res;
                     let existing = conn_state.replace_txvn(txvn_res);
                     assert!(existing.is_none());
-                    conn_state.transaction_finished();
+                    conn_state.client_meta_as_mut().transaction_finished();
                     scheduler_api::Message::Reply(msql_res)
                 },
             )
