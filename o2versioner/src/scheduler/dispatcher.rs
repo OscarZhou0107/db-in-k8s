@@ -161,11 +161,7 @@ impl State {
                     }
                 };
 
-                async {
-                    process
-                        .instrument(info_span!("<->dbproxy", message = field::Empty))
-                        .await
-                }
+                process.instrument(info_span!("<->dbproxy", message = field::Empty))
             })
             .instrument(info_span!("dbproxies", message = num_dbproxy))
             .await;

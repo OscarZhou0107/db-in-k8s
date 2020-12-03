@@ -3,7 +3,7 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, ToSocketAddrs};
-use tracing::{info, warn};
+use tracing::{field, info, info_span, instrument, warn, Instrument, Span};
 use unicase::UniCase;
 
 /// Helper function to bind to a `TcpListener` as an admin port and forward all incomming `TcpStream` to `connection_handler`.
@@ -14,6 +14,7 @@ use unicase::UniCase;
 /// with `String` represents the reply response, and `bool` denotes whether to continue the `TcpListener`.
 /// 3. The returned `String` should not have any newline characters
 /// 4. `server_name` is name to be used for output
+#[instrument(name="listen", skip(addr, admin_command_handler, server_name), fields(message=field::Empty))]
 pub async fn start_admin_tcplistener<A, C, Fut, S>(addr: A, mut admin_command_handler: C, server_name: S)
 where
     A: ToSocketAddrs,
@@ -24,6 +25,7 @@ where
     let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
+    Span::current().record("message", &&local_addr.to_string()[..]);
     let server_name = format!("{} Admin", server_name.into());
     info!("[{}] {} successfully binded ", local_addr, server_name);
 
@@ -40,7 +42,10 @@ where
                 let mut line_reader = BufReader::new(tcp_read).lines();
                 while let Ok(line) = line_reader.try_next().await {
                     if let Some(line) = line {
-                        let (mut res, should_continue) = admin_command_handler(line.trim().to_owned()).await;
+                        let line = line.trim().to_owned();
+                        let (mut res, should_continue) = admin_command_handler(line.clone())
+                            .instrument(info_span!("request", message = &&line[..]))
+                            .await;
                         assert!(
                             !res.contains("\n"),
                             "admin_command_handler reply message should not contain any newline characters"

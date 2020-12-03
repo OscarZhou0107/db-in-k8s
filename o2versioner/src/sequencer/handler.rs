@@ -51,9 +51,16 @@ pub async fn main(conf: SequencerConfig) {
     // Allow sequencer to be terminated by admin
     if let Some(admin_addr) = &conf.admin_addr {
         let admin_addr = admin_addr.clone();
-        let admin_handle = tokio::spawn(async move {
-            start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Sequencer").await;
-            stop_tx.unwrap().send(()).unwrap();
+        let admin_handle = tokio::spawn({
+            let admin = async move {
+                start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Sequencer").await;
+                stop_tx.unwrap().send(()).unwrap();
+            };
+
+            let admin = async {
+                admin.instrument(info_span!("admin")).await;
+            };
+            admin.in_current_span()
         });
 
         // handler_handle can either run to finish or be the result
@@ -114,11 +121,7 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
                 }
             };
 
-            async {
-                process_req
-                    .instrument(info_span!("request", message = field::Empty, client = field::Empty))
-                    .await
-            }
+            process_req.instrument(info_span!("request", message = field::Empty, client = field::Empty))
         })
         .forward(serded_write)
         .map(|_| ())

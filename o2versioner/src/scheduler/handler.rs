@@ -90,9 +90,15 @@ pub async fn main(conf: Config) {
     // Allow scheduler to be terminated by admin
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
         let admin_addr = admin_addr.clone();
-        let admin_handle = tokio::spawn(async move {
-            start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Scheduler").await;
-            stop_tx.unwrap().send(()).unwrap();
+        let admin_handle = tokio::spawn({
+            let admin = async move {
+                start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Scheduler").await;
+                stop_tx.unwrap().send(()).unwrap();
+            };
+            let admin = async {
+                admin.instrument(info_span!("admin")).await;
+            };
+            admin.in_current_span()
         });
 
         // main_handle can either run to finish or be the result
