@@ -64,25 +64,22 @@ pub async fn main(conf: Config) {
     };
 
     // Launch main handler as a new task
-    let handler_handle = tokio::spawn(
-        tcp::start_tcplistener(
-            conf.scheduler.to_addr(),
-            move |tcp_stream| {
-                let sequencer_socket_pool = sequencer_socket_pool.clone();
-                // Connection/session specific storage
-                // Note: this closure contains one copy of dispatcher_addr
-                // Then, for each connection, a new dispatcher_addr is cloned
-                let dispatcher_addr = Arc::new(dispatcher_addr.clone());
-                async move {
-                    process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
-                }
-            },
-            conf.scheduler.max_connection,
-            "Scheduler",
-            stop_rx,
-        )
-        .instrument(info_span!("handler", message = %conf.scheduler.to_addr())),
-    );
+    let handler_handle = tokio::spawn(tcp::start_tcplistener(
+        conf.scheduler.to_addr(),
+        move |tcp_stream| {
+            let sequencer_socket_pool = sequencer_socket_pool.clone();
+            // Connection/session specific storage
+            // Note: this closure contains one copy of dispatcher_addr
+            // Then, for each connection, a new dispatcher_addr is cloned
+            let dispatcher_addr = Arc::new(dispatcher_addr.clone());
+            async move {
+                process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
+            }
+        },
+        conf.scheduler.max_connection,
+        "Scheduler",
+        stop_rx,
+    ));
 
     // Combine the dispatcher handle and main handler handle into a main_handle
     let main_handle = future::try_join(dispatcher_handle, handler_handle);
@@ -173,7 +170,7 @@ async fn process_connection(
         .map(|_| ())
         .await;
 
-    info!("connection dropped");
+    info!("Connection dropped");
 }
 
 #[instrument(name="request", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, txid=field::Empty, cmd=field::Empty))]

@@ -11,7 +11,7 @@ use tokio::sync::oneshot;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info, warn, Instrument};
+use tracing::{debug, field, info, instrument, warn, Instrument, Span};
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -20,6 +20,7 @@ use tracing::{debug, info, warn, Instrument};
 /// 2. `connection_handler` is a `FnMut` closure takes in `TcpStream` and returns `Future<Output=()>`
 /// 3. `max_connection` can be specified to limit the max number of connections allowed. Server will shutdown immediately once `max_connection` connections are all dropped.
 /// 4. `server_name` is a name to be used for output
+#[instrument(name="listener", skip(addr, connection_handler, max_connection, server_name, stop_rx), fields(message=field::Empty))]
 pub async fn start_tcplistener<A, C, Fut, S>(
     addr: A,
     mut connection_handler: C,
@@ -36,7 +37,8 @@ pub async fn start_tcplistener<A, C, Fut, S>(
     let local_addr = listener.local_addr().unwrap();
 
     let server_name = server_name.into();
-    info!("[{}] {} successfully binded ", local_addr, server_name);
+    Span::current().record("message", &&local_addr.to_string()[..]);
+    info!("{} successfully binded", server_name);
 
     let mut cur_num_connection = 0;
     let mut spawned_tasks = Vec::new();
@@ -118,6 +120,7 @@ where
 /// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
 /// 2. `msgs: Msgs` must be an owned collection that contains owned data types.
 /// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
+#[instrument(name="sender", skip(tcp_stream, msgs, client_name), fields(message=field::Empty, to=field::Empty))]
 pub async fn send_and_receive_as_json<Msgs, S>(
     tcp_stream: &mut TcpStream,
     msgs: Msgs,
@@ -129,6 +132,10 @@ where
     S: Into<String>,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
+    let peer_addr = tcp_stream.peer_addr().unwrap();
+    Span::current().record("message", &&local_addr.to_string()[..]);
+    Span::current().record("to", &&peer_addr.to_string()[..]);
+
     let (tcp_read, tcp_write) = tcp_stream.split();
 
     // Delimit frames from bytes using a length header
