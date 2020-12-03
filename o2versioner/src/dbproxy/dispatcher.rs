@@ -216,10 +216,7 @@ mod tests_dispatcher {
         //Only one unique transaction
         assert!(transactions_2.lock().await.len() == 1);
     }
-    fn helper_spawn_worker(){
-
-    }
-
+    
     fn helper_spawn_dispatcher(pending_queue : Arc<Mutex<PendingQueue>>, sender : mpsc::Sender<QueryResult>, version : Arc<Mutex<DbVersion>>, transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>){
        
         let mut config = tokio_postgres::Config::new();

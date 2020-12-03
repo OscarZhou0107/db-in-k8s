@@ -48,7 +48,7 @@ mod tests_test {
     use crate::core::TxTableVN;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
-    use std::{collections::HashMap, sync::Arc};
+    use std::{collections::HashMap, sync::Arc, net::SocketAddr};
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
@@ -58,6 +58,9 @@ mod tests_test {
 
     #[tokio::test]
     async fn test_send_items_to_from_multiple_channel() {
+        let details = "127.0.0.1:2346";
+        let addr : SocketAddr = details.parse().expect("Unable to parse socket address");
+        
         //Prepare - Mock db related context
         let mut mock_db = HashMap::new();
         mock_db.insert("table1".to_string(), 0);
@@ -92,8 +95,8 @@ mod tests_test {
         };
 
         //Prepare - Responder
-        helper_spawn_responder(version.clone(), responder_receiver);
-        helper_spawn_mock_client(verifying_queue);
+        helper_spawn_responder(version.clone(), responder_receiver, addr.clone());
+        helper_spawn_mock_client(verifying_queue, addr);
 
         let worker_num: u32 = 5;
         //Action - Spwan worker thread to send response
@@ -106,9 +109,8 @@ mod tests_test {
         assert!(true);
     }
 
-    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>) {
+    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>, addr : SocketAddr) {
         tokio::spawn(async move {
-            let addr = "127.0.0.1:2346";
             let listener = TcpListener::bind(addr).await.unwrap();
             let (tcp_stream, _) = listener.accept().await.unwrap();
             let (_, tcp_write) = tcp_stream.into_split();
@@ -117,9 +119,8 @@ mod tests_test {
         });
     }
 
-    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>) {
+    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>, addr : SocketAddr) {
         tokio::spawn(async move {
-            let addr = "127.0.0.1:2346";
             let socket = TcpStream::connect(addr).await.unwrap();
             let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
             let mut deserialize = tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
