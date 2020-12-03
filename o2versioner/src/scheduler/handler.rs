@@ -288,7 +288,7 @@ async fn process_query(
 
     dispatcher_addr
         .request(
-            conn_state.client_meta().client_addr(),
+            conn_state.client_meta().clone(),
             msql,
             conn_state.current_txvn().clone(),
         )
@@ -313,7 +313,7 @@ async fn process_endtx(
         scheduler_api::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
     } else {
         dispatcher_addr
-            .request(conn_state.client_meta().client_addr(), msql, txvn)
+            .request(conn_state.client_meta().clone(), msql, txvn)
             .map_ok_or_else(
                 |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
                 |res| {

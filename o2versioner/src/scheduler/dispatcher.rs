@@ -28,7 +28,7 @@ impl DispatcherReply {
 
 /// Request sent from `DispatcherAddr` to `Dispatcher`
 struct Request {
-    client_addr: SocketAddr,
+    client_meta: ClientMeta,
     command: Msql,
     txvn: Option<TxVN>,
     /// A single use reply channel
@@ -55,7 +55,9 @@ impl State {
     async fn execute(&self, request: Request) {
         debug!(
             "Scheduler dispatcher received from handler: {:?} {:?} {:?}",
-            request.client_addr, request.command, request.txvn
+            request.client_meta.client_addr(),
+            request.command,
+            request.txvn
         );
 
         // Check whether there are no dbproxies in managers at all,
@@ -92,13 +94,13 @@ impl State {
         let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
 
         let Request {
-            client_addr,
+            client_meta,
             command,
             txvn,
             reply,
         } = request;
 
-        let msg = Message::MsqlRequest(client_addr, command, txvn.clone());
+        let msg = Message::MsqlRequest(client_meta.client_addr(), command, txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply));
 
         // Each communication with dbproxy is spawned as a separate task
@@ -301,7 +303,7 @@ impl DispatcherAddr {
     /// `Option<TxVN>` is to support single read query in the future
     pub async fn request(
         &self,
-        client_addr: SocketAddr,
+        client_meta: ClientMeta,
         command: Msql,
         txvn: Option<TxVN>,
     ) -> Result<DispatcherReply, String> {
@@ -310,7 +312,7 @@ impl DispatcherAddr {
 
         // Construct the request to sent
         let request = Request {
-            client_addr,
+            client_meta,
             command,
             txvn,
             reply: Some(tx),
@@ -318,7 +320,9 @@ impl DispatcherAddr {
 
         debug!(
             "Scheduler handler send to dispatcher: {:?} {:?} {:?}",
-            request.client_addr, request.command, request.txvn
+            request.client_meta.client_addr(),
+            request.command,
+            request.txvn
         );
 
         // Send the request
