@@ -106,8 +106,9 @@ impl Dispatcher {
                     }
 
                     let _ = sender
-                        .send(prepare_query_result(operation.operation_type, operation.versions, raw))
+                        .send(operation.into_sqlresponse(raw))
                         .await;
+
                     if finish {
                         break;
                     }
@@ -129,54 +130,6 @@ impl Dispatcher {
            _ = n1 => {}
            _ = n2 => {}
         };
-    }
-}
-
-fn prepare_query_result(
-    mode: Task,
-    transaction_version: Option<TxVN>,
-    raw: Result<Vec<tokio_postgres::SimpleQueryMessage>, tokio_postgres::error::Error>,
-) -> QueryResult {
-    let result;
-    let succeed;
-    let writer = PostgreToCsvWriter::new(mode.clone());
-    match raw {
-        Ok(message) => {
-            result = writer.to_csv(message);
-            succeed = true;
-        }
-        Err(err) => {
-            result = "There was an error".to_string();
-            succeed = false;
-        }
-    }
-
-    let result_type;
-    let mut contained_newer_versions = Vec::new();
-
-    match mode {
-        Task::BEGIN => {
-            result_type = QueryResultType::BEGIN;
-            match transaction_version {
-                Some(versions) => {
-                    contained_newer_versions = versions.txtablevns;
-                }
-                None => {}
-            }
-        }
-        Task::READ | Task::WRITE => {
-            result_type = QueryResultType::QUERY;
-        }
-        Task::COMMIT | Task::ABORT => {
-            result_type = QueryResultType::END;
-        }
-    };
-
-    QueryResult {
-        result: result,
-        result_type: result_type,
-        succeed: succeed,
-        contained_newer_versions: contained_newer_versions,
     }
 }
 

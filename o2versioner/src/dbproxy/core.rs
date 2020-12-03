@@ -6,7 +6,7 @@ use bb8_postgres::{
     bb8::{ManageConnection, Pool, PooledConnection},
     PostgresConnectionManager,
 };
-use csv::*;
+use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
+use tokio_postgres::{Client, Error, Config, Connection, NoTls, SimpleQueryMessage, Socket, tls::NoTlsStream};
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -72,6 +72,50 @@ impl QueueMessage {
             operation_type: operation_type,
             query: query_string,
             versions: versions,
+        }
+    }
+
+    pub fn into_sqlresponse(self, raw : Result<Vec<SimpleQueryMessage>, tokio_postgres::error::Error>) -> QueryResult {
+        let result;
+        let succeed;
+        let writer = PostgreToCsvWriter::new(self.operation_type.clone());
+        match raw {
+            Ok(message) => {
+                result = writer.to_csv(message);
+                succeed = true;
+            }
+            Err(err) => {
+                result = "There was an error".to_string();
+                succeed = false;
+            }
+        }
+
+        let result_type;
+        let mut contained_newer_versions = Vec::new();
+
+        match self.operation_type {
+            Task::BEGIN => {
+                result_type = QueryResultType::BEGIN;
+                match self.versions {
+                    Some(versions) => {
+                        contained_newer_versions = versions.txtablevns;
+                    }
+                    None => {}
+                }
+            }
+            Task::READ | Task::WRITE => {
+                result_type = QueryResultType::QUERY;
+            }
+            Task::COMMIT | Task::ABORT => {
+                result_type = QueryResultType::END;
+            }
+        };
+
+        QueryResult {
+            result: result,
+            result_type: result_type,
+            succeed: succeed,
+            contained_newer_versions: contained_newer_versions,
         }
     }
 }
@@ -320,23 +364,6 @@ pub enum Task {
     COMMIT,
 }
 
-fn test_helper_get_query_result_version_release() -> QueryResult {
-    QueryResult {
-        result: " ".to_string(),
-        result_type: QueryResultType::BEGIN,
-        succeed: true,
-        contained_newer_versions: Vec::new(),
-    }
-}
-
-fn test_helper_get_query_result_non_release() -> QueryResult {
-    QueryResult {
-        result: " ".to_string(),
-        result_type: QueryResultType::END,
-        succeed: true,
-        contained_newer_versions: Vec::new(),
-    }
-}
 //================================Test================================//
 
 // #[cfg(test)]
