@@ -78,7 +78,6 @@ pub async fn main(conf: Config) {
                 }
             },
             conf.scheduler.max_connection,
-            "Scheduler",
             stop_rx,
         )
         .in_current_span(),
@@ -92,11 +91,8 @@ pub async fn main(conf: Config) {
         let admin_addr = admin_addr.clone();
         let admin_handle = tokio::spawn({
             let admin = async move {
-                start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Scheduler").await;
+                start_admin_tcplistener(admin_addr, basic_admin_command_handler).await;
                 stop_tx.unwrap().send(()).unwrap();
-            };
-            let admin = async {
-                admin.instrument(info_span!("admin")).await;
             };
             admin.in_current_span()
         });
@@ -257,7 +253,7 @@ async fn process_begintx(
         let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
         let msg = scheduler_sequencer::Message::RequestTxVN(conn_state.client_meta().clone(), msqlbegintx);
 
-        tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg, "Scheduler handler")
+        tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg)
             .map_err(|e| e.to_string())
             .and_then(|res| async {
                 match res {

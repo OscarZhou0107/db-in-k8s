@@ -13,30 +13,24 @@ use unicase::UniCase;
 /// 2. `admin_command_handler` is a `FnMut` closure takes in `String` and returns `Future<Output = (String, bool)>`,
 /// with `String` represents the reply response, and `bool` denotes whether to continue the `TcpListener`.
 /// 3. The returned `String` should not have any newline characters
-/// 4. `server_name` is name to be used for output
-#[instrument(name="listen", skip(addr, admin_command_handler, server_name), fields(message=field::Empty))]
-pub async fn start_admin_tcplistener<A, C, Fut, S>(addr: A, mut admin_command_handler: C, server_name: S)
+#[instrument(name="admin:listen", skip(addr, admin_command_handler), fields(message=field::Empty))]
+pub async fn start_admin_tcplistener<A, C, Fut>(addr: A, mut admin_command_handler: C)
 where
     A: ToSocketAddrs,
     C: FnMut(String) -> Fut,
     Fut: Future<Output = (String, bool)> + Send + 'static,
-    S: Into<String>,
 {
     let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
     Span::current().record("message", &&local_addr.to_string()[..]);
-    let server_name = format!("{} Admin", server_name.into());
-    info!("[{}] {} successfully binded ", local_addr, server_name);
+    info!("Successfully binded");
 
     'outer: while let Some(tcp_stream) = listener.next().await {
         match tcp_stream {
             Ok(mut tcp_stream) => {
                 let peer_addr = tcp_stream.peer_addr().unwrap();
-                info!(
-                    "[{}] <- [{}] Admin incomming connection established",
-                    local_addr, peer_addr
-                );
+                info!("Admin incomming connection [{}] established", peer_addr);
 
                 let (tcp_read, mut tcp_write) = tcp_stream.split();
                 let mut line_reader = BufReader::new(tcp_read).lines();
@@ -72,18 +66,12 @@ where
                 }
             }
             Err(e) => {
-                warn!(
-                    "[{}] {} TcpListener cannot get client: {:?}",
-                    local_addr, server_name, e
-                );
+                warn!("Cannot get client: {:?}", e);
             }
         }
     }
 
-    warn!(
-        "[{}] {} TcpListener says service terminated, have a good night",
-        local_addr, server_name
-    );
+    warn!("Service terminated, have a good night");
 }
 
 /// A very basic admin command handler
@@ -112,10 +100,10 @@ mod tests_start_admin_tcplistener {
 
         let admin_addr = "127.0.0.1:27643";
 
-        let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, basic_admin_command_handler, "test"));
+        let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, basic_admin_command_handler));
         let client_handle = tokio::spawn(async move {
             let mut tcp_stream = TcpStream::connect(admin_addr).await.unwrap();
-            let res = mock_ascii_client(&mut tcp_stream, vec!["help", "exit"], "admin tcplistener tester").await;
+            let res = mock_ascii_client(&mut tcp_stream, vec!["help", "exit"]).await;
             info!("All responses received: {:?}", res);
         });
 

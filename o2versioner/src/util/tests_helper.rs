@@ -22,11 +22,10 @@ pub fn init_logger() -> DefaultGuard {
 }
 
 /// A mock echo server for testing
-#[instrument(name="echo(mock)" skip(addr, max_connection, server_name))]
-pub async fn mock_echo_server<A, S>(addr: A, max_connection: Option<u32>, server_name: S)
+#[instrument(name="echo(mock)" skip(addr, max_connection))]
+pub async fn mock_echo_server<A>(addr: A, max_connection: Option<u32>)
 where
     A: ToSocketAddrs,
-    S: Into<String>,
 {
     tcp::start_tcplistener(
         addr,
@@ -45,24 +44,18 @@ where
                 .await;
         },
         max_connection,
-        server_name,
         None,
     )
     .await;
 }
 
-#[instrument(name = "client(mock)", skip(tcp_stream, msgs, client_name))]
-pub async fn mock_json_client<Msgs, S>(
-    tcp_stream: &mut TcpStream,
-    msgs: Msgs,
-    client_name: S,
-) -> Vec<std::io::Result<Msgs::Item>>
+#[instrument(name = "client(mock)", skip(tcp_stream, msgs))]
+pub async fn mock_json_client<Msgs>(tcp_stream: &mut TcpStream, msgs: Msgs) -> Vec<std::io::Result<Msgs::Item>>
 where
     Msgs: IntoIterator,
     for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
-    S: Into<String>,
 {
-    tcp::send_and_receive_as_json(tcp_stream, msgs, client_name).await
+    tcp::send_and_receive_as_json(tcp_stream, msgs).await
 }
 
 /// Send a collection of msg through the argument `TcpStream`, and expecting a reply for each of the msg sent.
@@ -72,15 +65,10 @@ where
 /// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
 /// 2. The sent message must not contain any newline characters
 /// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
-#[instrument(name="ascii(mock):chat" skip(tcp_stream, msgs, client_name) fields(message=field::Empty, to=field::Empty))]
-pub async fn mock_ascii_client<Msgs, S, MS>(
-    tcp_stream: &mut TcpStream,
-    msgs: Msgs,
-    client_name: S,
-) -> Vec<std::io::Result<String>>
+#[instrument(name="ascii(mock):chat" skip(tcp_stream, msgs) fields(message=field::Empty, to=field::Empty))]
+pub async fn mock_ascii_client<Msgs, MS>(tcp_stream: &mut TcpStream, msgs: Msgs) -> Vec<std::io::Result<String>>
 where
     Msgs: IntoIterator<Item = MS>,
-    S: Into<String>,
     MS: Into<String>,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
@@ -105,7 +93,7 @@ where
                     !send_msg.contains("\n"),
                     "mock_ascii_client send message should not contain any newline characters"
                 );
-                debug!("[{}] -> SEND REQUEST: {:?}", local_addr, send_msg);
+                debug!("SEND REQUEST: {:?}", send_msg);
                 send_msg += "\n";
                 responses.push(
                     tcp_write
@@ -113,7 +101,7 @@ where
                         .and_then(|_| line_reader.next_line())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap().trim().to_owned();
-                            info!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
+                            info!("GOT RESPONSE: {:?}", received_msg);
                             received_msg
                         })
                         .await,
@@ -124,8 +112,7 @@ where
         )
         .await;
 
-    let client_name = client_name.into();
-    debug!("[{}] {} TcpStream says current task finished", local_addr, client_name);
+    debug!("Current task finished");
 
     responses
 }

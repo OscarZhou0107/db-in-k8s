@@ -5,6 +5,7 @@ use o2versioner::util::config::SequencerConfig;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration};
+use tracing::{info_span, Instrument};
 
 #[tokio::test]
 async fn test_sequencer() {
@@ -55,7 +56,9 @@ async fn test_sequencer() {
         ];
 
         let mut tcp_stream = TcpStream::connect(sequencer_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 0").await
+        tests_helper::mock_json_client(&mut tcp_stream, msgs)
+            .instrument(info_span!("tester0"))
+            .await
     });
 
     let tester_handle_1 = tokio::spawn(async move {
@@ -92,7 +95,9 @@ async fn test_sequencer() {
         ];
 
         let mut tcp_stream = TcpStream::connect(sequencer_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await
+        tests_helper::mock_json_client(&mut tcp_stream, msgs)
+            .instrument(info_span!("tester1"))
+            .await
     });
 
     // Must run, otherwise it won't do the work
@@ -152,7 +157,9 @@ async fn test_sequencer_with_admin() {
         ];
 
         let mut tcp_stream = TcpStream::connect(sequencer_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 0").await;
+        tests_helper::mock_json_client(&mut tcp_stream, msgs)
+            .instrument(info_span!("tester0"))
+            .await;
         println!("tester_handle_0 DONE");
     });
 
@@ -190,7 +197,9 @@ async fn test_sequencer_with_admin() {
         ];
 
         let mut tcp_stream = TcpStream::connect(sequencer_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1").await;
+        tests_helper::mock_json_client(&mut tcp_stream, msgs)
+            .instrument(info_span!("tester1"))
+            .await;
         println!("tester_handle_1 DONE");
     });
 
@@ -198,8 +207,9 @@ async fn test_sequencer_with_admin() {
 
     let admin_client_handle = tokio::spawn(async move {
         let mut tcp_stream = TcpStream::connect(sequencer_admin_addr).await.unwrap();
-        let res =
-            tests_helper::mock_ascii_client(&mut tcp_stream, vec!["help", "exit"], "admin tcplistener tester").await;
+        let res = tests_helper::mock_ascii_client(&mut tcp_stream, vec!["help", "exit"])
+            .instrument(info_span!("admin_client"))
+            .await;
         println!("admin_client_handle DONE: All responses received: {:?}", res);
     });
 

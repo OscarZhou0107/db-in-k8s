@@ -55,7 +55,7 @@ async fn test_double_s() {
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 2")
+        tests_helper::mock_json_client(&mut tcp_stream, msgs)
             .instrument(info_span!("tester0"))
             .await;
     });
@@ -71,7 +71,7 @@ async fn test_double_s() {
         ];
 
         let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs, "Tester 1")
+        tests_helper::mock_json_client(&mut tcp_stream, msgs)
             .instrument(info_span!("tester1"))
             .await;
     });
@@ -117,8 +117,8 @@ async fn run_double_s() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, "Mock dbproxy 0"));
-    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, "Mock dbproxy 1"));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr));
 
     sleep(Duration::from_millis(300)).await;
 
@@ -133,7 +133,7 @@ async fn run_double_s() {
     //     ];
 
     //     let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-    //     tests_helper::mock_json_client(&mut tcp_stream, msgs, "Client Tester 0")
+    //     tests_helper::mock_json_client(&mut tcp_stream, msgs)
     //         .instrument(info_span!("tester0"))
     //         .await;
 
@@ -151,18 +151,14 @@ async fn run_double_s() {
     .unwrap();
 }
 
-#[instrument(name="dbproxy(mock)" skip(addr, server_name))]
-pub async fn mock_dbproxy<A, S>(addr: A, server_name: S)
+#[instrument(name="dbproxy(mock)" skip(addr))]
+pub async fn mock_dbproxy<A>(addr: A)
 where
     A: ToSocketAddrs,
-    S: Into<String>,
 {
-    let server_name = server_name.into();
-    let server_name_clone = server_name.clone();
     start_tcplistener(
         addr,
         move |mut tcp_stream| {
-            let server_name = server_name_clone.clone();
             async move {
                 let _peer_addr = tcp_stream.peer_addr().unwrap();
                 let (tcp_read, tcp_write) = tcp_stream.split();
@@ -184,13 +180,12 @@ where
                 // Process a stream of incoming messages from a single tcp connection
                 serded_read
                     .and_then(move |msg| {
-                        let server_name = server_name.clone();
                         async move {
-                            debug!("{} receives {:?}", server_name, msg);
+                            debug!("Receives {:?}", msg);
 
                             // Simulate some load
                             let sleep_time = rand::rngs::OsRng::default().gen_range(20, 400);
-                            info!("{} works for {} ms", server_name, sleep_time);
+                            info!("Works for {} ms", sleep_time);
                             sleep(Duration::from_millis(sleep_time)).await;
 
                             match msg {
@@ -214,7 +209,6 @@ where
             }
         },
         None,
-        server_name,
         None,
     )
     .await;

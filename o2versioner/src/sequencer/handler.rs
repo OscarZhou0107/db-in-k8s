@@ -42,7 +42,6 @@ pub async fn main(conf: SequencerConfig) {
                 process_connection(tcp_stream, state_cloned)
             },
             conf.max_connection,
-            "Sequencer",
             stop_rx,
         )
         .in_current_span(),
@@ -53,13 +52,10 @@ pub async fn main(conf: SequencerConfig) {
         let admin_addr = admin_addr.clone();
         let admin_handle = tokio::spawn({
             let admin = async move {
-                start_admin_tcplistener(admin_addr, basic_admin_command_handler, "Sequencer").await;
+                start_admin_tcplistener(admin_addr, basic_admin_command_handler).await;
                 stop_tx.unwrap().send(()).unwrap();
             };
 
-            let admin = async {
-                admin.instrument(info_span!("admin")).await;
-            };
             admin.in_current_span()
         });
 

@@ -19,26 +19,22 @@ use tracing::{debug, field, info, instrument, warn, Instrument, Span};
 /// 1. `addr` is the tcp port to bind to
 /// 2. `connection_handler` is a `FnMut` closure takes in `TcpStream` and returns `Future<Output=()>`
 /// 3. `max_connection` can be specified to limit the max number of connections allowed. Server will shutdown immediately once `max_connection` connections are all dropped.
-/// 4. `server_name` is a name to be used for output
-#[instrument(name="listen", skip(addr, connection_handler, max_connection, server_name, stop_rx), fields(message=field::Empty))]
-pub async fn start_tcplistener<A, C, Fut, S>(
+#[instrument(name="listen", skip(addr, connection_handler, max_connection, stop_rx), fields(message=field::Empty))]
+pub async fn start_tcplistener<A, C, Fut>(
     addr: A,
     mut connection_handler: C,
     max_connection: Option<u32>,
-    server_name: S,
     stop_rx: Option<oneshot::Receiver<()>>,
 ) where
     A: ToSocketAddrs,
     C: FnMut(TcpStream) -> Fut,
     Fut: Future<Output = ()> + Send + 'static,
-    S: Into<String>,
 {
     let listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
 
-    let server_name = server_name.into();
     Span::current().record("message", &&local_addr.to_string()[..]);
-    info!("{} successfully binded", server_name);
+    info!("Successfully binded");
 
     let mut cur_num_connection = 0;
     let mut spawned_tasks = Vec::new();
@@ -57,10 +53,9 @@ pub async fn start_tcplistener<A, C, Fut, S>(
                 match tcp_stream {
                     Ok((tcp_stream, peer_addr)) => {
                         info!(
-                            "[{}] <- [{}] Incomming connection [{}] established",
-                            local_addr,
-                            peer_addr,
-                            cur_num_connection
+                            "Incomming connection [{}] [{}] established",
+                            cur_num_connection,
+                            peer_addr
                         );
 
                         // Spawn a new thread for each tcp connection
@@ -68,8 +63,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
                     }
                     Err(e) => {
                         warn!(
-                            "[{}] {} TcpListener cannot get client: {:?}",
-                            local_addr, server_name, e
+                            "Cannot get client: {:?}", e
                         );
                     }
                 }
@@ -83,7 +77,7 @@ pub async fn start_tcplistener<A, C, Fut, S>(
                 }
             },
             _ = &mut should_stopped => {
-                warn!( "[{}] {} TcpListener no longer accepts any new connections", local_addr, server_name);
+                warn!("No longer accepts any new connections");
                 break;
             }
         };
@@ -91,22 +85,14 @@ pub async fn start_tcplistener<A, C, Fut, S>(
 
     // Wait on all spawned tasks to finish
     futures::future::join_all(spawned_tasks).await;
-    info!(
-        "[{}] {} TcpListener says service terminated, have a good night",
-        local_addr, server_name
-    );
+    info!("Service terminated, have a good night");
 }
 
-pub async fn send_and_receive_single_as_json<Msg, S>(
-    tcp_stream: &mut TcpStream,
-    msg: Msg,
-    client_name: S,
-) -> std::io::Result<Msg>
+pub async fn send_and_receive_single_as_json<Msg>(tcp_stream: &mut TcpStream, msg: Msg) -> std::io::Result<Msg>
 where
     for<'a> Msg: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
-    S: Into<String>,
 {
-    send_and_receive_as_json(tcp_stream, iter::once(msg), client_name)
+    send_and_receive_as_json(tcp_stream, iter::once(msg))
         .await
         .into_iter()
         .next()
@@ -120,16 +106,11 @@ where
 /// 1. For each msg in `msgs`, send it using the argument `TcpStream` and expecting a reply. Pack the reply into a `Vec`.
 /// 2. `msgs: Msgs` must be an owned collection that contains owned data types.
 /// 3. `<Msgs as IntoInterator>::Item` must be an owned type, and will be used as the type to hold the replies from the server.
-#[instrument(name="chat", skip(tcp_stream, msgs, client_name), fields(message=field::Empty, to=field::Empty))]
-pub async fn send_and_receive_as_json<Msgs, S>(
-    tcp_stream: &mut TcpStream,
-    msgs: Msgs,
-    client_name: S,
-) -> Vec<std::io::Result<Msgs::Item>>
+#[instrument(name="chat", skip(tcp_stream, msgs), fields(message=field::Empty, to=field::Empty))]
+pub async fn send_and_receive_as_json<Msgs>(tcp_stream: &mut TcpStream, msgs: Msgs) -> Vec<std::io::Result<Msgs::Item>>
 where
     Msgs: IntoIterator,
     for<'a> Msgs::Item: Serialize + Deserialize<'a> + Unpin + Send + Sync + Debug + UnwindSafe + RefUnwindSafe,
-    S: Into<String>,
 {
     let local_addr = tcp_stream.local_addr().unwrap();
     let peer_addr = tcp_stream.peer_addr().unwrap();
@@ -151,14 +132,14 @@ where
         .fold(
             (serded_read, serded_write, &mut responses),
             |(mut serded_read, mut serded_write, responses), send_msg| async move {
-                debug!("[{}] -> SEND REQUEST: {:?}", local_addr, send_msg);
+                debug!("SEND REQUEST: {:?}", send_msg);
                 responses.push(
                     serded_write
                         .send(send_msg)
                         .and_then(|_| serded_read.try_next())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap();
-                            debug!("[{}] <- GOT RESPONSE: {:?}", local_addr, received_msg);
+                            debug!("GOT RESPONSE: {:?}", received_msg);
                             received_msg
                         })
                         .await,
@@ -169,8 +150,7 @@ where
         )
         .await;
 
-    let client_name = client_name.into();
-    debug!("[{}] {} TcpStream says current task finished", local_addr, client_name);
+    debug!("Current task finished");
 
     responses
 }
@@ -227,7 +207,7 @@ mod tests_tcppool {
     use bb8::Pool;
     use futures::future;
     use std::time::Duration;
-    use tracing::debug;
+    use tracing::{debug, info_span, Instrument};
 
     /// cargo test -- --show-output
     #[tokio::test]
@@ -244,47 +224,47 @@ mod tests_tcppool {
         // are joined.
 
         let server_handle = tokio::spawn(async move {
-            tests_helper::mock_echo_server(port, Some(pool_size), "tests_tcppool_server").await;
+            tests_helper::mock_echo_server(port, Some(pool_size)).await;
             debug!("server_handle finished");
         });
 
-        let client_handles = tokio::spawn(async move {
-            // As soon as the two client handles finish their tasks,
-            // the end of scope of the current task will be reached,
-            // and pool will be dropped automatically without any
-            // max_lifetime being set.
-            let pool = Pool::builder()
-                .max_size(pool_size)
-                .build(TcpStreamConnectionManager::new(port).await)
-                .await
-                .unwrap();
+        let client_handles = tokio::spawn({
+            let fut = async move {
+                // As soon as the two client handles finish their tasks,
+                // the end of scope of the current task will be reached,
+                // and pool will be dropped automatically without any
+                // max_lifetime being set.
+                let pool = Pool::builder()
+                    .max_size(pool_size)
+                    .build(TcpStreamConnectionManager::new(port).await)
+                    .await
+                    .unwrap();
 
-            let pool_cloned = pool.clone();
-            let client0_handle = tokio::spawn(async move {
-                let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-                tests_helper::mock_json_client(
-                    &mut tcp_stream,
-                    vec![String::from("hello0"), String::from("hello00")],
-                    "Pooled client 0",
-                )
-                .await;
-                debug!("client0_handle finished");
-            });
+                let pool_cloned = pool.clone();
+                let client0_handle = tokio::spawn(async move {
+                    let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+                    tests_helper::mock_json_client(
+                        &mut tcp_stream,
+                        vec![String::from("hello0"), String::from("hello00")],
+                    )
+                    .instrument(info_span!("client0"))
+                    .await;
+                    debug!("client0_handle finished");
+                });
 
-            let pool_cloned = pool.clone();
-            let client1_handle = tokio::spawn(async move {
-                let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-                tests_helper::mock_json_client(
-                    &mut tcp_stream,
-                    vec!["hello1".to_owned(), "hello11".to_owned()],
-                    "Pooled client 1",
-                )
-                .await;
-                debug!("client1_handle finished");
-            });
+                let pool_cloned = pool.clone();
+                let client1_handle = tokio::spawn(async move {
+                    let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
+                    tests_helper::mock_json_client(&mut tcp_stream, vec!["hello1".to_owned(), "hello11".to_owned()])
+                        .instrument(info_span!("client1"))
+                        .await;
+                    debug!("client1_handle finished");
+                });
 
-            tokio::try_join!(client0_handle, client1_handle).unwrap();
-            debug!("pool dropped automatically")
+                tokio::try_join!(client0_handle, client1_handle).unwrap();
+                debug!("pool dropped automatically")
+            };
+            fut.instrument(info_span!("super_clients"))
         });
 
         tokio::try_join!(server_handle, client_handles).unwrap();
@@ -313,31 +293,25 @@ mod tests_tcppool {
         // so that all connections are dropped,
         // and then server_handle can properly terminate.
         let server_handle = tokio::spawn(async move {
-            tests_helper::mock_echo_server(port, Some(pool_size), "tests_tcppool_server").await;
+            tests_helper::mock_echo_server(port, Some(pool_size)).await;
             debug!("server_handle finished");
         });
 
         let pool_cloned = pool.clone();
         let client0_handle = tokio::spawn(async move {
             let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-            tests_helper::mock_json_client(
-                &mut tcp_stream,
-                vec![String::from("hello0"), String::from("hello00")],
-                "Pooled client 0",
-            )
-            .await;
+            tests_helper::mock_json_client(&mut tcp_stream, vec![String::from("hello0"), String::from("hello00")])
+                .instrument(info_span!("client0"))
+                .await;
             debug!("client0_handle finished");
         });
 
         let pool_cloned = pool.clone();
         let client1_handle = tokio::spawn(async move {
             let mut tcp_stream = pool_cloned.get().await.expect("Can't grab socket from pool");
-            tests_helper::mock_json_client(
-                &mut tcp_stream,
-                vec!["hello1".to_owned(), "hello11".to_owned()],
-                "Pooled client 1",
-            )
-            .await;
+            tests_helper::mock_json_client(&mut tcp_stream, vec!["hello1".to_owned(), "hello11".to_owned()])
+                .instrument(info_span!("client1"))
+                .await;
             debug!("client1_handle finished");
         });
 

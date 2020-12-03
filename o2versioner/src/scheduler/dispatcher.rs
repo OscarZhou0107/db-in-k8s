@@ -116,25 +116,24 @@ impl State {
                     Span::current().record("message", &&dbproxy_addr.to_string()[..]);
                     debug!("{:?}", msg_cloned);
                     let mut tcpsocket = dbproxy_pool.get().await.unwrap();
-                    let msqlresponse =
-                        send_and_receive_single_as_json(&mut tcpsocket, msg_cloned, format!("Scheduler dispatcher"))
-                            .inspect_err(|e| warn!("Cannot send: {:?}", e))
-                            .map_err(|e| e.to_string())
-                            .and_then(|res| match res {
-                                Message::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
-                                _ => future::err(String::from("Invalid response from Dbproxy")),
-                            })
-                            .map_ok_or_else(
-                                |e| {
-                                    if is_endtx {
-                                        MsqlResponse::endtx_err(e)
-                                    } else {
-                                        MsqlResponse::query_err(e)
-                                    }
-                                },
-                                |msqlresponse| msqlresponse,
-                            )
-                            .await;
+                    let msqlresponse = send_and_receive_single_as_json(&mut tcpsocket, msg_cloned)
+                        .inspect_err(|e| warn!("Cannot send: {:?}", e))
+                        .map_err(|e| e.to_string())
+                        .and_then(|res| match res {
+                            Message::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
+                            _ => future::err(String::from("Invalid response from Dbproxy")),
+                        })
+                        .map_ok_or_else(
+                            |e| {
+                                if is_endtx {
+                                    MsqlResponse::endtx_err(e)
+                                } else {
+                                    MsqlResponse::query_err(e)
+                                }
+                            },
+                            |msqlresponse| msqlresponse,
+                        )
+                        .await;
 
                     // if this is a EndTx, need to release the version and notifier other queries waiting on versions
                     let txvn = if is_endtx {
