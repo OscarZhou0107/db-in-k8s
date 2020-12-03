@@ -224,10 +224,20 @@ async fn process_msql(
     Span::current().record("cmd", &msql.as_ref());
     Span::current().record("txid", &conn_state.client_meta().current_txid());
 
-    match msql {
-        Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
-        Msql::Query(_) => process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await,
-        Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
+    match Legality::check(&msql, conn_state.current_txvn()) {
+        Legality::Critical(e) => {
+            warn!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
+            scheduler_api::Message::Reply(MsqlResponse::err(e, &msql))
+        }
+        Legality::Panic(e) => {
+            error!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
+            panic!("{}", e);
+        }
+        _ => match msql {
+            Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
+            Msql::Query(_) => process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await,
+            Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
+        },
     }
 }
 
@@ -236,36 +246,29 @@ async fn process_begintx(
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
 ) -> scheduler_api::Message {
-    if conn_state.current_txvn().is_some() {
-        warn!(
-            "Cannot begin new transaction because previous transaction not finished yet. {:?} {:?}",
-            msqlbegintx,
-            conn_state.current_txvn()
-        );
-        scheduler_api::Message::Reply(MsqlResponse::begintx_err("Previous transaction not finished yet"))
-    } else {
-        let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
-        let msg = scheduler_sequencer::Message::RequestTxVN(conn_state.client_meta().clone(), msqlbegintx);
+    assert!(conn_state.current_txvn().is_none());
 
-        tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg)
-            .map_err(|e| e.to_string())
-            .and_then(|res| async {
-                match res {
-                    scheduler_sequencer::Message::ReplyTxVN(txvn) => {
-                        let existing = conn_state.replace_txvn(Some(txvn));
-                        assert!(existing.is_none());
-                        Ok(())
-                    }
-                    _ => Err(String::from("Invalid response from Sequencer")),
+    let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
+    let msg = scheduler_sequencer::Message::RequestTxVN(conn_state.client_meta().clone(), msqlbegintx);
+
+    tcp::send_and_receive_single_as_json(&mut sequencer_socket, msg)
+        .map_err(|e| e.to_string())
+        .and_then(|res| async {
+            match res {
+                scheduler_sequencer::Message::ReplyTxVN(txvn) => {
+                    let existing = conn_state.replace_txvn(Some(txvn));
+                    assert!(existing.is_none());
+                    Ok(())
                 }
-            })
-            .map_ok_or_else(
-                |e| scheduler_api::Message::Reply(MsqlResponse::begintx_err(e)),
-                |_| scheduler_api::Message::Reply(MsqlResponse::begintx_ok()),
-            )
-            .instrument(info_span!("<->sequencer"))
-            .await
-    }
+                _ => Err(String::from("Invalid response from Sequencer")),
+            }
+        })
+        .map_ok_or_else(
+            |e| scheduler_api::Message::Reply(MsqlResponse::begintx_err(e)),
+            |_| scheduler_api::Message::Reply(MsqlResponse::begintx_ok()),
+        )
+        .instrument(info_span!("<->sequencer"))
+        .await
 }
 
 async fn process_query(
@@ -274,10 +277,7 @@ async fn process_query(
     _sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
-    if conn_state.current_txvn().is_none() {
-        error!("Does not support single un-transactioned query for now. {:?}", msql);
-        panic!("Does not support single un-transactioned query for now");
-    }
+    assert!(conn_state.current_txvn().is_some());
 
     dispatcher_addr
         .request(
@@ -302,22 +302,19 @@ async fn process_endtx(
     dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     let txvn = conn_state.replace_txvn(None);
-    if txvn.is_none() {
-        warn!("There is not transaction to end. {:?}", msql);
-        scheduler_api::Message::Reply(MsqlResponse::endtx_err("There is not transaction to end"))
-    } else {
-        dispatcher_addr
-            .request(conn_state.client_meta().clone(), msql, txvn)
-            .map_ok_or_else(
-                |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
-                |res| {
-                    let DispatcherReply { msql_res, txvn_res } = res;
-                    let existing = conn_state.replace_txvn(txvn_res);
-                    assert!(existing.is_none());
-                    conn_state.client_meta_as_mut().transaction_finished();
-                    scheduler_api::Message::Reply(msql_res)
-                },
-            )
-            .await
-    }
+    assert!(txvn.is_some());
+
+    dispatcher_addr
+        .request(conn_state.client_meta().clone(), msql, txvn)
+        .map_ok_or_else(
+            |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
+            |res| {
+                let DispatcherReply { msql_res, txvn_res } = res;
+                let existing = conn_state.replace_txvn(txvn_res);
+                assert!(existing.is_none());
+                conn_state.client_meta_as_mut().transaction_finished();
+                scheduler_api::Message::Reply(msql_res)
+            },
+        )
+        .await
 }
