@@ -10,7 +10,6 @@ use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
@@ -122,7 +121,6 @@ async fn process_connection(
     dispatcher_addr: Arc<DispatcherAddr>,
 ) {
     let client_addr = socket.peer_addr().unwrap();
-    let local_addr = socket.local_addr().unwrap();
 
     Span::current().record("message", &&client_addr.to_string()[..]);
 
@@ -154,13 +152,11 @@ async fn process_connection(
             let conn_state_cloned = conn_state.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr.clone();
-            let local_addr_cloned = local_addr.clone();
-            debug!("<- [{}] Received {:?}", client_addr, msg);
+            debug!("<- {:?}", msg);
 
             async move {
                 Ok(process_request(
                     msg,
-                    local_addr_cloned,
                     conn_state_cloned,
                     sequencer_socket_pool_cloned,
                     dispatcher_addr_cloned,
@@ -178,10 +174,9 @@ async fn process_connection(
     info!("Connection dropped");
 }
 
-#[instrument(name="request", skip(msg, local_addr, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, txid=field::Empty, cmd=field::Empty))]
+#[instrument(name="request", skip(msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, txid=field::Empty, cmd=field::Empty))]
 async fn process_request(
     msg: scheduler_api::Message,
-    local_addr: SocketAddr,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
@@ -200,27 +195,13 @@ async fn process_request(
             Err(e) => scheduler_api::Message::InvalidMsqlText(e.to_owned()),
         },
         scheduler_api::Message::RequestCrash(reason) => {
-            error!(
-                "[{}] <- [{}] Requested for a soft crash because of {}",
-                local_addr,
-                conn_state_guard.client_meta().client_addr(),
-                reason
-            );
-            error!(
-                "[{}] -- [{}] Current connection state: {:?}",
-                local_addr,
-                conn_state_guard.client_meta().client_addr(),
-                conn_state_guard
-            );
+            error!("<- Soft Crash Request: {}", reason);
+            error!("Connection state: {:?}", conn_state_guard);
             panic!("Received a soft crash request");
         }
         _ => scheduler_api::Message::InvalidRequest,
     };
-    debug!(
-        "-> [{}] Reply {:?}",
-        conn_state_guard.client_meta().client_addr(),
-        response
-    );
+    debug!("-> {:?}", response);
 
     response
     // conn_state_guard should be dropped here

@@ -37,28 +37,29 @@ where
                 while let Ok(line) = line_reader.try_next().await {
                     if let Some(line) = line {
                         let line = line.trim().to_owned();
-                        let (mut res, should_continue) = admin_command_handler(line.clone())
-                            .instrument(info_span!("request", message = &&line[..]))
+
+                        let conn = async {
+                            let (mut res, should_continue) = admin_command_handler(line.clone()).await;
+                            assert!(
+                                !res.contains("\n"),
+                                "admin_command_handler reply message should not contain any newline characters"
+                            );
+                            res += "\n";
+                            tcp_write
+                                .write_all(res.as_bytes())
+                                .map_ok_or_else(
+                                    |e| warn!("-> Unable to reply message {}: {:?}", res.trim(), e),
+                                    |_| info!("-> {}", res.trim()),
+                                )
+                                .await;
+
+                            should_continue
+                        };
+
+                        let should_continue = conn
+                            .instrument(info_span!("request", message = %peer_addr, cmd = &&line[..]))
                             .await;
-                        assert!(
-                            !res.contains("\n"),
-                            "admin_command_handler reply message should not contain any newline characters"
-                        );
-                        res += "\n";
-                        tcp_write
-                            .write_all(res.as_bytes())
-                            .map_ok_or_else(
-                                |e| {
-                                    warn!(
-                                        "-> [{}] Admin unable to reply message \"{}\": {:?}",
-                                        peer_addr,
-                                        res.trim(),
-                                        e
-                                    )
-                                },
-                                |_| info!("-> [{}] Admin successfully replied \"{}\"", peer_addr, res.trim()),
-                            )
-                            .await;
+
                         if !should_continue {
                             break 'outer;
                         }
@@ -77,6 +78,7 @@ where
 /// A very basic admin command handler
 pub async fn basic_admin_command_handler(command: String) -> (String, bool) {
     let command = UniCase::new(command);
+    info!("Recevied {}", command);
     if command == UniCase::new(String::from("kill"))
         || command == UniCase::new(String::from("exit"))
         || command == UniCase::new(String::from("quit"))

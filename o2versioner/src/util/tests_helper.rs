@@ -8,7 +8,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tracing::dispatcher::DefaultGuard;
-use tracing::{debug, error, field, info, instrument, Span};
+use tracing::{debug, error, field, info, info_span, instrument, Instrument, Span};
 
 #[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_logger() -> DefaultGuard {
@@ -36,11 +36,12 @@ where
             tokio::io::copy(&mut reader, &mut writer)
                 .then(move |result| {
                     match result {
-                        Ok(amt) => debug!("-> [{}] ECHOED {} BYTES", peer_addr, amt),
-                        Err(e) => error!("-> [{}] ERROR ON ECHOING: {}", peer_addr, e),
+                        Ok(amt) => debug!("-> ECHOED {} BYTES", amt),
+                        Err(e) => error!("-> ERROR ON ECHOING: {}", e),
                     };
                     future::ready(())
                 })
+                .instrument(info_span!("conn", message = %peer_addr))
                 .await;
         },
         max_connection,
@@ -93,7 +94,7 @@ where
                     !send_msg.contains("\n"),
                     "mock_ascii_client send message should not contain any newline characters"
                 );
-                debug!("SEND REQUEST: {:?}", send_msg);
+                debug!("-> {:?}", send_msg);
                 send_msg += "\n";
                 responses.push(
                     tcp_write
@@ -101,7 +102,7 @@ where
                         .and_then(|_| line_reader.next_line())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap().trim().to_owned();
-                            info!("GOT RESPONSE: {:?}", received_msg);
+                            info!("<- {:?}", received_msg);
                             received_msg
                         })
                         .await,

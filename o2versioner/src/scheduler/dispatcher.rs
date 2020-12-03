@@ -56,7 +56,7 @@ impl State {
     async fn execute(&self, request: Request) {
         Span::current().record("message", &&request.client_meta.to_string()[..]);
         Span::current().record("cmd", &request.command.as_ref());
-        debug!("{:?} {:?}", request.command, request.txvn);
+        debug!("<- {:?} {:?}", request.command, request.txvn);
 
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
@@ -114,7 +114,7 @@ impl State {
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
                 let process = async move {
                     Span::current().record("message", &&dbproxy_addr.to_string()[..]);
-                    debug!("{:?}", msg_cloned);
+                    debug!("-> {:?}", msg_cloned);
                     let mut tcpsocket = dbproxy_pool.get().await.unwrap();
                     let msqlresponse = send_and_receive_single_as_json(&mut tcpsocket, msg_cloned)
                         .inspect_err(|e| warn!("Cannot send: {:?}", e))
@@ -151,7 +151,7 @@ impl State {
 
                     // If the oneshot channel is not consumed, consume it to send the reply back to handler
                     if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
-                        debug!("Reply to handler: {:?}", msqlresponse);
+                        debug!("~~ {:?}", msqlresponse);
                         reply
                             .send(DispatcherReply::new(msqlresponse, txvn))
                             .expect(&format!("Cannot reply response to handler"));

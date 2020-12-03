@@ -77,8 +77,12 @@ pub async fn main(conf: SequencerConfig) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
+#[instrument(name="conn", skip(tcp_stream, state), fields(message=field::Empty))]
 async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>) {
     let peer_addr = tcp_stream.peer_addr().unwrap();
+
+    Span::current().record("message", &&peer_addr.to_string()[..]);
+
     let (tcp_read, tcp_write) = tcp_stream.split();
 
     // Delimit frames from bytes using a length header
@@ -105,13 +109,13 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
                 match msg {
                     scheduler_sequencer::Message::RequestTxVN(client_meta, sqlbegintx) => {
                         Span::current().record("client", &&client_meta.to_string()[..]);
-                        debug!("<- [{}] {:?}", peer_addr, sqlbegintx);
+                        debug!("<- {:?}", sqlbegintx);
                         let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
-                        debug!("-> [{}] {:?}", peer_addr, txvn);
+                        debug!("-> {:?}", txvn);
                         Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
                     }
                     other => {
-                        warn!("<- [{}] Unsupported: {:?}", peer_addr, other);
+                        warn!("<- Unsupported: {:?}", other);
                         Ok(scheduler_sequencer::Message::Invalid)
                     }
                 }

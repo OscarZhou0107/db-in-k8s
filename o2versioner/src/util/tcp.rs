@@ -132,14 +132,14 @@ where
         .fold(
             (serded_read, serded_write, &mut responses),
             |(mut serded_read, mut serded_write, responses), send_msg| async move {
-                debug!("SEND REQUEST: {:?}", send_msg);
+                debug!("-> {:?}", send_msg);
                 responses.push(
                     serded_write
                         .send(send_msg)
                         .and_then(|_| serded_read.try_next())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap();
-                            debug!("GOT RESPONSE: {:?}", received_msg);
+                            debug!("<- {:?}", received_msg);
                             received_msg
                         })
                         .await,
