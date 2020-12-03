@@ -13,6 +13,9 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, field, info, instrument, warn, Instrument, Span};
 
+pub type StopTx = oneshot::Sender<()>;
+type StopRx = oneshot::Receiver<()>;
+
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
 /// Note:
@@ -24,7 +27,7 @@ pub async fn start_tcplistener<A, C, Fut>(
     addr: A,
     mut connection_handler: C,
     max_connection: Option<u32>,
-    stop_rx: Option<oneshot::Receiver<()>>,
+    stop_rx: Option<StopRx>,
 ) where
     A: ToSocketAddrs,
     C: FnMut(TcpStream) -> Fut,

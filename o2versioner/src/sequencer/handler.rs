@@ -5,7 +5,7 @@ use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
@@ -24,15 +24,19 @@ use tracing::{debug, field, info_span, instrument, warn, Instrument, Span};
 pub async fn main(conf: SequencerConfig) {
     let state = Arc::new(Mutex::new(State::new()));
 
+    let (stop_tx, stop_rx) = oneshot::channel();
+    let stop_tx = Arc::new(Mutex::new(Some(stop_tx)));
+
     let handler_handle = tokio::spawn(
         tcp::start_tcplistener(
             conf.to_addr(),
             move |tcp_stream| {
+                let stop_tx_cloned = stop_tx.clone();
                 let state_cloned = state.clone();
-                process_connection(tcp_stream, state_cloned)
+                process_connection(tcp_stream, state_cloned, stop_tx_cloned)
             },
             conf.max_connection,
-            None,
+            Some(stop_rx),
         )
         .in_current_span(),
     );
@@ -44,8 +48,12 @@ pub async fn main(conf: SequencerConfig) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-#[instrument(name="conn", skip(tcp_stream, state), fields(message=field::Empty))]
-async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>) {
+#[instrument(name="conn", skip(tcp_stream, state, stop_tx), fields(message=field::Empty))]
+async fn process_connection(
+    mut tcp_stream: TcpStream,
+    state: Arc<Mutex<State>>,
+    stop_tx: Arc<Mutex<Option<tcp::StopTx>>>,
+) {
     let peer_addr = tcp_stream.peer_addr().unwrap();
 
     Span::current().record("message", &&peer_addr.to_string()[..]);
@@ -70,6 +78,7 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
     serded_read
         .and_then(move |msg| {
             let state_cloned = state.clone();
+            let stop_tx_cloned = stop_tx.clone();
 
             let process_req = async move {
                 Span::current().record("message", &msg.as_ref());
@@ -103,6 +112,17 @@ async fn process_connection(mut tcp_stream: TcpStream, state: Arc<Mutex<State>>)
 
                         warn!("{}", status);
                         Ok(scheduler_sequencer::Message::ReplyBlockUnblock(String::from(status)))
+                    }
+                    scheduler_sequencer::Message::RequestStop => {
+                        warn!("Receiving stop request, will shutdown soon");
+                        stop_tx_cloned
+                            .lock()
+                            .await
+                            .take()
+                            .expect("The StopTx is already used!")
+                            .send(())
+                            .unwrap();
+                        Ok(scheduler_sequencer::Message::ReplyStop)
                     }
                     other => {
                         warn!("<- Unsupported: {:?}", other);

@@ -9,4 +9,6 @@ pub enum Message {
     RequestBlock,
     RequestUnblock,
     ReplyBlockUnblock(String),
+    RequestStop,
+    ReplyStop,
 }
