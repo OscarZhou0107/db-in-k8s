@@ -1,17 +1,15 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer;
-use crate::util::admin_handler::*;
 use crate::util::config::SequencerConfig;
 use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, field, info_span, instrument, warn, Instrument, Span};
 
 /// Main entrance for Sequencer
 ///
@@ -26,14 +24,6 @@ use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span}
 pub async fn main(conf: SequencerConfig) {
     let state = Arc::new(Mutex::new(State::new()));
 
-    // Create a stop_signal channel if admin mode is turned on
-    let (stop_tx, stop_rx) = if conf.admin_addr.is_some() {
-        let (tx, rx) = oneshot::channel();
-        (Some(tx), Some(rx))
-    } else {
-        (None, None)
-    };
-
     let handler_handle = tokio::spawn(
         tcp::start_tcplistener(
             conf.to_addr(),
@@ -42,35 +32,12 @@ pub async fn main(conf: SequencerConfig) {
                 process_connection(tcp_stream, state_cloned)
             },
             conf.max_connection,
-            stop_rx,
+            None,
         )
         .in_current_span(),
     );
 
-    // Allow sequencer to be terminated by admin
-    if let Some(admin_addr) = &conf.admin_addr {
-        let admin_addr = admin_addr.clone();
-        let admin_handle = tokio::spawn({
-            let admin = async move {
-                start_admin_tcplistener(admin_addr, basic_admin_command_handler).await;
-                stop_tx.unwrap().send(()).unwrap();
-            };
-
-            admin.in_current_span()
-        });
-
-        // handler_handle can either run to finish or be the result
-        // of the above stop_tx.send()
-        handler_handle.await.unwrap();
-
-        // At this point, we just want to cancel the admin_handle
-        tokio::select! {
-            _ = future::ready(()) => info!("Sequencer admin is terminated" ),
-            _ = admin_handle => {}
-        };
-    } else {
-        handler_handle.await.unwrap();
-    }
+    handler_handle.await.unwrap();
 }
 
 /// Process the `tcp_stream` for a single connection

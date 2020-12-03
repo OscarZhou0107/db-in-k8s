@@ -24,7 +24,6 @@ async fn test_scheduler() {
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
-            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -94,7 +93,6 @@ async fn test_scheduler_with_admin() {
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
-            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -189,7 +187,6 @@ async fn test_scheduler_with_request_crash() {
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
-            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],

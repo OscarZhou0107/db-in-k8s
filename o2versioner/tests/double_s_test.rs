@@ -33,7 +33,6 @@ async fn test_double_s() {
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
-            admin_addr: None,
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![],
@@ -100,7 +99,6 @@ async fn run_double_s() {
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:24212"),
-            admin_addr: None,
             max_connection: None,
         },
         dbproxy: vec![

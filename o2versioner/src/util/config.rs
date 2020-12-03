@@ -43,8 +43,6 @@ impl SchedulerConfig {
 pub struct SequencerConfig {
     pub addr: String,
     #[serde(default)]
-    pub admin_addr: Option<String>,
-    #[serde(default)]
     pub max_connection: Option<u32>,
 }
 
@@ -88,7 +86,6 @@ mod tests_config {
                 },
                 sequencer: SequencerConfig {
                     addr: String::from("127.0.0.1:9876"),
-                    admin_addr: None,
                     max_connection: Some(50),
                 },
                 dbproxy: vec![
