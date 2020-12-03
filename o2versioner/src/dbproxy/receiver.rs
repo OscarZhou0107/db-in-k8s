@@ -37,7 +37,7 @@ mod tests_receiver {
     use super::Receiver;
     use crate::comm::scheduler_dbproxy::Message;
     use crate::core::*;
-    use crate::dbproxy::core::{PendingQueue, Task};
+    use crate::dbproxy::core::{PendingQueue};
     use futures::SinkExt;
     use std::net::*;
     use std::sync::Arc;
@@ -54,7 +54,6 @@ mod tests_receiver {
         let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
         let pending_queue_2 = Arc::clone(&pending_queue);
 
-        let v: Vec<TableOps> = Vec::new();
         let item = Message::MsqlRequest(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
             Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
@@ -87,7 +86,6 @@ mod tests_receiver {
         let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
         let pending_queue_2 = Arc::clone(&pending_queue);
 
-        let v: Vec<TableOps> = Vec::new();
         let item = Message::MsqlRequest(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
             Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
