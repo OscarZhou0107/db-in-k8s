@@ -17,39 +17,22 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, field, info, instrument, warn, Span};
 
-/// Response sent from dbproxy to handler direction
-#[derive(Debug)]
-pub struct Reply {
-    /// Response to the `Msql` command
-    pub msql_res: MsqlResponse,
-    /// The modified `TxVN`,
-    /// this should be used to update the `ConnectionState`.
-    pub txvn_res: Option<TxVN>,
-}
-
-impl Reply {
-    pub fn new(msql_res: MsqlResponse, txvn_res: Option<TxVN>) -> Self {
-        Self { msql_res, txvn_res }
-    }
-}
-
 /// Request sent from dispatcher direction
 pub struct TranceiverRequest {
     pub dbproxy_addr: SocketAddr,
-    pub client_meta: ClientMeta,
-    pub command: Msql,
-    pub txvn: Option<TxVN>,
+    pub dbproxy_msg: Message,
 }
 
 impl ExecutorRequest for TranceiverRequest {
-    type ReplyType = Reply;
+    type ReplyType = Message;
 }
 
 /// A state containing shared variables
 #[derive(Clone)]
 struct State {
     transmitters: Arc<Mutex<HashMap<SocketAddr, OwnedWriteHalf>>>,
-    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), TranceiverRequest>>>,
+    /// (DbProxyAddr, ClientAddr) -> RequestWrapper<TranceiverRequest>
+    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), RequestWrapper<TranceiverRequest>>>>,
 }
 
 impl State {
@@ -62,16 +45,46 @@ impl State {
 
     #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty))]
     async fn execute_request(&self, request: RequestWrapper<TranceiverRequest>) {
-        let (request, reply_ch) = request.unwrap();
+        let dbproxy_msg = request.request().dbproxy_msg.clone();
+        let client_addr = dbproxy_msg.get_client_addr().clone().unwrap();
+        let dbproxy_addr = request.request().dbproxy_addr.clone();
 
-        Span::current().record("message", &&request.dbproxy_addr.to_string()[..]);
+        Span::current().record("message", &&dbproxy_addr.to_string()[..]);
+
+        let transmitters = self.transmitters.clone();
+        let mut transmitters_guard = transmitters.lock().await;
+        let writer = transmitters_guard.get_mut(&dbproxy_addr).expect("dbproxy_addr unknown");
+        let delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
+        let mut serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
+
+        debug!("-> {:?}", dbproxy_msg);
+        serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
+
+        let prev = self
+            .outstanding_req
+            .lock()
+            .await
+            .insert((dbproxy_addr, client_addr), request);
+        assert!(prev.is_none());
+
+        // transmitters_guard is released
     }
 
-    #[instrument(name="execute_response", skip(self, msg), fields(message=field::Empty))]
-    async fn execute_response(&self, msg: Message) {
-        match msg {
+    #[instrument(name="execute_response", skip(self, dbproxy_addr, msg), fields(message=field::Empty, from=field::Empty))]
+    async fn execute_response(&self, dbproxy_addr: SocketAddr, msg: Message) {
+        Span::current().record("from", &&dbproxy_addr.to_string()[..]);
+        match &msg {
             Message::MsqlResponse(client_addr, msqlresponse) => {
-                todo!();
+                Span::current().record("message", &&client_addr.to_string()[..]);
+                let request_wrapper = self
+                    .outstanding_req
+                    .lock()
+                    .await
+                    .remove(&(dbproxy_addr, client_addr.clone()))
+                    .expect("No record in outstanding_req");
+                let (request, reply_ch) = request_wrapper.unwrap();
+                debug!("-> {:?}", msg);
+                reply_ch.unwrap().send(msg).unwrap();
             }
             other => warn!("Unsupported {:?}", other),
         };
@@ -147,7 +160,7 @@ impl Transceiver {
                     // Each response execution is spawned as separate task
                     serded_read
                         .try_for_each_concurrent(None, |msg| async {
-                            state.clone().execute_response(msg).await;
+                            state.clone().execute_response(dbproxy_addr, msg).await;
                             Ok(())
                         })
                         .await;

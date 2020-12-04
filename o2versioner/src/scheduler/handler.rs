@@ -1,6 +1,5 @@
 use super::core::*;
 use super::dispatcher::*;
-use super::transceiver::Reply;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
@@ -287,7 +286,7 @@ async fn process_query(
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::query_err(e)),
             |res| {
-                let Reply { msql_res, txvn_res } = res;
+                let DispatcherReply { msql_res, txvn_res } = res;
                 conn_state.replace_txvn(txvn_res);
                 scheduler_api::Message::Reply(msql_res)
             },
@@ -308,7 +307,7 @@ async fn process_endtx(
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
             |res| {
-                let Reply { msql_res, txvn_res } = res;
+                let DispatcherReply { msql_res, txvn_res } = res;
                 let existing = conn_state.replace_txvn(txvn_res);
                 assert!(existing.is_none());
                 conn_state.client_meta_as_mut().transaction_finished();

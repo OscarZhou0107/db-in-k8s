@@ -1,5 +1,4 @@
 use super::core::{DbVNManager, DbproxyManager};
-use super::transceiver::Reply;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
@@ -12,7 +11,23 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, Notify, RwLock};
 use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
 
-/// DispatcherRequest sent from handler to dbproxy direction
+/// Response sent from dispatcher to handler
+#[derive(Debug)]
+pub struct DispatcherReply {
+    /// Response to the `Msql` command
+    pub msql_res: MsqlResponse,
+    /// The modified `TxVN`,
+    /// this should be used to update the `ConnectionState`.
+    pub txvn_res: Option<TxVN>,
+}
+
+impl DispatcherReply {
+    pub fn new(msql_res: MsqlResponse, txvn_res: Option<TxVN>) -> Self {
+        Self { msql_res, txvn_res }
+    }
+}
+
+/// DispatcherRequest sent from handler to dispatcher
 pub struct DispatcherRequest {
     client_meta: ClientMeta,
     command: Msql,
@@ -20,7 +35,7 @@ pub struct DispatcherRequest {
 }
 
 impl ExecutorRequest for DispatcherRequest {
-    type ReplyType = Reply;
+    type ReplyType = DispatcherReply;
 }
 
 impl DispatcherRequest {
@@ -65,7 +80,7 @@ impl State {
 
             reply_ch
                 .unwrap()
-                .send(Reply::new(
+                .send(DispatcherReply::new(
                     MsqlResponse::err("Dbproxy servers are all offline", &request.command),
                     request.txvn,
                 ))
@@ -151,7 +166,7 @@ impl State {
                     if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
                         debug!("~~ {:?}", msqlresponse);
                         reply
-                            .send(Reply::new(msqlresponse, txvn))
+                            .send(DispatcherReply::new(msqlresponse, txvn))
                             .expect(&format!("Cannot reply response to handler"));
                     } else {
                         debug!("Not reply to handler: {:?}", msqlresponse);

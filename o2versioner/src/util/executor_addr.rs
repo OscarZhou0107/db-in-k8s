@@ -24,6 +24,11 @@ impl<Request> RequestWrapper<Request>
 where
     Request: ExecutorRequest,
 {
+    /// Returns a ref to the internal `Request`
+    pub fn request(&self) -> &Request {
+        &self.payload
+    }
+
     /// Takes out both the actual `Request` and also the sender channel for `Request::ReplyType`
     pub fn unwrap(self) -> (Request, Option<oneshot::Sender<Request::ReplyType>>) {
         (self.payload, self.reply)
