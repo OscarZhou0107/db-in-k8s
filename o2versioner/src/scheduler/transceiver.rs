@@ -23,7 +23,6 @@ pub struct TransceiverRequest {
 #[derive(Debug)]
 pub struct TransceiverReply {
     pub msg: Message,
-    pub current_request_id: usize,
 }
 
 impl ExecutorRequest for TransceiverRequest {
@@ -81,16 +80,10 @@ impl Transceiver {
                             let mut guard = outstanding_req_clone.lock().await;
                             let queue = guard.get_mut(&client_addr).expect("No client addr in outstanding_req");
                             let request_wrapper = queue.pop_back().expect("No record in outstanding_req");
-                            let (request, reply_ch) = request_wrapper.unwrap();
+                            let (_request, reply_ch) = request_wrapper.unwrap();
                             info!("conn fifo has {} after Pop back", queue.len());
                             debug!("-> {:?}", msg);
-                            reply_ch
-                                .unwrap()
-                                .send(TransceiverReply {
-                                    msg,
-                                    current_request_id: request.current_request_id,
-                                })
-                                .unwrap();
+                            reply_ch.unwrap().send(TransceiverReply { msg }).unwrap();
                         }
                         other => warn!("Unsupported {:?}", other),
                     };

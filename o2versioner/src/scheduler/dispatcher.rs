@@ -8,7 +8,7 @@ use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Notify, RwLock};
-use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Response sent from dispatcher to handler
 #[derive(Debug)]
@@ -140,18 +140,18 @@ impl State {
                         })
                         .inspect_err(|e| warn!("Cannot send: {:?}", e))
                         .and_then(|res| {
-                            if current_request_id != res.current_request_id {
-                                error!(
-                                    "Incorrect reply from transceiver, owned request_id={}, received request_id={}",
-                                    current_request_id, res.current_request_id
-                                );
-                                panic!("Mismatched reply from transceiver");
-                            } else {
-                                debug!(
-                                    "owned request_id={}, received request_id={}",
-                                    current_request_id, res.current_request_id
-                                );
-                            }
+                            // if current_request_id != res.current_request_id {
+                            //     error!(
+                            //         "Incorrect reply from transceiver, owned request_id={}, received request_id={}",
+                            //         current_request_id, res.current_request_id
+                            //     );
+                            //     panic!("Mismatched reply from transceiver");
+                            // } else {
+                            //     debug!(
+                            //         "owned request_id={}, received request_id={}",
+                            //         current_request_id, res.current_request_id
+                            //     );
+                            // }
 
                             match res.msg {
                                 Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
