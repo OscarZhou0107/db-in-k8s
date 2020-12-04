@@ -1,9 +1,9 @@
 use super::core::{DbVNManager, DbproxyManager};
-use super::executor_addr::*;
 use super::transceiver::Reply;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
+use crate::util::executor_addr::*;
 use crate::util::tcp::*;
 use bb8::Pool;
 use futures::prelude::*;

@@ -1,8 +1,8 @@
 #![allow(warnings)]
-use super::executor_addr::*;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
+use crate::util::executor_addr::*;
 use futures::prelude::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
