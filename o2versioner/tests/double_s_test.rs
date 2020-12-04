@@ -128,70 +128,70 @@ async fn run_double_s() {
 
     sleep(Duration::from_millis(300)).await;
 
-    // let tx0 = vec![
-    //     Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
-    //     Message::RequestMsqlText(MsqlText::query("update w1 set name=\"ray\" where id = 20;", "write w1")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
-    //     Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 22;", "write w2")),
-    //     Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    // ];
+    let tx0 = vec![
+        Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
+        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
+        Message::RequestMsqlText(MsqlText::query("update w1 set name=\"ray\" where id = 20;", "write w1")),
+        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
+        Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 22;", "write w2")),
+        Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+    ];
 
-    // let tx1 = vec![
-    //     Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 r1 WRITE w2 w3")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
-    //     Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 20;", "write w2")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
-    //     Message::RequestMsqlText(MsqlText::query("update w3 set name=\"ray\" where id = 22;", "write w3")),
-    //     Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    // ];
+    let tx1 = vec![
+        Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 r1 WRITE w2 w3")),
+        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0")),
+        Message::RequestMsqlText(MsqlText::query("update w2 set name=\"ray\" where id = 20;", "write w2")),
+        Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1")),
+        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
+        Message::RequestMsqlText(MsqlText::query("update w3 set name=\"ray\" where id = 22;", "write w3")),
+        Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+    ];
 
-    // let tx2 = vec![
-    //     Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ w1 w2 WRITE r0 r1")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1")),
-    //     Message::RequestMsqlText(MsqlText::query("update r0 set name=\"ray\" where id = 20;", "write r0")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1")),
-    //     Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
-    //     Message::RequestMsqlText(MsqlText::query("update r1 set name=\"ray\" where id = 22;", "write r1")),
-    //     Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    // ];
+    let tx2 = vec![
+        Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ w1 w2 WRITE r0 r1")),
+        Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1")),
+        Message::RequestMsqlText(MsqlText::query("update r0 set name=\"ray\" where id = 20;", "write r0")),
+        Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1")),
+        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2")),
+        Message::RequestMsqlText(MsqlText::query("update r1 set name=\"ray\" where id = 22;", "write r1")),
+        Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+    ];
 
-    // let msgs0 = [
-    //     tx0.clone(),
-    //     tx1.clone(),
-    //     tx2.clone(),
-    //     tx1.clone(),
-    //     tx0.clone(),
-    //     tx2.clone(),
-    // ]
-    // .concat();
-    // let tester_handle_0 = tokio::spawn(async move {
-    //     let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-    //     tests_helper::mock_json_client(&mut tcp_stream, msgs0)
-    //         .instrument(info_span!("tester0"))
-    //         .await;
+    let msgs0 = [
+        tx0.clone(),
+        tx1.clone(),
+        tx2.clone(),
+        tx1.clone(),
+        tx0.clone(),
+        tx2.clone(),
+    ]
+    .concat();
+    let tester_handle_0 = tokio::spawn(async move {
+        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+        tests_helper::mock_json_client(&mut tcp_stream, msgs0)
+            .instrument(info_span!("tester0"))
+            .await;
 
-    //     println!("\ntester_handle_0 DONE\n");
-    // });
+        println!("\ntester_handle_0 DONE\n");
+    });
 
-    // let msgs1 = [
-    //     tx2.clone(),
-    //     tx0.clone(),
-    //     tx1.clone(),
-    //     tx0.clone(),
-    //     tx2.clone(),
-    //     tx1.clone(),
-    // ]
-    // .concat();
-    // let tester_handle_1 = tokio::spawn(async move {
-    //     let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-    //     tests_helper::mock_json_client(&mut tcp_stream, msgs1)
-    //         .instrument(info_span!("tester1"))
-    //         .await;
+    let msgs1 = [
+        tx2.clone(),
+        tx0.clone(),
+        tx1.clone(),
+        tx0.clone(),
+        tx2.clone(),
+        tx1.clone(),
+    ]
+    .concat();
+    let tester_handle_1 = tokio::spawn(async move {
+        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
+        tests_helper::mock_json_client(&mut tcp_stream, msgs1)
+            .instrument(info_span!("tester1"))
+            .await;
 
-    //     println!("\ntester_handle_1 DONE\n");
-    // });
+        println!("\ntester_handle_1 DONE\n");
+    });
 
     // Must run, otherwise it won't do the work
     tokio::try_join!(
@@ -199,8 +199,8 @@ async fn run_double_s() {
         sequencer_handle,
         dbproxy0_handle,
         dbproxy1_handle,
-        // tester_handle_0,
-        // tester_handle_1
+        tester_handle_0,
+        tester_handle_1
     )
     .unwrap();
 }

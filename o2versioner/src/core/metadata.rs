@@ -35,6 +35,33 @@ impl ClientMeta {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestMeta {
+    pub client_addr: SocketAddr,
+    pub cur_txid: usize,
+    pub request_id: usize,
+}
+
+impl fmt::Display for RequestMeta {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "(client={} txid={} reqid={})",
+            self.client_addr, self.cur_txid, self.request_id
+        )
+    }
+}
+
+impl RequestMeta {
+    pub fn new(client_meta: &ClientMeta, request_id: usize) -> Self {
+        Self {
+            client_addr: client_meta.client_addr(),
+            cur_txid: client_meta.current_txid(),
+            request_id,
+        }
+    }
+}
+
 /// Unit test for `ClientMeta`
 #[cfg(test)]
 mod tests_client_meta {
