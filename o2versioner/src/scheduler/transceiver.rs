@@ -10,9 +10,10 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, instrument, warn, Span};
+use tracing::{debug, error, field, instrument, warn, Instrument, Span};
 
 /// Request sent from dispatcher direction
+#[derive(Debug)]
 pub struct TransceiverRequest {
     pub dbproxy_addr: SocketAddr,
     pub dbproxy_msg: Message,
@@ -38,27 +39,39 @@ impl State {
         }
     }
 
-    #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty))]
+    #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty, to=field::Empty))]
     async fn execute_request(&self, request: RequestWrapper<TransceiverRequest>) {
         let dbproxy_msg = request.request().dbproxy_msg.clone();
         let client_addr = dbproxy_msg.get_client_addr().clone().unwrap();
         let dbproxy_addr = request.request().dbproxy_addr.clone();
 
-        Span::current().record("message", &&dbproxy_addr.to_string()[..]);
+        Span::current().record("message", &&client_addr.to_string()[..]);
+        Span::current().record("to", &&dbproxy_addr.to_string()[..]);
 
+        debug!("-> {:?}", dbproxy_msg);
+
+        error!("Push {:?}", request.request().dbproxy_msg);
         let prev = self
             .outstanding_req
             .lock()
             .await
             .insert((dbproxy_addr, client_addr), request);
-        assert!(prev.is_none());
+        assert!(
+            prev.is_none(),
+            format!(
+                "dbproxy_addr={}, client_addr={}, prev={:?}, current={:?}",
+                dbproxy_addr,
+                client_addr,
+                prev.unwrap().request().dbproxy_msg,
+                dbproxy_msg
+            )
+        );
 
         let mut transimtters_guard = self.transmitters.lock().await;
         let writer = transimtters_guard.get_mut(&dbproxy_addr).expect("dbproxy_addr unknown");
         let delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
         let mut serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
 
-        debug!("-> {:?}", dbproxy_msg);
         serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
 
         // transmitters_guard is released
@@ -74,9 +87,10 @@ impl State {
                     .outstanding_req
                     .lock()
                     .await
-                    .remove(&(dbproxy_addr, client_addr.clone()))
+                    .remove(&(dbproxy_addr.clone(), client_addr.clone()))
                     .expect("No record in outstanding_req");
-                let (_request, reply_ch) = request_wrapper.unwrap();
+                let (request, reply_ch) = request_wrapper.unwrap();
+                warn!("Popped {:?}", request);
                 debug!("-> {:?}", msg);
                 reply_ch.unwrap().send(msg).unwrap();
             }
@@ -144,34 +158,40 @@ impl Transceiver {
 
         // Every dbproxy receiver is spawned as separate task
         let state_clone = state.clone();
-        let receiver_handle = tokio::spawn(stream::iter(receivers).for_each_concurrent(
-            None,
-            move |(dbproxy_addr, reader)| {
-                let state = state_clone.clone();
-                async move {
-                    let delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
-                    let serded_read = SymmetricallyFramed::new(delimited_read, SymmetricalJson::<Message>::default());
+        let receiver_handle = tokio::spawn(
+            stream::iter(receivers)
+                .for_each_concurrent(None, move |(dbproxy_addr, reader)| {
+                    let state = state_clone.clone();
+                    async move {
+                        let delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
+                        let serded_read =
+                            SymmetricallyFramed::new(delimited_read, SymmetricalJson::<Message>::default());
 
-                    // Each response execution is spawned as separate task
-                    serded_read
-                        .try_for_each_concurrent(None, |msg| async {
-                            state.clone().execute_response(dbproxy_addr, msg).await;
-                            Ok(())
-                        })
-                        .await
-                        .unwrap();
-                }
-            },
-        ));
+                        // Each response execution is spawned as separate task
+                        serded_read
+                            .try_for_each_concurrent(None, |msg| async {
+                                state.clone().execute_response(dbproxy_addr, msg).await;
+                                Ok(())
+                            })
+                            .await
+                            .unwrap();
+                    }
+                })
+                .in_current_span(),
+        );
 
         // Every incoming request_rx is spawned as separate task
         let state_clone = state.clone();
-        let request_rx_handle = tokio::spawn(request_rx.for_each_concurrent(None, move |tranceive_request| {
-            let state = state_clone.clone();
-            async move {
-                state.clone().execute_request(tranceive_request).await;
-            }
-        }));
+        let request_rx_handle = tokio::spawn(
+            request_rx
+                .for_each_concurrent(None, move |tranceive_request| {
+                    let state = state_clone.clone();
+                    async move {
+                        state.clone().execute_request(tranceive_request).await;
+                    }
+                })
+                .in_current_span(),
+        );
 
         tokio::try_join!(receiver_handle, request_rx_handle).unwrap();
     }

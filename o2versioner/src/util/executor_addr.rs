@@ -11,6 +11,7 @@ pub trait ExecutorRequest {
 pub type RequestReceiver<Request> = mpsc::Receiver<RequestWrapper<Request>>;
 
 /// Wrapper of `Request` which also carries the sender channel for `Request::ReplyType`
+#[derive(Debug)]
 pub struct RequestWrapper<Request>
 where
     Request: ExecutorRequest,
