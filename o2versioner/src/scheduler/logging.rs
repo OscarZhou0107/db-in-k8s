@@ -55,6 +55,18 @@ impl RequestRecord {
     pub fn elapsed(&self) -> chrono::Duration {
         self.res_timestamp - self.req_timestamp
     }
+
+    pub fn is_begintx(&self) -> bool {
+        self.req.is_begintx()
+    }
+
+    pub fn is_query(&self) -> bool {
+        self.req.is_query()
+    }
+
+    pub fn is_endtx(&self) -> bool {
+        self.req.is_endtx()
+    }
 }
 
 pub struct ClientRecord {
