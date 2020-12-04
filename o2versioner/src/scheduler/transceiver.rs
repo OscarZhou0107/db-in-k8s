@@ -50,9 +50,9 @@ impl Transceiver {
         )
     }
 
-    #[instrument(name="transceive", skip(self), fields(dbproxy=field::Empty))]
+    #[instrument(name="transceive", skip(self), fields(message=field::Empty))]
     pub async fn run(self) {
-        Span::current().record("dbproxy", &&self.dbproxy_addr.to_string()[..]);
+        Span::current().record("message", &&self.dbproxy_addr.to_string()[..]);
 
         let Transceiver {
             dbproxy_addr,
@@ -82,7 +82,7 @@ impl Transceiver {
                             let queue = guard.get_mut(&client_addr).expect("No client addr in outstanding_req");
                             let request_wrapper = queue.pop_back().expect("No record in outstanding_req");
                             let (request, reply_ch) = request_wrapper.unwrap();
-                            info!("currently have {} after Pop back", queue.len());
+                            info!("conn fifo has {} after Pop back", queue.len());
                             debug!("-> {:?}", msg);
                             reply_ch
                                 .unwrap()
@@ -110,7 +110,7 @@ impl Transceiver {
                     debug!("-> {:?}", dbproxy_msg);
                     let mut guard = outstanding_req.lock().await;
                     let queue = guard.entry(client_addr.clone()).or_default();
-                    info!("currently have {} before Push front", queue.len());
+                    info!("conn fifo has {} before Push front", queue.len());
                     queue.push_front(request);
                     let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
                     let mut serded_write =

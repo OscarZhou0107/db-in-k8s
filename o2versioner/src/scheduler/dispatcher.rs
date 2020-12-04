@@ -66,11 +66,12 @@ impl State {
         }
     }
 
-    #[instrument(name="execute", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
+    #[instrument(name="execute", skip(self, request), fields(message=field::Empty, id=field::Empty, cmd=field::Empty, op=field::Empty))]
     async fn execute(&self, request: RequestWrapper<DispatcherRequest>) {
         let (request, reply_ch) = request.unwrap();
 
         Span::current().record("message", &&request.client_meta.to_string()[..]);
+        Span::current().record("id", &request.current_request_id);
         Span::current().record("cmd", &request.command.as_ref());
         debug!("<- {:?} {:?}", request.command, request.txvn);
 
