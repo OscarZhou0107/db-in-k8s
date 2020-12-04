@@ -1,4 +1,4 @@
-use o2versioner::core::*;
+use o2versioner::{util::config::DbProxyConfig, core::*};
 use futures::prelude::*;
 use o2versioner::{core::MsqlQuery, dbproxy};
 use o2versioner::{comm::scheduler_dbproxy::Message};
@@ -174,7 +174,7 @@ async fn test_dbproxy_end_to_end_2() {
 
     sleep(Duration::from_millis(1000)).await;
     
-    let tcp_stream = TcpStream::connect("127.0.0.1:2347").await.unwrap();
+    let tcp_stream = TcpStream::connect("127.0.0.1:2348").await.unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
     let mut deserializer = SymmetricallyFramed::new(
@@ -224,13 +224,16 @@ fn helper_spawn_client_sender(tcp_write: OwnedWriteHalf, mut messages: Vec<Messa
 
 fn helper_spawn_proxy(addr : SocketAddr) {
     tokio::spawn(async move {
-        let mut config = tokio_postgres::Config::new();
-        config.user("postgres");
-        config.password("Rayh8768");
-        config.host("localhost");
-        config.port(5432);
-        config.dbname("Test");
 
-        dbproxy::main(addr, config).await;
+        let config = DbProxyConfig {
+            addr : addr.to_string(),
+            port : 5432,
+            host : "localhost".to_string(),
+            user : "postgres".to_string(),
+            password : "Abc@123".to_string(),
+            dbname : "Test".to_string(),
+        };
+
+        dbproxy::main(config).await;
     });
 }

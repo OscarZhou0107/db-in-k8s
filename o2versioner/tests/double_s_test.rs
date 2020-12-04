@@ -101,12 +101,20 @@ async fn run_double_s() {
         },
         dbproxy: vec![
             DbProxyConfig {
-                addr: String::from(dbproxy0_addr),
-                sql_addr: String::from("THIS IS NOT NEEDED"),
+                addr: String::from("127.0.0.1:8876"),
+                host: String::from("localhost"),
+                port: 5432,
+                user: String::from("postgres"),
+                password: String::from(""),
+                dbname: String::from("Test"),
             },
             DbProxyConfig {
-                addr: String::from(dbproxy1_addr),
-                sql_addr: String::from("THIS IS NOT NEEDED"),
+                addr: String::from("127.0.0.1:8876"),
+                host: String::from("localhost"),
+                port: 5432,
+                user: String::from("postgres"),
+                password: String::from(""),
+                dbname: String::from("Test"),
             },
         ],
     };

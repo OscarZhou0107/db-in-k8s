@@ -24,7 +24,7 @@ impl Responder {
                         version
                             .lock()
                             .await
-                            .release_on_tables(result.contained_newer_versions.clone());
+                            .release_on_transaction(result.contained_newer_versions.clone());
                     }
                     _ => {}
                 }
@@ -43,11 +43,9 @@ mod tests_test {
     use super::Responder;
     use crate::comm::scheduler_dbproxy::Message;
     use crate::comm::MsqlResponse;
-    use crate::core::RWOperation;
-    use crate::core::TxTableVN;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
-    use std::{collections::HashMap, sync::Arc, net::SocketAddr};
+    use std::{sync::Arc, net::SocketAddr};
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
@@ -61,22 +59,8 @@ mod tests_test {
         let addr : SocketAddr = details.parse().expect("Unable to parse socket address");
         
         //Prepare - Mock db related context
-        let mut mock_db = HashMap::new();
-        mock_db.insert("table1".to_string(), 0);
-        mock_db.insert("table2".to_string(), 0);
-        let mock_table_vs = vec![
-            TxTableVN {
-                table: "table1".to_string(),
-                vn: 0,
-                op: RWOperation::R,
-            },
-            TxTableVN {
-                table: "table2".to_string(),
-                vn: 0,
-                op: RWOperation::R,
-            },
-        ];
-        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
+       
+        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         //Prepare - Network
         let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
             mpsc::channel(100);
@@ -90,7 +74,7 @@ mod tests_test {
             result: "r".to_string(),
             succeed: true,
             result_type: QueryResultType::BEGIN,
-            contained_newer_versions: mock_table_vs.clone(),
+            contained_newer_versions: Default::default(),
         };
 
         //Prepare - Responder

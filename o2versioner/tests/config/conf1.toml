@@ -10,8 +10,16 @@ max_connection = 50
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
-sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
+host = "localhost"
+port = "5432"
+user = "postgres"
+password = "Abc@123"
+dbname = "Test"
 
 [[dbproxy]]
-addr = "127.0.0.1:8877"
-sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
+addr = "127.0.0.1:8876"
+host = "localhost"
+port = "5432"
+user = "postgres"
+password = "Abc@123"
+dbname = "Test"

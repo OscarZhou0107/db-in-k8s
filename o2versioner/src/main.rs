@@ -23,15 +23,13 @@ async fn main() {
     info!("{:?}", conf);
 
     if matches.is_present("dbproxy") {
+        let index: usize = matches.value_of("dbindex")
+        .unwrap()
+        .to_string()
+        .parse()
+        .unwrap();
 
-        let mut config = tokio_postgres::Config::new();
-        config.user("postgres");
-        config.password("Rayh8768");
-        config.host("localhost");
-        config.port(5432);
-        config.dbname("Test");
-
-        dbproxy::main("127.0.0.1:2345", config).await
+        dbproxy::main(conf.dbproxy.get(index).unwrap().clone()).await
     } else if matches.is_present("scheduler") {
         scheduler_main(conf).await
     } else if matches.is_present("sequencer") {
@@ -53,6 +51,11 @@ fn parse_args() -> ArgMatches<'static> {
                 .takes_value(true),
         )
         .arg(Arg::with_name("dbproxy").long("dbproxy").help("Run the dbproxy"))
+        .arg(
+            Arg::with_name("dbindex")
+                .long("dbindex")
+                .help("Indicate the index of dbproxy"),
+        )
         .arg(Arg::with_name("scheduler").long("scheduler").help("Run the scheduler"))
         .arg(Arg::with_name("sequencer").long("sequencer").help("Run the sequencer"))
         .group(
