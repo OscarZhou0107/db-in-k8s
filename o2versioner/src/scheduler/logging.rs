@@ -13,6 +13,13 @@ impl RequestRecordStart {
     pub fn finish(self, res: &MsqlResponse) -> RequestRecord {
         let RequestRecordStart { req, req_timestamp } = self;
 
+        assert!(
+            (req.is_begintx() && res.is_begintx())
+                || (req.is_query() && res.is_query())
+                || (req.is_endtx() && res.is_endtx()),
+            "Request must match with Response type"
+        );
+
         RequestRecord {
             req,
             req_timestamp,
@@ -36,18 +43,38 @@ impl RequestRecord {
             req_timestamp: Utc::now(),
         }
     }
+
+    pub fn request_info(&self) -> (&Msql, &DateTime<Utc>) {
+        (&self.req, &self.req_timestamp)
+    }
+
+    pub fn reponse_info(&self) -> (&MsqlResponse, &DateTime<Utc>) {
+        (&self.res, &self.res_timestamp)
+    }
+
+    pub fn elapsed(&self) -> chrono::Duration {
+        self.res_timestamp - self.req_timestamp
+    }
 }
 
 pub struct ClientRecord {
     client_addr: SocketAddr,
-    req_records: Vec<RequestRecord>,
+    records: Vec<RequestRecord>,
 }
 
 impl ClientRecord {
     pub fn new(client_addr: SocketAddr) -> Self {
         Self {
             client_addr,
-            req_records: Vec::new(),
+            records: Vec::new(),
         }
+    }
+
+    pub fn records(&self) -> &[RequestRecord] {
+        &self.records
+    }
+
+    pub fn push(&mut self, req_record: RequestRecord) {
+        self.records.push(req_record)
     }
 }
