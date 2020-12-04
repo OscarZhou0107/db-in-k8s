@@ -126,18 +126,12 @@ async fn process_connection(
     let (tcp_read, tcp_write) = socket.split();
 
     // Delimit frames from bytes using a length header
-    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
-    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
+    let delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
+    let delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read = SymmetricallyFramed::new(
-        length_delimited_read,
-        SymmetricalJson::<scheduler_api::Message>::default(),
-    );
-    let serded_write = SymmetricallyFramed::new(
-        length_delimited_write,
-        SymmetricalJson::<scheduler_api::Message>::default(),
-    );
+    let serded_read = SymmetricallyFramed::new(delimited_read, SymmetricalJson::<scheduler_api::Message>::default());
+    let serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<scheduler_api::Message>::default());
 
     // Each individual connection communication is executed in blocking order,
     // the socket is dedicated for one session only, opposed to being shared for multiple sessions.

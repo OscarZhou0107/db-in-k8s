@@ -21,6 +21,7 @@ pub enum Message {
     MsqlRequest(SocketAddr, Msql, Option<TxVN>),
     /// The repsone to the `MsqlRequest`
     MsqlResponse(MsqlResponse),
+    MsqlResponseNew(SocketAddr, MsqlResponse),
     /// Response to an invalid request, for exmample, sending `MsqlResponse(MsqlResponse)` to the dbproxy
     Invalid,
 }

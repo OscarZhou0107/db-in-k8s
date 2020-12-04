@@ -1,5 +1,6 @@
 #![allow(warnings)]
 use super::inner_comm::*;
+use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use futures::prelude::*;
@@ -9,7 +10,10 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use tracing::{debug, field, info, instrument};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
+use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::{debug, field, info, instrument, warn, Span};
 
 pub struct Transceiver {
     receivers: HashMap<SocketAddr, OwnedReadHalf>,
@@ -53,6 +57,33 @@ impl Transceiver {
         )
     }
 
-    #[instrument(name="dispatch", skip(self), fields(dbvn=field::Empty, dbproxy=field::Empty))]
-    pub async fn run(mut self) {}
+    #[instrument(name="transceive", skip(self), fields(dbproxy=field::Empty))]
+    pub async fn run(self) {
+        Span::current().record("dbproxy", &self.receivers.len());
+        let Transceiver {
+            receivers,
+            transmitters,
+            request_rx,
+        } = self;
+
+        let receiver_handle = tokio::spawn(stream::iter(receivers).for_each_concurrent(
+            None,
+            |(dbproxy_addr, reader)| async {
+                let delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
+                let serded_read = SymmetricallyFramed::new(delimited_read, SymmetricalJson::<Message>::default());
+
+                serded_read
+                    .try_for_each(|msg| async {
+                        match msg {
+                            Message::MsqlResponseNew(client_addr, msqlresponse) => {
+                                todo!();
+                            }
+                            other => warn!("Unsupported {:?}", other),
+                        };
+                        Ok(())
+                    })
+                    .await;
+            },
+        ));
+    }
 }
