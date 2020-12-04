@@ -42,7 +42,7 @@ impl State {
     #[instrument(name="execute_response", skip(self, msg), fields(message=field::Empty))]
     async fn execute_response(&self, msg: Message) {
         match msg {
-            Message::MsqlResponseNew(client_addr, msqlresponse) => {
+            Message::MsqlResponse(client_addr, msqlresponse) => {
                 todo!();
             }
             other => warn!("Unsupported {:?}", other),
