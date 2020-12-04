@@ -251,9 +251,10 @@ impl Dispatcher {
             .len();
         Span::current().record("dbvn", &num_dbvn_manager);
 
-        // Handle each Request concurrently
+
         let Dispatcher { state, request_rx } = self;
 
+        // Handle each Request concurrently
         request_rx
             .for_each_concurrent(None, |dispatch_request| async {
                 state.clone().execute(dispatch_request).await
