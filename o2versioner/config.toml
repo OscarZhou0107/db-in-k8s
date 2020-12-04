@@ -3,6 +3,7 @@ addr = "127.0.0.1:1077"
 dispatcher_queue_size = 500
 max_connection = 50
 sequencer_pool_size = 20
+transceiver_queue_size = 20
 
 [sequencer]
 addr = "127.0.0.1:9876"
@@ -10,16 +11,16 @@ max_connection = 50
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
+dbname = "Test"
 host = "localhost"
+password = "Abc@123"
 port = "5432"
 user = "postgres"
-password = "Abc@123"
-dbname = "Test"
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
+dbname = "Test"
 host = "localhost"
+password = "Abc@123"
 port = "5432"
 user = "postgres"
-password = "Abc@123"
-dbname = "Test"

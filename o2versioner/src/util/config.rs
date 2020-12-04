@@ -30,6 +30,7 @@ pub struct SchedulerConfig {
     pub max_connection: Option<u32>,
     pub sequencer_pool_size: u32,
     pub dispatcher_queue_size: usize,
+    pub transceiver_queue_size: usize,
 }
 
 impl SchedulerConfig {
@@ -84,7 +85,8 @@ mod tests_config {
                     admin_addr: None,
                     max_connection: Some(50),
                     sequencer_pool_size: 20,
-                    dispatcher_queue_size: 500
+                    dispatcher_queue_size: 500,
+                    transceiver_queue_size: 500
                 },
                 sequencer: SequencerConfig {
                     addr: String::from("127.0.0.1:9876"),

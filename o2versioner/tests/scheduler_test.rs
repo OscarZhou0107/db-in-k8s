@@ -20,6 +20,7 @@ async fn test_scheduler() {
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
             dispatcher_queue_size: 1,
+            transceiver_queue_size: 1,
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
@@ -88,6 +89,7 @@ async fn test_scheduler_with_admin() {
             max_connection: None,
             sequencer_pool_size: sequencer_max_connection,
             dispatcher_queue_size: 1,
+            transceiver_queue_size: 1,
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
@@ -181,6 +183,7 @@ async fn test_scheduler_with_request_crash() {
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
             dispatcher_queue_size: 1,
+            transceiver_queue_size: 1,
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
