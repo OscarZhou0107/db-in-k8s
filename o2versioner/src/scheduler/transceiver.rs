@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use super::inner_comm::*;
+use super::executor_addr::*;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
@@ -17,11 +17,39 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, field, info, instrument, warn, Span};
 
+/// Response sent from dbproxy to handler direction
+#[derive(Debug)]
+pub struct Reply {
+    /// Response to the `Msql` command
+    pub msql_res: MsqlResponse,
+    /// The modified `TxVN`,
+    /// this should be used to update the `ConnectionState`.
+    pub txvn_res: Option<TxVN>,
+}
+
+impl Reply {
+    pub fn new(msql_res: MsqlResponse, txvn_res: Option<TxVN>) -> Self {
+        Self { msql_res, txvn_res }
+    }
+}
+
+/// Request sent from dispatcher direction
+pub struct TranceiverRequest {
+    pub dbproxy_addr: SocketAddr,
+    pub client_meta: ClientMeta,
+    pub command: Msql,
+    pub txvn: Option<TxVN>,
+}
+
+impl ExecutorRequest for TranceiverRequest {
+    type ReplyType = Reply;
+}
+
 /// A state containing shared variables
 #[derive(Clone)]
 struct State {
     transmitters: Arc<Mutex<HashMap<SocketAddr, OwnedWriteHalf>>>,
-    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), Request>>>,
+    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), TranceiverRequest>>>,
 }
 
 impl State {
@@ -32,11 +60,11 @@ impl State {
         }
     }
 
-    #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
-    async fn execute_request(&self, request: Request) {
-        Span::current().record("message", &&request.client_meta.to_string()[..]);
-        Span::current().record("cmd", &request.command.as_ref());
-        debug!("<- {:?} {:?}", request.command, request.txvn);
+    #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty))]
+    async fn execute_request(&self, request: RequestWrapper<TranceiverRequest>) {
+        let (request, reply_ch) = request.unwrap();
+
+        Span::current().record("message", &&request.dbproxy_addr.to_string()[..]);
     }
 
     #[instrument(name="execute_response", skip(self, msg), fields(message=field::Empty))]
@@ -50,16 +78,18 @@ impl State {
     }
 }
 
+pub type TranceiverAddr = ExecutorAddr<TranceiverRequest>;
+
 pub struct Transceiver {
     state: State,
     receivers: Vec<(SocketAddr, OwnedReadHalf)>,
 
-    request_rx: mpsc::Receiver<Request>,
+    request_rx: RequestReceiver<TranceiverRequest>,
 }
 
 impl Transceiver {
     /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` into `Transceiver`
-    pub async fn new<I>(queue_size: usize, iter: I) -> (ExecutorAddr, Self)
+    pub async fn new<I>(queue_size: usize, iter: I) -> (TranceiverAddr, Self)
     where
         I: IntoIterator<Item = SocketAddr>,
     {

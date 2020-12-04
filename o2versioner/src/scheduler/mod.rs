@@ -1,7 +1,7 @@
 mod core;
 mod dispatcher;
+mod executor_addr;
 mod handler;
-mod inner_comm;
 mod transceiver;
 
 pub use handler::main;

@@ -1,6 +1,6 @@
 use super::core::*;
 use super::dispatcher::*;
-use super::inner_comm::*;
+use super::transceiver::Reply;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
@@ -117,7 +117,7 @@ pub async fn main(conf: Config) {
 async fn process_connection(
     mut socket: TcpStream,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    dispatcher_addr: Arc<ExecutorAddr>,
+    dispatcher_addr: Arc<DispatcherAddr>,
 ) {
     let client_addr = socket.peer_addr().unwrap();
 
@@ -182,7 +182,7 @@ async fn process_request(
     msg: scheduler_api::Message,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    dispatcher_addr: Arc<ExecutorAddr>,
+    dispatcher_addr: Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
@@ -214,7 +214,7 @@ async fn process_msql(
     msql: Msql,
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
-    dispatcher_addr: Arc<ExecutorAddr>,
+    dispatcher_addr: Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     Span::current().record("cmd", &msql.as_ref());
     Span::current().record("txid", &conn_state.client_meta().current_txid());
@@ -274,16 +274,16 @@ async fn process_query(
     msql: Msql,
     conn_state: &mut ConnectionState,
     _sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
-    dispatcher_addr: &Arc<ExecutorAddr>,
+    dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     assert!(conn_state.current_txvn().is_some());
 
     dispatcher_addr
-        .request(
+        .request(DispatcherRequest::new(
             conn_state.client_meta().clone(),
             msql,
             conn_state.current_txvn().clone(),
-        )
+        ))
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::query_err(e)),
             |res| {
@@ -298,13 +298,13 @@ async fn process_query(
 async fn process_endtx(
     msql: Msql,
     conn_state: &mut ConnectionState,
-    dispatcher_addr: &Arc<ExecutorAddr>,
+    dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> scheduler_api::Message {
     let txvn = conn_state.replace_txvn(None);
     assert!(txvn.is_some());
 
     dispatcher_addr
-        .request(conn_state.client_meta().clone(), msql, txvn)
+        .request(DispatcherRequest::new(conn_state.client_meta().clone(), msql, txvn))
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
             |res| {

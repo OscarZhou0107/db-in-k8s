@@ -1,5 +1,6 @@
 use super::core::{DbVNManager, DbproxyManager};
-use super::inner_comm::*;
+use super::executor_addr::*;
+use super::transceiver::Reply;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
@@ -8,8 +9,29 @@ use bb8::Pool;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex, Notify, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock};
 use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
+
+/// DispatcherRequest sent from handler to dbproxy direction
+pub struct DispatcherRequest {
+    client_meta: ClientMeta,
+    command: Msql,
+    txvn: Option<TxVN>,
+}
+
+impl ExecutorRequest for DispatcherRequest {
+    type ReplyType = Reply;
+}
+
+impl DispatcherRequest {
+    pub fn new(client_meta: ClientMeta, command: Msql, txvn: Option<TxVN>) -> Self {
+        Self {
+            client_meta,
+            command,
+            txvn,
+        }
+    }
+}
 
 /// A state containing shared variables
 #[derive(Clone)]
@@ -29,7 +51,9 @@ impl State {
     }
 
     #[instrument(name="execute", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
-    async fn execute(&self, request: Request) {
+    async fn execute(&self, request: RequestWrapper<DispatcherRequest>) {
+        let (request, reply_ch) = request.unwrap();
+
         Span::current().record("message", &&request.client_meta.to_string()[..]);
         Span::current().record("cmd", &request.command.as_ref());
         debug!("<- {:?} {:?}", request.command, request.txvn);
@@ -39,8 +63,7 @@ impl State {
         if !self.is_dbproxy_existed().await {
             warn!("There are currently no dbproxy servers online, Scheduler dispatcher skipped the work");
 
-            request
-                .reply
+            reply_ch
                 .unwrap()
                 .send(Reply::new(
                     MsqlResponse::err("Dbproxy servers are all offline", &request.command),
@@ -72,15 +95,14 @@ impl State {
         let num_dbproxy = dbproxy_addrs.len();
         let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
 
-        let Request {
+        let DispatcherRequest {
             client_meta,
             command,
             txvn,
-            reply,
         } = request;
 
         let msg = Message::MsqlRequest(client_meta.client_addr(), command, txvn.clone());
-        let shared_reply_channel = Arc::new(Mutex::new(reply));
+        let shared_reply_channel = Arc::new(Mutex::new(reply_ch));
 
         // Each communication with dbproxy is spawned as a separate task
         dbproxy_tasks_stream
@@ -96,7 +118,7 @@ impl State {
                         .inspect_err(|e| warn!("Cannot send: {:?}", e))
                         .map_err(|e| e.to_string())
                         .and_then(|res| match res {
-                            Message::MsqlResponse(_ ,msqlresponse) => future::ok(msqlresponse),
+                            Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
                             _ => future::err(String::from("Invalid response from Dbproxy")),
                         })
                         .map_ok_or_else(
@@ -225,9 +247,11 @@ impl State {
     }
 }
 
+pub type DispatcherAddr = ExecutorAddr<DispatcherRequest>;
+
 pub struct Dispatcher {
     state: State,
-    request_rx: mpsc::Receiver<Request>,
+    request_rx: RequestReceiver<DispatcherRequest>,
 }
 
 impl Dispatcher {
@@ -235,10 +259,10 @@ impl Dispatcher {
         queue_size: usize,
         dbvn_manager: Arc<RwLock<DbVNManager>>,
         dbproxy_manager: DbproxyManager,
-    ) -> (ExecutorAddr, Dispatcher) {
+    ) -> (DispatcherAddr, Dispatcher) {
         let state = State::new(dbvn_manager, dbproxy_manager);
 
-        let (addr, request_rx) = ExecutorAddr::new(queue_size);
+        let (addr, request_rx) = DispatcherAddr::new(queue_size);
         (addr, Dispatcher { state, request_rx })
     }
 
@@ -251,10 +275,9 @@ impl Dispatcher {
             .len();
         Span::current().record("dbvn", &num_dbvn_manager);
 
-
         let Dispatcher { state, request_rx } = self;
 
-        // Handle each Request concurrently
+        // Handle each DispatcherRequest concurrently
         request_rx
             .for_each_concurrent(None, |dispatch_request| async {
                 state.clone().execute(dispatch_request).await
@@ -283,7 +306,7 @@ mod tests_dispatcher {
 
         let dispatcher_handler = tokio::spawn(dispatcher.run());
 
-        fn drop_dispatcher_addr(_: ExecutorAddr) {}
+        fn drop_dispatcher_addr(_: DispatcherAddr) {}
         drop_dispatcher_addr(dispatcher_addr);
 
         tokio::try_join!(dispatcher_handler).unwrap();
