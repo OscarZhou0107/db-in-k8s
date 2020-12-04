@@ -30,7 +30,7 @@ impl Responder {
                 }
 
                 serializer
-                    .send(Message::MsqlResponse(result.into_msql_response()))
+                    .send(Message::MsqlResponse(result.identifier.clone(),result.into_msql_response()))
                     .await
                     .unwrap();
             }
@@ -71,6 +71,7 @@ mod tests_test {
 
         //Prepare - Data
         let r = QueryResult {
+            identifier: addr.clone(),
             result: "r".to_string(),
             succeed: true,
             result_type: QueryResultType::BEGIN,
@@ -111,7 +112,7 @@ mod tests_test {
             //Action
             while let Some(msg) = deserialize.try_next().await.unwrap() {
                 match msg {
-                    Message::MsqlResponse(op) => {
+                    Message::MsqlResponse(_, op) => {
                         vertifying_queue.lock().await.push(op);
                     }
                     _other => {

@@ -92,7 +92,7 @@ async fn test_dbproxy_end_to_end() {
 
         while let Some(msg) = deserializer.try_next().await.unwrap() {
             match msg {
-                Message::MsqlResponse(res) => match res {
+                Message::MsqlResponse(_ ,res) => match res {
                     MsqlResponse::BeginTx(_b) => {begin_count += 1;}
                     MsqlResponse::Query(_q) => {query_count += 1;}
                     MsqlResponse::EndTx(_e) => {end_count += 1;}
@@ -191,7 +191,7 @@ async fn test_dbproxy_end_to_end_2() {
 
         while let Some(msg) = deserializer.try_next().await.unwrap() {
             match msg {
-                Message::MsqlResponse(res) => match res {
+                Message::MsqlResponse(_, res) => match res {
                     MsqlResponse::BeginTx(_b) => {begin_count += 1;}
                     MsqlResponse::Query(_q) => {query_count += 1;}
                     MsqlResponse::EndTx(_e) => {end_count += 1;}

@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use futures::prelude::*;
 use o2versioner::comm::scheduler_api::*;
 use o2versioner::comm::scheduler_dbproxy;
@@ -242,13 +244,17 @@ where
 
                             match msg {
                                 scheduler_dbproxy::Message::MsqlRequest(_client, msql, _txvn) => {
-                                    Ok(scheduler_dbproxy::Message::MsqlResponse(match msql {
+
+                                    let response = match msql {
                                         Msql::BeginTx(_) => {
                                             MsqlResponse::begintx_err("Dbproxy does not handle BeginTx")
                                         }
                                         Msql::Query(_) => MsqlResponse::query_ok("QUERY GOOD"),
                                         Msql::EndTx(_) => MsqlResponse::endtx_ok("ENDTX GOOD"),
-                                    }))
+                                    };
+                                    
+                                    let mock_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+                                    Ok(scheduler_dbproxy::Message::MsqlResponse(mock_socket_addr, response))
                                 }
                                 _ => Ok(scheduler_dbproxy::Message::Invalid),
                             }
