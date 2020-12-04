@@ -110,6 +110,7 @@ impl QueueMessage {
         };
 
         QueryResult {
+            identifier : self.identifier,
             result: result,
             result_type: result_type,
             succeed: succeed,
@@ -298,6 +299,7 @@ pub enum QueryResultType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct QueryResult {
+    pub identifier : SocketAddr,
     pub result: String,
     pub succeed: bool,
     pub result_type: QueryResultType,

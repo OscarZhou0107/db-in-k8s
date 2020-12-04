@@ -96,7 +96,7 @@ impl State {
                         .inspect_err(|e| warn!("Cannot send: {:?}", e))
                         .map_err(|e| e.to_string())
                         .and_then(|res| match res {
-                            Message::MsqlResponse(msqlresponse) => future::ok(msqlresponse),
+                            Message::MsqlResponse(_ ,msqlresponse) => future::ok(msqlresponse),
                             _ => future::err(String::from("Invalid response from Dbproxy")),
                         })
                         .map_ok_or_else(
