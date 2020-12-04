@@ -1,10 +1,9 @@
-use super::core::{DbVNManager, DbproxyManager};
+use super::core::DbVNManager;
+use super::transceiver::*;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use crate::util::executor_addr::*;
-use crate::util::tcp::*;
-use bb8::Pool;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -51,17 +50,21 @@ impl DispatcherRequest {
 /// A state containing shared variables
 #[derive(Clone)]
 struct State {
+    dbproxy_addrs: Vec<SocketAddr>,
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     dbvn_manager_notify: Arc<Notify>,
-    dbproxy_manager: DbproxyManager,
+    transceiver_addr: TransceiverAddr,
 }
 
 impl State {
-    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager: DbproxyManager) -> Self {
+    async fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, transceiver_addr: TransceiverAddr) -> Self {
+        let dbproxy_addrs = dbvn_manager.read().await.get_all_addr();
+
         Self {
+            dbproxy_addrs,
             dbvn_manager,
             dbvn_manager_notify: Arc::new(Notify::new()),
-            dbproxy_manager,
+            transceiver_addr,
         }
     }
 
@@ -75,7 +78,7 @@ impl State {
 
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
-        if !self.is_dbproxy_existed().await {
+        if self.dbproxy_addrs.is_empty() {
             warn!("There are currently no dbproxy servers online, Scheduler dispatcher skipped the work");
 
             reply_ch
@@ -96,12 +99,12 @@ impl State {
                 match msqlquery.tableops().access_pattern() {
                     AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
                     AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, &request.txvn).await],
-                    AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
+                    AccessPattern::WriteOnly => self.dbproxy_addrs.clone(),
                 }
             }
             Msql::EndTx(msqlendtx) => {
                 Span::current().record("op", &&format!("{:?}", msqlendtx.mode())[..]);
-                self.dbproxy_manager.to_vec()
+                self.dbproxy_addrs.clone()
             }
         };
 
@@ -121,17 +124,21 @@ impl State {
 
         // Each communication with dbproxy is spawned as a separate task
         dbproxy_tasks_stream
-            .for_each_concurrent(None, move |(dbproxy_addr, dbproxy_pool)| {
+            .for_each_concurrent(None, move |dbproxy_addr| {
                 let msg_cloned = msg.clone();
                 let txvn_cloned = txvn.clone();
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
                 let process = async move {
                     Span::current().record("message", &&dbproxy_addr.to_string()[..]);
                     debug!("-> {:?}", msg_cloned);
-                    let mut tcpsocket = dbproxy_pool.get().await.unwrap();
-                    let msqlresponse = send_and_receive_single_as_json(&mut tcpsocket, msg_cloned)
+
+                    let msqlresponse = self
+                        .transceiver_addr
+                        .request(TransceiverRequest {
+                            dbproxy_addr,
+                            dbproxy_msg: msg_cloned,
+                        })
                         .inspect_err(|e| warn!("Cannot send: {:?}", e))
-                        .map_err(|e| e.to_string())
                         .and_then(|res| match res {
                             Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
                             _ => future::err(String::from("Invalid response from Dbproxy")),
@@ -179,20 +186,8 @@ impl State {
             .await;
     }
 
-    async fn is_dbproxy_existed(&self) -> bool {
-        let num_dbproxy_pool = self.dbproxy_manager.inner().len();
-        let num_dbproxy_dbvn = self.dbvn_manager.read().await.inner().len();
-
-        assert_eq!(num_dbproxy_pool, num_dbproxy_dbvn);
-        return num_dbproxy_pool > 0;
-    }
-
     #[instrument(skip(self), fields(msqlquery, txvn))]
-    async fn wait_on_version(
-        &self,
-        msqlquery: &MsqlQuery,
-        txvn: &Option<TxVN>,
-    ) -> (SocketAddr, Pool<TcpStreamConnectionManager>) {
+    async fn wait_on_version(&self, msqlquery: &MsqlQuery, txvn: &Option<TxVN>) -> SocketAddr {
         assert_eq!(
             msqlquery.tableops().access_pattern(),
             AccessPattern::ReadOnly,
@@ -226,7 +221,7 @@ impl State {
             // For now, pick the first dbproxy from all available
             let dbproxy_addr = avail_dbproxy[0].0;
             debug!("Found dbproxy {} for executing the ReadOnly query", dbproxy_addr);
-            (dbproxy_addr, self.dbproxy_manager.get(&dbproxy_addr))
+            dbproxy_addr
         } else {
             // Single read operation that does not have a TxVN
             // Since a single-read transaction executes only at one replica,
@@ -270,12 +265,12 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub fn new(
+    pub async fn new(
         queue_size: usize,
         dbvn_manager: Arc<RwLock<DbVNManager>>,
-        dbproxy_manager: DbproxyManager,
+        transceiver_addr: TransceiverAddr,
     ) -> (DispatcherAddr, Dispatcher) {
-        let state = State::new(dbvn_manager, dbproxy_manager);
+        let state = State::new(dbvn_manager, transceiver_addr).await;
 
         let (addr, request_rx) = DispatcherAddr::new(queue_size);
         (addr, Dispatcher { state, request_rx })
@@ -300,30 +295,5 @@ impl Dispatcher {
             .await;
 
         info!("Scheduler dispatcher terminated after finishing all requests");
-    }
-}
-
-/// Unit test for `Dispatcher`
-#[cfg(test)]
-mod tests_dispatcher {
-    use super::*;
-    use crate::util::tests_helper::init_logger;
-    use std::iter::FromIterator;
-
-    #[tokio::test]
-    async fn test_drop_dispatcher_addr() {
-        let _guard = init_logger();
-        let (dispatcher_addr, dispatcher) = Dispatcher::new(
-            10,
-            Arc::new(RwLock::new(DbVNManager::from_iter(vec![]))),
-            DbproxyManager::from_iter(vec![]).await,
-        );
-
-        let dispatcher_handler = tokio::spawn(dispatcher.run());
-
-        fn drop_dispatcher_addr(_: DispatcherAddr) {}
-        drop_dispatcher_addr(dispatcher_addr);
-
-        tokio::try_join!(dispatcher_handler).unwrap();
     }
 }

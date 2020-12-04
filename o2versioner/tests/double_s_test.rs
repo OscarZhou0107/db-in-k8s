@@ -1,5 +1,3 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
 use futures::prelude::*;
 use o2versioner::comm::scheduler_api::*;
 use o2versioner::comm::scheduler_dbproxy;
@@ -105,7 +103,7 @@ async fn run_double_s() {
         },
         dbproxy: vec![
             DbProxyConfig {
-                addr: String::from("127.0.0.1:8876"),
+                addr: String::from(dbproxy0_addr),
                 host: String::from("localhost"),
                 port: 5432,
                 user: String::from("postgres"),
@@ -113,7 +111,7 @@ async fn run_double_s() {
                 dbname: String::from("Test"),
             },
             DbProxyConfig {
-                addr: String::from("127.0.0.1:8876"),
+                addr: String::from(dbproxy1_addr),
                 host: String::from("localhost"),
                 port: 5432,
                 user: String::from("postgres"),
@@ -237,7 +235,7 @@ where
                 serded_read
                     .and_then(move |msg| {
                         async move {
-                            debug!("Receives {:?}", msg);
+                            debug!("<- {:?}", msg);
 
                             // Simulate some load
                             let sleep_time = rand::rngs::OsRng::default().gen_range(20, 200);
@@ -245,8 +243,7 @@ where
                             sleep(Duration::from_millis(sleep_time)).await;
 
                             match msg {
-                                scheduler_dbproxy::Message::MsqlRequest(_client, msql, _txvn) => {
-
+                                scheduler_dbproxy::Message::MsqlRequest(client_addr, msql, _txvn) => {
                                     let response = match msql {
                                         Msql::BeginTx(_) => {
                                             MsqlResponse::begintx_err("Dbproxy does not handle BeginTx")
@@ -254,15 +251,14 @@ where
                                         Msql::Query(_) => MsqlResponse::query_ok("QUERY GOOD"),
                                         Msql::EndTx(_) => MsqlResponse::endtx_ok("ENDTX GOOD"),
                                     };
-                                    
-                                    let mock_socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-                                    Ok(scheduler_dbproxy::Message::MsqlResponse(mock_socket_addr, response))
+
+                                    Ok(scheduler_dbproxy::Message::MsqlResponse(client_addr, response))
                                 }
                                 _ => Ok(scheduler_dbproxy::Message::Invalid),
                             }
                         }
                     })
-                    .inspect_ok(|m| debug!("dbproxy mock rpelies {:?}", m))
+                    .inspect_ok(|m| debug!("dbproxy mock replies {:?}", m))
                     .forward(serded_write)
                     .map(|_| ())
                     .await;

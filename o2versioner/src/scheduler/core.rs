@@ -1,7 +1,4 @@
 use crate::core::*;
-use crate::util::tcp::TcpStreamConnectionManager;
-use bb8::Pool;
-use futures::prelude::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -55,6 +52,10 @@ impl FromIterator<SocketAddr> for DbVNManager {
 }
 
 impl DbVNManager {
+    pub fn get_all_addr(&self) -> Vec<SocketAddr> {
+        self.0.iter().map(|(addr, _)| addr.clone()).collect()
+    }
+
     pub fn get_all_that_can_execute_read_query(
         &self,
         tableops: &TableOps,
@@ -93,48 +94,6 @@ impl DbVNManager {
 
     pub fn inner(&self) -> &HashMap<SocketAddr, DbVN> {
         &self.0
-    }
-}
-
-#[derive(Clone)]
-pub struct DbproxyManager(HashMap<SocketAddr, Pool<TcpStreamConnectionManager>>);
-
-impl DbproxyManager {
-    /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` into `DbproxyManager`
-    pub async fn from_iter<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = SocketAddr>,
-    {
-        Self(
-            stream::iter(iter)
-                .then(|dbproxy_port| async move {
-                    (
-                        dbproxy_port.clone(),
-                        Pool::builder()
-                            .max_size(1)
-                            .build(TcpStreamConnectionManager::new(dbproxy_port).await)
-                            .await
-                            .unwrap(),
-                    )
-                })
-                .collect()
-                .await,
-        )
-    }
-
-    pub fn inner(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
-        &self.0
-    }
-
-    pub fn get(&self, dbproxy_addr: &SocketAddr) -> Pool<TcpStreamConnectionManager> {
-        self.0
-            .get(dbproxy_addr)
-            .expect(&format!("{} is not in the DbproxyManager", dbproxy_addr))
-            .clone()
-    }
-
-    pub fn to_vec(&self) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
-        self.0.iter().map(|(addr, pool)| (addr.clone(), pool.clone())).collect()
     }
 }
 

@@ -1,5 +1,6 @@
 use super::core::*;
 use super::dispatcher::*;
+use super::transceiver::*;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
@@ -42,12 +43,20 @@ pub async fn main(conf: Config) {
         .await
         .unwrap();
 
+    // Prepare transceiver
+    let (transceiver_addr, transceiver) =
+        Transceiver::new(conf.scheduler.transceiver_queue_size, conf.to_dbproxy_addrs()).await;
+
     // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
         Arc::new(RwLock::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()))),
-        DbproxyManager::from_iter(conf.to_dbproxy_addrs()).await,
-    );
+        transceiver_addr,
+    )
+    .await;
+
+    // Launch transceiver as a new task
+    let transceiver_handle = tokio::spawn(transceiver.run().in_current_span());
 
     // Launch dispatcher as a new task
     let dispatcher_handle = tokio::spawn(dispatcher.run().in_current_span());
@@ -81,7 +90,7 @@ pub async fn main(conf: Config) {
     );
 
     // Combine the dispatcher handle and main handler handle into a main_handle
-    let main_handle = future::try_join(dispatcher_handle, handler_handle);
+    let main_handle = future::try_join3(transceiver_handle, dispatcher_handle, handler_handle);
 
     // Allow scheduler to be terminated by admin
     if let Some(admin_addr) = &conf.scheduler.admin_addr {

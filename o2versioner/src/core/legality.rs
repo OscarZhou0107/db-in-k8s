@@ -1,4 +1,3 @@
-#![allow(warnings)]
 use super::*;
 
 /// The legality level of a given request.
@@ -18,7 +17,7 @@ pub enum Legality {
 impl Legality {
     pub fn check(msql: &Msql, txvn_opt: &Option<TxVN>) -> Self {
         match msql {
-            Msql::BeginTx(begintx) => {
+            Msql::BeginTx(_begintx) => {
                 if txvn_opt.is_some() {
                     Self::Critical("Cannot begin new transaction because previous transaction not finished yet.")
                 } else {
@@ -39,7 +38,7 @@ impl Legality {
                     }
                 }
             }
-            Msql::EndTx(endtx) => {
+            Msql::EndTx(_endtx) => {
                 if txvn_opt.is_none() {
                     Self::Critical("There is not transaction to end")
                 } else {

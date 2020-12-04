@@ -1,7 +1,4 @@
-#![allow(warnings)]
 use crate::comm::scheduler_dbproxy::*;
-use crate::comm::MsqlResponse;
-use crate::core::*;
 use crate::util::executor_addr::*;
 use futures::prelude::*;
 use std::collections::HashMap;
@@ -9,21 +6,19 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, instrument, warn, Span};
+use tracing::{debug, field, instrument, warn, Span};
 
 /// Request sent from dispatcher direction
-pub struct TranceiverRequest {
+pub struct TransceiverRequest {
     pub dbproxy_addr: SocketAddr,
     pub dbproxy_msg: Message,
 }
 
-impl ExecutorRequest for TranceiverRequest {
+impl ExecutorRequest for TransceiverRequest {
     type ReplyType = Message;
 }
 
@@ -31,8 +26,8 @@ impl ExecutorRequest for TranceiverRequest {
 #[derive(Clone)]
 struct State {
     transmitters: Arc<Mutex<HashMap<SocketAddr, OwnedWriteHalf>>>,
-    /// (DbProxyAddr, ClientAddr) -> RequestWrapper<TranceiverRequest>
-    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), RequestWrapper<TranceiverRequest>>>>,
+    /// (DbProxyAddr, ClientAddr) -> RequestWrapper<TransceiverRequest>
+    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), RequestWrapper<TransceiverRequest>>>>,
 }
 
 impl State {
@@ -44,21 +39,12 @@ impl State {
     }
 
     #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty))]
-    async fn execute_request(&self, request: RequestWrapper<TranceiverRequest>) {
+    async fn execute_request(&self, request: RequestWrapper<TransceiverRequest>) {
         let dbproxy_msg = request.request().dbproxy_msg.clone();
         let client_addr = dbproxy_msg.get_client_addr().clone().unwrap();
         let dbproxy_addr = request.request().dbproxy_addr.clone();
 
         Span::current().record("message", &&dbproxy_addr.to_string()[..]);
-
-        let transmitters = self.transmitters.clone();
-        let mut transmitters_guard = transmitters.lock().await;
-        let writer = transmitters_guard.get_mut(&dbproxy_addr).expect("dbproxy_addr unknown");
-        let delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
-        let mut serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
-
-        debug!("-> {:?}", dbproxy_msg);
-        serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
 
         let prev = self
             .outstanding_req
@@ -67,6 +53,14 @@ impl State {
             .insert((dbproxy_addr, client_addr), request);
         assert!(prev.is_none());
 
+        let mut transimtters_guard = self.transmitters.lock().await;
+        let writer = transimtters_guard.get_mut(&dbproxy_addr).expect("dbproxy_addr unknown");
+        let delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
+        let mut serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
+
+        debug!("-> {:?}", dbproxy_msg);
+        serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
+
         // transmitters_guard is released
     }
 
@@ -74,7 +68,7 @@ impl State {
     async fn execute_response(&self, dbproxy_addr: SocketAddr, msg: Message) {
         Span::current().record("from", &&dbproxy_addr.to_string()[..]);
         match &msg {
-            Message::MsqlResponse(client_addr, msqlresponse) => {
+            Message::MsqlResponse(client_addr, _msqlresponse) => {
                 Span::current().record("message", &&client_addr.to_string()[..]);
                 let request_wrapper = self
                     .outstanding_req
@@ -82,7 +76,7 @@ impl State {
                     .await
                     .remove(&(dbproxy_addr, client_addr.clone()))
                     .expect("No record in outstanding_req");
-                let (request, reply_ch) = request_wrapper.unwrap();
+                let (_request, reply_ch) = request_wrapper.unwrap();
                 debug!("-> {:?}", msg);
                 reply_ch.unwrap().send(msg).unwrap();
             }
@@ -91,22 +85,23 @@ impl State {
     }
 }
 
-pub type TranceiverAddr = ExecutorAddr<TranceiverRequest>;
+pub type TransceiverAddr = ExecutorAddr<TransceiverRequest>;
 
 pub struct Transceiver {
     state: State,
     receivers: Vec<(SocketAddr, OwnedReadHalf)>,
 
-    request_rx: RequestReceiver<TranceiverRequest>,
+    request_rx: RequestReceiver<TransceiverRequest>,
 }
 
 impl Transceiver {
     /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` into `Transceiver`
-    pub async fn new<I>(queue_size: usize, iter: I) -> (TranceiverAddr, Self)
+    pub async fn new<I>(queue_size: usize, iter: I) -> (TransceiverAddr, Self)
     where
         I: IntoIterator<Item = SocketAddr>,
     {
         let sockets: Vec<_> = stream::iter(iter)
+            .inspect(|addr| debug!("{}", addr))
             .then(|dbproxy_port| async move {
                 TcpStream::connect(dbproxy_port)
                     .await
@@ -163,7 +158,8 @@ impl Transceiver {
                             state.clone().execute_response(dbproxy_addr, msg).await;
                             Ok(())
                         })
-                        .await;
+                        .await
+                        .unwrap();
                 }
             },
         ));
@@ -177,6 +173,6 @@ impl Transceiver {
             }
         }));
 
-        tokio::try_join!(receiver_handle, request_rx_handle);
+        tokio::try_join!(receiver_handle, request_rx_handle).unwrap();
     }
 }
