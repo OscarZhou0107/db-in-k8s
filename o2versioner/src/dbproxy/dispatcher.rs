@@ -151,10 +151,7 @@ mod tests_dispatcher {
         let transactions_2 = Arc::clone(&transactions);
 
         //Global version//
-        let mut mock_db = HashMap::new();
-        mock_db.insert("table1".to_string(), 0);
-        mock_db.insert("table2".to_string(), 0);
-        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
+        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
 
         //PendingQueue
         let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
@@ -221,7 +218,7 @@ mod tests_dispatcher {
        
         let mut config = tokio_postgres::Config::new();
         config.user("postgres");
-        config.password("Rayh8768");
+        config.password("Abc@123");
         config.host("localhost");
         config.port(5432);
         config.dbname("Test");

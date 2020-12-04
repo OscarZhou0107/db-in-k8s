@@ -1,5 +1,5 @@
-use crate::comm::MsqlResponse;
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxTableVN, TxVN};
+use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxVN};
+use crate::{comm::MsqlResponse, core::DbVN};
 use async_trait::async_trait;
 use bb8_postgres::{
     bb8::{Pool, PooledConnection},
@@ -8,7 +8,6 @@ use bb8_postgres::{
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -74,7 +73,7 @@ impl QueueMessage {
         }
     }
 
-    pub fn into_sqlresponse(self, raw : Result<Vec<SimpleQueryMessage>, tokio_postgres::error::Error>) -> QueryResult {
+    pub fn into_sqlresponse(self, raw: Result<Vec<SimpleQueryMessage>, tokio_postgres::error::Error>) -> QueryResult {
         let result;
         let succeed;
         let writer = PostgreToCsvWriter::new(self.operation_type.clone());
@@ -90,14 +89,14 @@ impl QueueMessage {
         }
 
         let result_type;
-        let mut contained_newer_versions = Vec::new();
+        let mut contained_newer_versions: TxVN = Default::default();
 
         match self.operation_type {
             Task::BEGIN => {
                 result_type = QueryResultType::BEGIN;
                 match self.versions {
                     Some(versions) => {
-                        contained_newer_versions = versions.txtablevns;
+                        contained_newer_versions = versions;
                     }
                     None => {}
                 }
@@ -155,46 +154,27 @@ impl PendingQueue {
 }
 
 pub struct DbVersion {
-    table_versions: HashMap<String, u64>,
+    db_version: DbVN,
     notify: Arc<Notify>,
 }
 
 impl DbVersion {
-    pub fn new(table_versions: HashMap<String, u64>) -> Self {
+    pub fn new(db_versions: DbVN) -> Self {
         Self {
-            table_versions: table_versions,
+            db_version: db_versions,
             notify: Arc::new(Notify::new()),
         }
     }
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
-        transaction_version
-            .txtablevns
-            .iter()
-            .for_each(|t| match self.table_versions.get_mut(&t.table) {
-                Some(v) => *v = t.vn + 1,
-                None => println!("Table {} not found to release version.", t.table),
-            });
-        self.notify.notify_one();
-    }
-
-    pub fn release_on_tables(&mut self, tables: Vec<TxTableVN>) {
-        tables.iter().for_each(|t| match self.table_versions.get_mut(&t.table) {
-            Some(v) => *v = t.vn + 1,
-            None => println!("Table {} not found to release version.", t.table),
-        });
+        self.db_version
+            .release_version(transaction_version.into_dbvn_release_request());
         self.notify.notify_one();
     }
 
     pub fn violate_version(&self, transaction_version: Option<TxVN>) -> bool {
-        if let Some(versions) = transaction_version {
-            versions.txtablevns.iter().any(|t| {
-                if let Some(v) = self.table_versions.get(&t.table) {
-                    return *v < t.vn;
-                } else {
-                    return true;
-                }
-            });
+        if let Some(tx_version) = transaction_version {
+            return self.db_version.can_execute_query(&tx_version.txtablevns);
         }
         false
     }
@@ -321,7 +301,7 @@ pub struct QueryResult {
     pub result: String,
     pub succeed: bool,
     pub result_type: QueryResultType,
-    pub contained_newer_versions: Vec<TxTableVN>,
+    pub contained_newer_versions: TxVN,
 }
 
 impl QueryResult {
@@ -521,4 +501,3 @@ fn postgres_read_test() {
         println!("Converted string is: {}", csv);
     });
 }
-
