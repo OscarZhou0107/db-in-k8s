@@ -1,4 +1,5 @@
 use super::core::{DbVNManager, DbproxyManager};
+use super::inner_comm::*;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
@@ -7,33 +8,8 @@ use bb8::Pool;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot, Mutex, Notify, RwLock};
+use tokio::sync::{mpsc, Mutex, Notify, RwLock};
 use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
-
-/// Response sent from `Dispatcher` to `DispatcherAddr`
-#[derive(Debug)]
-pub struct DispatcherReply {
-    /// Response to the `Msql` command
-    pub msql_res: MsqlResponse,
-    /// The modified `TxVN`,
-    /// this should be used to update the `ConnectionState`.
-    pub txvn_res: Option<TxVN>,
-}
-
-impl DispatcherReply {
-    fn new(msql_res: MsqlResponse, txvn_res: Option<TxVN>) -> Self {
-        Self { msql_res, txvn_res }
-    }
-}
-
-/// Request sent from `DispatcherAddr` to `Dispatcher`
-struct Request {
-    client_meta: ClientMeta,
-    command: Msql,
-    txvn: Option<TxVN>,
-    /// A single use reply channel
-    reply: Option<oneshot::Sender<DispatcherReply>>,
-}
 
 /// A state containing shared variables
 #[derive(Clone)]
@@ -66,7 +42,7 @@ impl State {
             request
                 .reply
                 .unwrap()
-                .send(DispatcherReply::new(
+                .send(Reply::new(
                     MsqlResponse::err("Dbproxy servers are all offline", &request.command),
                     request.txvn,
                 ))
@@ -153,7 +129,7 @@ impl State {
                     if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
                         debug!("~~ {:?}", msqlresponse);
                         reply
-                            .send(DispatcherReply::new(msqlresponse, txvn))
+                            .send(Reply::new(msqlresponse, txvn))
                             .expect(&format!("Cannot reply response to handler"));
                     } else {
                         debug!("Not reply to handler: {:?}", msqlresponse);
@@ -259,10 +235,11 @@ impl Dispatcher {
         queue_size: usize,
         dbvn_manager: Arc<RwLock<DbVNManager>>,
         dbproxy_manager: DbproxyManager,
-    ) -> (DispatcherAddr, Dispatcher) {
+    ) -> (ExecutorAddr, Dispatcher) {
         let state = State::new(dbvn_manager, dbproxy_manager);
-        let (request_tx, request_rx) = mpsc::channel(queue_size);
-        (DispatcherAddr { request_tx }, Dispatcher { state, request_rx })
+
+        let (addr, request_rx) = ExecutorAddr::new(queue_size);
+        (addr, Dispatcher { state, request_rx })
     }
 
     #[instrument(name="dispatch", skip(self), fields(dbvn=field::Empty, dbproxy=field::Empty))]
@@ -289,52 +266,6 @@ impl Dispatcher {
     }
 }
 
-/// Encloses a way to talk to the Dispatcher
-#[derive(Debug, Clone)]
-pub struct DispatcherAddr {
-    request_tx: mpsc::Sender<Request>,
-}
-
-impl DispatcherAddr {
-    /// `Option<TxVN>` is to support single read query in the future
-    pub async fn request(
-        &self,
-        client_meta: ClientMeta,
-        command: Msql,
-        txvn: Option<TxVN>,
-    ) -> Result<DispatcherReply, String> {
-        // Create a reply oneshot channel
-        let (tx, rx) = oneshot::channel();
-
-        // Construct the request to sent
-        let request = Request {
-            client_meta,
-            command,
-            txvn,
-            reply: Some(tx),
-        };
-
-        debug!(
-            "Scheduler handler send to dispatcher: {:?} {:?} {:?}",
-            request.client_meta.client_addr(),
-            request.command,
-            request.txvn
-        );
-
-        // Send the request
-        self.request_tx.send(request).await.map_err(|e| e.to_string())?;
-
-        // Wait for the reply
-        rx.await.map_err(|e| e.to_string())
-    }
-}
-
-impl Drop for DispatcherAddr {
-    fn drop(&mut self) {
-        info!("Dropping DispatcherAddr");
-    }
-}
-
 /// Unit test for `Dispatcher`
 #[cfg(test)]
 mod tests_dispatcher {
@@ -353,7 +284,7 @@ mod tests_dispatcher {
 
         let dispatcher_handler = tokio::spawn(dispatcher.run());
 
-        fn drop_dispatcher_addr(_: DispatcherAddr) {}
+        fn drop_dispatcher_addr(_: ExecutorAddr) {}
         drop_dispatcher_addr(dispatcher_addr);
 
         tokio::try_join!(dispatcher_handler).unwrap();
