@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Request sent from dispatcher direction
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl Transceiver {
                             let queue = guard.get_mut(&client_addr).expect("No client addr in outstanding_req");
                             let request_wrapper = queue.pop_back().expect("No record in outstanding_req");
                             let (request, reply_ch) = request_wrapper.unwrap();
-                            warn!("currently have {} after Pop back {:?}", queue.len(), request);
+                            info!("currently have {} after Pop back", queue.len());
                             debug!("-> {:?}", msg);
                             reply_ch
                                 .unwrap()
@@ -110,11 +110,7 @@ impl Transceiver {
                     debug!("-> {:?}", dbproxy_msg);
                     let mut guard = outstanding_req.lock().await;
                     let queue = guard.entry(client_addr.clone()).or_default();
-                    error!(
-                        "currently have {} before Push front {:?}",
-                        queue.len(),
-                        request.request().dbproxy_msg
-                    );
+                    info!("currently have {} before Push front", queue.len());
                     queue.push_front(request);
                     let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
                     let mut serded_write =
