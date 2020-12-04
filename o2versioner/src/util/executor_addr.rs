@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use tracing::info;
+use tracing::debug;
 
 /// Trait that a `Request` must implement in order to use `ExecutorAddr`
 pub trait ExecutorRequest {
@@ -90,6 +90,6 @@ where
     Request: ExecutorRequest,
 {
     fn drop(&mut self) {
-        info!("Dropping ExecutorAddr");
+        debug!("Dropping ExecutorAddr");
     }
 }

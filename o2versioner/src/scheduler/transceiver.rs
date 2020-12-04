@@ -2,146 +2,49 @@ use crate::comm::scheduler_dbproxy::*;
 use crate::util::executor_addr::*;
 use futures::prelude::*;
 use std::collections::HashMap;
+use std::collections::LinkedList;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, error, field, instrument, warn, Instrument, Span};
+use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Request sent from dispatcher direction
 #[derive(Debug)]
 pub struct TransceiverRequest {
     pub dbproxy_addr: SocketAddr,
     pub dbproxy_msg: Message,
+    pub current_request_id: usize,
+}
+
+#[derive(Debug)]
+pub struct TransceiverReply {
+    pub msg: Message,
+    pub current_request_id: usize,
 }
 
 impl ExecutorRequest for TransceiverRequest {
-    type ReplyType = Message;
-}
-
-/// A state containing shared variables
-#[derive(Clone)]
-struct State {
-    transmitters: Arc<Mutex<HashMap<SocketAddr, OwnedWriteHalf>>>,
-    /// (DbProxyAddr, ClientAddr) -> RequestWrapper<TransceiverRequest>
-    outstanding_req: Arc<Mutex<HashMap<(SocketAddr, SocketAddr), RequestWrapper<TransceiverRequest>>>>,
-}
-
-impl State {
-    fn new(transmitters: HashMap<SocketAddr, OwnedWriteHalf>) -> Self {
-        Self {
-            transmitters: Arc::new(Mutex::new(transmitters)),
-            outstanding_req: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    #[instrument(name="execute_request", skip(self, request), fields(message=field::Empty, to=field::Empty))]
-    async fn execute_request(&self, request: RequestWrapper<TransceiverRequest>) {
-        let dbproxy_msg = request.request().dbproxy_msg.clone();
-        let client_addr = dbproxy_msg.get_client_addr().clone().unwrap();
-        let dbproxy_addr = request.request().dbproxy_addr.clone();
-
-        Span::current().record("message", &&client_addr.to_string()[..]);
-        Span::current().record("to", &&dbproxy_addr.to_string()[..]);
-
-        debug!("-> {:?}", dbproxy_msg);
-
-        error!("Push {:?}", request.request().dbproxy_msg);
-        let prev = self
-            .outstanding_req
-            .lock()
-            .await
-            .insert((dbproxy_addr, client_addr), request);
-        assert!(
-            prev.is_none(),
-            format!(
-                "dbproxy_addr={}, client_addr={}, prev={:?}, current={:?}",
-                dbproxy_addr,
-                client_addr,
-                prev.unwrap().request().dbproxy_msg,
-                dbproxy_msg
-            )
-        );
-
-        let mut transimtters_guard = self.transmitters.lock().await;
-        let writer = transimtters_guard.get_mut(&dbproxy_addr).expect("dbproxy_addr unknown");
-        let delimited_write = FramedWrite::new(writer, LengthDelimitedCodec::new());
-        let mut serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
-
-        serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
-
-        // transmitters_guard is released
-    }
-
-    #[instrument(name="execute_response", skip(self, dbproxy_addr, msg), fields(message=field::Empty, from=field::Empty))]
-    async fn execute_response(&self, dbproxy_addr: SocketAddr, msg: Message) {
-        Span::current().record("from", &&dbproxy_addr.to_string()[..]);
-        match &msg {
-            Message::MsqlResponse(client_addr, _msqlresponse) => {
-                Span::current().record("message", &&client_addr.to_string()[..]);
-                let request_wrapper = self
-                    .outstanding_req
-                    .lock()
-                    .await
-                    .remove(&(dbproxy_addr.clone(), client_addr.clone()))
-                    .expect("No record in outstanding_req");
-                let (request, reply_ch) = request_wrapper.unwrap();
-                warn!("Popped {:?}", request);
-                debug!("-> {:?}", msg);
-                reply_ch.unwrap().send(msg).unwrap();
-            }
-            other => warn!("Unsupported {:?}", other),
-        };
-    }
+    type ReplyType = TransceiverReply;
 }
 
 pub type TransceiverAddr = ExecutorAddr<TransceiverRequest>;
 
 pub struct Transceiver {
-    state: State,
-    receivers: Vec<(SocketAddr, OwnedReadHalf)>,
-
+    dbproxy_addr: SocketAddr,
     request_rx: RequestReceiver<TransceiverRequest>,
 }
 
 impl Transceiver {
     /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` into `Transceiver`
-    pub async fn new<I>(queue_size: usize, iter: I) -> (TransceiverAddr, Self)
-    where
-        I: IntoIterator<Item = SocketAddr>,
-    {
-        let sockets: Vec<_> = stream::iter(iter)
-            .inspect(|addr| debug!("{}", addr))
-            .then(|dbproxy_port| async move {
-                TcpStream::connect(dbproxy_port)
-                    .await
-                    .expect("Cannot connect to dbproxy")
-            })
-            .collect()
-            .await;
-
-        let (receivers, transmitters) = sockets
-            .into_iter()
-            .map(|tcp_stream| {
-                let dbproxy_addr = tcp_stream.peer_addr().unwrap();
-                let (rx, tx) = tcp_stream.into_split();
-                ((dbproxy_addr.clone(), rx), (dbproxy_addr, tx))
-            })
-            .unzip();
-
-        let state = State::new(transmitters);
-
+    pub fn new(queue_size: usize, dbproxy_addr: SocketAddr) -> (TransceiverAddr, Self) {
         let (addr, request_rx) = ExecutorAddr::new(queue_size);
-
         (
             addr,
             Self {
-                state,
-                receivers,
+                dbproxy_addr,
                 request_rx,
             },
         )
@@ -149,50 +52,82 @@ impl Transceiver {
 
     #[instrument(name="transceive", skip(self), fields(dbproxy=field::Empty))]
     pub async fn run(self) {
-        Span::current().record("dbproxy", &self.receivers.len());
+        Span::current().record("dbproxy", &&self.dbproxy_addr.to_string()[..]);
+
         let Transceiver {
-            state,
-            receivers,
-            request_rx,
+            dbproxy_addr,
+            mut request_rx,
         } = self;
 
-        // Every dbproxy receiver is spawned as separate task
-        let state_clone = state.clone();
-        let receiver_handle = tokio::spawn(
-            stream::iter(receivers)
-                .for_each_concurrent(None, move |(dbproxy_addr, reader)| {
-                    let state = state_clone.clone();
-                    async move {
-                        let delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
-                        let serded_read =
-                            SymmetricallyFramed::new(delimited_read, SymmetricalJson::<Message>::default());
+        let socket = TcpStream::connect(dbproxy_addr)
+            .await
+            .expect("Cannot connect to dbproxy");
+        let (reader, mut writer) = socket.into_split();
 
-                        // Each response execution is spawned as separate task
-                        serded_read
-                            .try_for_each_concurrent(None, |msg| async {
-                                state.clone().execute_response(dbproxy_addr, msg).await;
-                                Ok(())
-                            })
-                            .await
-                            .unwrap();
-                    }
-                })
-                .in_current_span(),
-        );
+        // (ClientAddr) -> LinkedList<RequestWrapper<TransceiverRequest>>
+        let outstanding_req: HashMap<SocketAddr, LinkedList<RequestWrapper<TransceiverRequest>>> = HashMap::new();
+        let outstanding_req = Arc::new(Mutex::new(outstanding_req));
 
-        // Every incoming request_rx is spawned as separate task
-        let state_clone = state.clone();
-        let request_rx_handle = tokio::spawn(
-            request_rx
-                .for_each_concurrent(None, move |tranceive_request| {
-                    let state = state_clone.clone();
-                    async move {
-                        state.clone().execute_request(tranceive_request).await;
-                    }
-                })
-                .in_current_span(),
-        );
+        // Spawn dbproxy reader, processing reply from dbproxy in serial one after one
+        let delimited_read = FramedRead::new(reader, LengthDelimitedCodec::new());
+        let mut serded_read = SymmetricallyFramed::new(delimited_read, SymmetricalJson::<Message>::default());
+        let outstanding_req_clone = outstanding_req.clone();
+        let reader_task = async move {
+            while let Some(msg) = serded_read.try_next().await.unwrap() {
+                let task = async {
+                    match &msg {
+                        Message::MsqlResponse(client_addr, _msqlresponse) => {
+                            Span::current().record("client", &&client_addr.to_string()[..]);
+                            let mut guard = outstanding_req_clone.lock().await;
+                            let queue = guard.get_mut(&client_addr).expect("No client addr in outstanding_req");
+                            let request_wrapper = queue.pop_back().expect("No record in outstanding_req");
+                            let (request, reply_ch) = request_wrapper.unwrap();
+                            warn!("currently have {} after Pop back {:?}", queue.len(), request);
+                            debug!("-> {:?}", msg);
+                            reply_ch
+                                .unwrap()
+                                .send(TransceiverReply {
+                                    msg,
+                                    current_request_id: request.current_request_id,
+                                })
+                                .unwrap();
+                        }
+                        other => warn!("Unsupported {:?}", other),
+                    };
+                };
+                task.instrument(info_span!("reply", client = field::Empty)).await;
+            }
+        };
+        let reader_handle = tokio::spawn(reader_task.in_current_span());
 
-        tokio::try_join!(receiver_handle, request_rx_handle).unwrap();
+        // Spawn request_rx, processing request from dispatcher in serial one after one
+        let request_rx_task = async move {
+            while let Some(request) = request_rx.next().await {
+                let task = async {
+                    let dbproxy_msg = request.request().dbproxy_msg.clone();
+                    let client_addr = dbproxy_msg.get_client_addr().clone().unwrap();
+                    Span::current().record("client", &&client_addr.to_string()[..]);
+                    debug!("-> {:?}", dbproxy_msg);
+                    let mut guard = outstanding_req.lock().await;
+                    let queue = guard.entry(client_addr.clone()).or_default();
+                    error!(
+                        "currently have {} before Push front {:?}",
+                        queue.len(),
+                        request.request().dbproxy_msg
+                    );
+                    queue.push_front(request);
+                    let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
+                    let mut serded_write =
+                        SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
+                    serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
+                };
+                task.instrument(info_span!("request", client = field::Empty)).await;
+            }
+        };
+        let request_rx_handle = tokio::spawn(request_rx_task.in_current_span());
+
+        tokio::try_join!(reader_handle, request_rx_handle).unwrap();
+
+        info!("all communications done");
     }
 }

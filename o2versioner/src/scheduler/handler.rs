@@ -44,19 +44,28 @@ pub async fn main(conf: Config) {
         .unwrap();
 
     // Prepare transceiver
-    let (transceiver_addr, transceiver) =
-        Transceiver::new(conf.scheduler.transceiver_queue_size, conf.to_dbproxy_addrs()).await;
+    let (transceiver_addrs, transceivers): (Vec<_>, Vec<_>) = conf
+        .to_dbproxy_addrs()
+        .into_iter()
+        .map(|dbproxy_addr| {
+            let (trscaddrs, trsc) = Transceiver::new(conf.scheduler.transceiver_queue_size, dbproxy_addr);
+            ((dbproxy_addr, trscaddrs), trsc)
+        })
+        .unzip();
 
     // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
         Arc::new(RwLock::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()))),
-        transceiver_addr,
-    )
-    .await;
+        DbproxyManager::from_iter(transceiver_addrs),
+    );
 
     // Launch transceiver as a new task
-    let transceiver_handle = tokio::spawn(transceiver.run().in_current_span());
+    let transceiver_handle = tokio::spawn(
+        stream::iter(transceivers)
+            .for_each_concurrent(None, |transceiver| transceiver.run())
+            .in_current_span(),
+    );
 
     // Launch dispatcher as a new task
     let dispatcher_handle = tokio::spawn(dispatcher.run().in_current_span());
@@ -185,7 +194,7 @@ async fn process_connection(
     }
 }
 
-#[instrument(name="request", skip(msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, txid=field::Empty, cmd=field::Empty))]
+#[instrument(name="request", skip(msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, id=field::Empty, txid=field::Empty, cmd=field::Empty))]
 async fn process_request(
     msg: scheduler_api::Message,
     conn_state: Arc<Mutex<ConnectionState>>,
@@ -195,6 +204,7 @@ async fn process_request(
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
     Span::current().record("message", &msg.as_ref());
+    Span::current().record("id", &conn_state_guard.current_request_id());
 
     let response = match msg {
         scheduler_api::Message::RequestMsql(msql) => {
@@ -213,6 +223,8 @@ async fn process_request(
         _ => scheduler_api::Message::InvalidRequest,
     };
     debug!("-> {:?}", response);
+
+    conn_state_guard.increment_request_id();
 
     response
     // conn_state_guard should be dropped here
@@ -291,6 +303,7 @@ async fn process_query(
             conn_state.client_meta().clone(),
             msql,
             conn_state.current_txvn().clone(),
+            conn_state.current_request_id(),
         ))
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::query_err(e)),
@@ -312,7 +325,12 @@ async fn process_endtx(
     assert!(txvn.is_some());
 
     dispatcher_addr
-        .request(DispatcherRequest::new(conn_state.client_meta().clone(), msql, txvn))
+        .request(DispatcherRequest::new(
+            conn_state.client_meta().clone(),
+            msql,
+            txvn,
+            conn_state.current_request_id(),
+        ))
         .map_ok_or_else(
             |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
             |res| {

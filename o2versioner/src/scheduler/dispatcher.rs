@@ -1,4 +1,4 @@
-use super::core::DbVNManager;
+use super::core::{DbVNManager, DbproxyManager};
 use super::transceiver::*;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
@@ -8,7 +8,7 @@ use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Notify, RwLock};
-use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Response sent from dispatcher to handler
 #[derive(Debug)]
@@ -31,6 +31,7 @@ pub struct DispatcherRequest {
     client_meta: ClientMeta,
     command: Msql,
     txvn: Option<TxVN>,
+    current_request_id: usize,
 }
 
 impl ExecutorRequest for DispatcherRequest {
@@ -38,11 +39,12 @@ impl ExecutorRequest for DispatcherRequest {
 }
 
 impl DispatcherRequest {
-    pub fn new(client_meta: ClientMeta, command: Msql, txvn: Option<TxVN>) -> Self {
+    pub fn new(client_meta: ClientMeta, command: Msql, txvn: Option<TxVN>, current_request_id: usize) -> Self {
         Self {
             client_meta,
             command,
             txvn,
+            current_request_id,
         }
     }
 }
@@ -50,21 +52,17 @@ impl DispatcherRequest {
 /// A state containing shared variables
 #[derive(Clone)]
 struct State {
-    dbproxy_addrs: Vec<SocketAddr>,
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     dbvn_manager_notify: Arc<Notify>,
-    transceiver_addr: TransceiverAddr,
+    dbproxy_manager: DbproxyManager,
 }
 
 impl State {
-    async fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, transceiver_addr: TransceiverAddr) -> Self {
-        let dbproxy_addrs = dbvn_manager.read().await.get_all_addr();
-
+    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager: DbproxyManager) -> Self {
         Self {
-            dbproxy_addrs,
             dbvn_manager,
             dbvn_manager_notify: Arc::new(Notify::new()),
-            transceiver_addr,
+            dbproxy_manager,
         }
     }
 
@@ -78,7 +76,7 @@ impl State {
 
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
-        if self.dbproxy_addrs.is_empty() {
+        if self.dbproxy_manager.inner().is_empty() {
             warn!("There are currently no dbproxy servers online, Scheduler dispatcher skipped the work");
 
             reply_ch
@@ -99,12 +97,12 @@ impl State {
                 match msqlquery.tableops().access_pattern() {
                     AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
                     AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, &request.txvn).await],
-                    AccessPattern::WriteOnly => self.dbproxy_addrs.clone(),
+                    AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
                 }
             }
             Msql::EndTx(msqlendtx) => {
                 Span::current().record("op", &&format!("{:?}", msqlendtx.mode())[..]);
-                self.dbproxy_addrs.clone()
+                self.dbproxy_manager.to_vec()
             }
         };
 
@@ -117,6 +115,7 @@ impl State {
             client_meta,
             command,
             txvn,
+            current_request_id,
         } = request;
 
         let msg = Message::MsqlRequest(client_meta.client_addr(), command, txvn.clone());
@@ -124,7 +123,7 @@ impl State {
 
         // Each communication with dbproxy is spawned as a separate task
         dbproxy_tasks_stream
-            .for_each_concurrent(None, move |dbproxy_addr| {
+            .for_each_concurrent(None, move |(dbproxy_addr, transceiver_addr)| {
                 let msg_cloned = msg.clone();
                 let txvn_cloned = txvn.clone();
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
@@ -132,16 +131,31 @@ impl State {
                     Span::current().record("message", &&dbproxy_addr.to_string()[..]);
                     debug!("-> {:?}", msg_cloned);
 
-                    let msqlresponse = self
-                        .transceiver_addr
+                    let msqlresponse = transceiver_addr
                         .request(TransceiverRequest {
                             dbproxy_addr,
                             dbproxy_msg: msg_cloned,
+                            current_request_id,
                         })
                         .inspect_err(|e| warn!("Cannot send: {:?}", e))
-                        .and_then(|res| match res {
-                            Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
-                            _ => future::err(String::from("Invalid response from Dbproxy")),
+                        .and_then(|res| {
+                            if current_request_id != res.current_request_id {
+                                error!(
+                                    "Incorrect reply from transceiver, owned request_id={}, received request_id={}",
+                                    current_request_id, res.current_request_id
+                                );
+                                panic!("Mismatched reply from transceiver");
+                            } else {
+                                debug!(
+                                    "owned request_id={}, received request_id={}",
+                                    current_request_id, res.current_request_id
+                                );
+                            }
+
+                            match res.msg {
+                                Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
+                                _ => future::err(String::from("Invalid response from Dbproxy")),
+                            }
                         })
                         .map_ok_or_else(
                             |e| {
@@ -184,10 +198,12 @@ impl State {
             })
             .instrument(info_span!("dbproxies", message = num_dbproxy))
             .await;
+
+        info!("all tasks done");
     }
 
     #[instrument(skip(self), fields(msqlquery, txvn))]
-    async fn wait_on_version(&self, msqlquery: &MsqlQuery, txvn: &Option<TxVN>) -> SocketAddr {
+    async fn wait_on_version(&self, msqlquery: &MsqlQuery, txvn: &Option<TxVN>) -> (SocketAddr, TransceiverAddr) {
         assert_eq!(
             msqlquery.tableops().access_pattern(),
             AccessPattern::ReadOnly,
@@ -221,7 +237,7 @@ impl State {
             // For now, pick the first dbproxy from all available
             let dbproxy_addr = avail_dbproxy[0].0;
             debug!("Found dbproxy {} for executing the ReadOnly query", dbproxy_addr);
-            dbproxy_addr
+            (dbproxy_addr.clone(), self.dbproxy_manager.get(&dbproxy_addr))
         } else {
             // Single read operation that does not have a TxVN
             // Since a single-read transaction executes only at one replica,
@@ -265,12 +281,12 @@ pub struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub async fn new(
+    pub fn new(
         queue_size: usize,
         dbvn_manager: Arc<RwLock<DbVNManager>>,
-        transceiver_addr: TransceiverAddr,
+        dbproxy_manager: DbproxyManager,
     ) -> (DispatcherAddr, Dispatcher) {
-        let state = State::new(dbvn_manager, transceiver_addr).await;
+        let state = State::new(dbvn_manager, dbproxy_manager);
 
         let (addr, request_rx) = DispatcherAddr::new(queue_size);
         (addr, Dispatcher { state, request_rx })

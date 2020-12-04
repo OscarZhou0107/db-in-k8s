@@ -1,3 +1,4 @@
+use super::transceiver::TransceiverAddr;
 use crate::core::*;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -9,6 +10,7 @@ use tracing::warn;
 pub struct ConnectionState {
     client_meta: ClientMeta,
     cur_txvn: Option<TxVN>,
+    current_request_id: usize,
 }
 
 impl ConnectionState {
@@ -16,11 +18,10 @@ impl ConnectionState {
         Self {
             client_meta: ClientMeta::new(client_addr),
             cur_txvn: None,
+            current_request_id: 0,
         }
     }
-}
 
-impl ConnectionState {
     pub fn client_meta(&self) -> &ClientMeta {
         &self.client_meta
     }
@@ -38,6 +39,14 @@ impl ConnectionState {
         self.cur_txvn = new_txvn;
         old_txvn
     }
+
+    pub fn current_request_id(&self) -> usize {
+        self.current_request_id
+    }
+
+    pub fn increment_request_id(&mut self) {
+        self.current_request_id += 1;
+    }
 }
 
 pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
@@ -52,9 +61,9 @@ impl FromIterator<SocketAddr> for DbVNManager {
 }
 
 impl DbVNManager {
-    pub fn get_all_addr(&self) -> Vec<SocketAddr> {
-        self.0.iter().map(|(addr, _)| addr.clone()).collect()
-    }
+    // pub fn get_all_addr(&self) -> Vec<SocketAddr> {
+    //     self.0.iter().map(|(addr, _)| addr.clone()).collect()
+    // }
 
     pub fn get_all_that_can_execute_read_query(
         &self,
@@ -94,6 +103,35 @@ impl DbVNManager {
 
     pub fn inner(&self) -> &HashMap<SocketAddr, DbVN> {
         &self.0
+    }
+}
+
+#[derive(Clone)]
+pub struct DbproxyManager(HashMap<SocketAddr, TransceiverAddr>);
+
+impl FromIterator<(SocketAddr, TransceiverAddr)> for DbproxyManager {
+    fn from_iter<I: IntoIterator<Item = (SocketAddr, TransceiverAddr)>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl DbproxyManager {
+    pub fn inner(&self) -> &HashMap<SocketAddr, TransceiverAddr> {
+        &self.0
+    }
+
+    pub fn get(&self, dbproxy_addr: &SocketAddr) -> TransceiverAddr {
+        self.0
+            .get(dbproxy_addr)
+            .expect(&format!("{} is not in the DbproxyManager", dbproxy_addr))
+            .clone()
+    }
+
+    pub fn to_vec(&self) -> Vec<(SocketAddr, TransceiverAddr)> {
+        self.0
+            .iter()
+            .map(|(addr, transceiver_addr)| (addr.clone(), transceiver_addr.clone()))
+            .collect()
     }
 }
 
