@@ -1,7 +1,4 @@
 use crate::core::*;
-use crate::util::tcp::TcpStreamConnectionManager;
-use bb8::Pool;
-use futures::prelude::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -10,16 +7,28 @@ use tracing::warn;
 
 #[derive(Debug)]
 pub struct ConnectionState {
+    client_meta: ClientMeta,
     cur_txvn: Option<TxVN>,
 }
 
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self { cur_txvn: None }
+impl ConnectionState {
+    pub fn new(client_addr: SocketAddr) -> Self {
+        Self {
+            client_meta: ClientMeta::new(client_addr),
+            cur_txvn: None,
+        }
     }
 }
 
 impl ConnectionState {
+    pub fn client_meta(&self) -> &ClientMeta {
+        &self.client_meta
+    }
+
+    pub fn client_meta_as_mut(&mut self) -> &mut ClientMeta {
+        &mut self.client_meta
+    }
+
     pub fn current_txvn(&self) -> &Option<TxVN> {
         &self.cur_txvn
     }
@@ -43,6 +52,10 @@ impl FromIterator<SocketAddr> for DbVNManager {
 }
 
 impl DbVNManager {
+    pub fn get_all_addr(&self) -> Vec<SocketAddr> {
+        self.0.iter().map(|(addr, _)| addr.clone()).collect()
+    }
+
     pub fn get_all_that_can_execute_read_query(
         &self,
         tableops: &TableOps,
@@ -84,48 +97,6 @@ impl DbVNManager {
     }
 }
 
-#[derive(Clone)]
-pub struct DbproxyManager(HashMap<SocketAddr, Pool<TcpStreamConnectionManager>>);
-
-impl DbproxyManager {
-    /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` with `max_conn: u32` 'into `DbproxyManager`
-    pub async fn from_iter<I>(iter: I, max_conn: u32) -> Self
-    where
-        I: IntoIterator<Item = SocketAddr>,
-    {
-        Self(
-            stream::iter(iter)
-                .then(|dbproxy_port| async move {
-                    (
-                        dbproxy_port.clone(),
-                        Pool::builder()
-                            .max_size(max_conn)
-                            .build(TcpStreamConnectionManager::new(dbproxy_port).await)
-                            .await
-                            .unwrap(),
-                    )
-                })
-                .collect()
-                .await,
-        )
-    }
-
-    pub fn inner(&self) -> &HashMap<SocketAddr, Pool<TcpStreamConnectionManager>> {
-        &self.0
-    }
-
-    pub fn get(&self, dbproxy_addr: &SocketAddr) -> Pool<TcpStreamConnectionManager> {
-        self.0
-            .get(dbproxy_addr)
-            .expect(&format!("{} is not in the DbproxyManager", dbproxy_addr))
-            .clone()
-    }
-
-    pub fn to_vec(&self) -> Vec<(SocketAddr, Pool<TcpStreamConnectionManager>)> {
-        self.0.iter().map(|(addr, pool)| (addr.clone(), pool.clone())).collect()
-    }
-}
-
 /// Unit test for `ConnectionState`
 #[cfg(test)]
 mod tests_connection_state {
@@ -133,7 +104,7 @@ mod tests_connection_state {
 
     #[test]
     fn test_replace_txvn() {
-        let mut conn_state = ConnectionState::default();
+        let mut conn_state = ConnectionState::new("127.0.0.1:6666".parse().unwrap());
         assert_eq!(*conn_state.current_txvn(), None);
         assert_eq!(conn_state.replace_txvn(Some(TxVN::default())), None);
         assert_eq!(*conn_state.current_txvn(), Some(TxVN::default()));

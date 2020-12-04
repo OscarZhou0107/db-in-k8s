@@ -74,7 +74,7 @@ use serde::{Deserialize, Serialize};
 ///     Message::RequestCrash(String::from("just for fun"))
 /// );
 /// ```
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, strum::AsRefStr, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Message {
     /// Request in `Msql` format

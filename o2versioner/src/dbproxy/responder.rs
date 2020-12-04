@@ -1,6 +1,5 @@
 use super::core::{DbVersion, QueryResult, QueryResultType};
 use crate::comm::scheduler_dbproxy::Message;
-use crate::comm::MsqlResponse;
 use futures::SinkExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -25,13 +24,13 @@ impl Responder {
                         version
                             .lock()
                             .await
-                            .release_on_tables(result.contained_newer_versions.clone());
+                            .release_on_transaction(result.contained_newer_versions.clone());
                     }
                     _ => {}
                 }
 
                 serializer
-                    .send(Message::MsqlResponse(result.into_msql_response()))
+                    .send(Message::MsqlResponse(result.identifier.clone(),result.into_msql_response()))
                     .await
                     .unwrap();
             }
@@ -44,11 +43,9 @@ mod tests_test {
     use super::Responder;
     use crate::comm::scheduler_dbproxy::Message;
     use crate::comm::MsqlResponse;
-    use crate::core::RWOperation;
-    use crate::core::TxTableVN;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
-    use std::{collections::HashMap, sync::Arc};
+    use std::{sync::Arc, net::SocketAddr};
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
@@ -58,23 +55,12 @@ mod tests_test {
 
     #[tokio::test]
     async fn test_send_items_to_from_multiple_channel() {
+        let details = "127.0.0.1:2346";
+        let addr : SocketAddr = details.parse().expect("Unable to parse socket address");
+        
         //Prepare - Mock db related context
-        let mut mock_db = HashMap::new();
-        mock_db.insert("table1".to_string(), 0);
-        mock_db.insert("table2".to_string(), 0);
-        let mock_table_vs = vec![
-            TxTableVN {
-                table: "table1".to_string(),
-                vn: 0,
-                op: RWOperation::R,
-            },
-            TxTableVN {
-                table: "table2".to_string(),
-                vn: 0,
-                op: RWOperation::R,
-            },
-        ];
-        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
+       
+        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         //Prepare - Network
         let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
             mpsc::channel(100);
@@ -85,15 +71,16 @@ mod tests_test {
 
         //Prepare - Data
         let r = QueryResult {
+            identifier: addr.clone(),
             result: "r".to_string(),
             succeed: true,
             result_type: QueryResultType::BEGIN,
-            contained_newer_versions: mock_table_vs.clone(),
+            contained_newer_versions: Default::default(),
         };
 
         //Prepare - Responder
-        helper_spawn_responder(version.clone(), responder_receiver);
-        helper_spawn_mock_client(verifying_queue);
+        helper_spawn_responder(version.clone(), responder_receiver, addr.clone());
+        helper_spawn_mock_client(verifying_queue, addr);
 
         let worker_num: u32 = 5;
         //Action - Spwan worker thread to send response
@@ -106,9 +93,8 @@ mod tests_test {
         assert!(true);
     }
 
-    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>) {
+    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>, addr : SocketAddr) {
         tokio::spawn(async move {
-            let addr = "127.0.0.1:2345";
             let listener = TcpListener::bind(addr).await.unwrap();
             let (tcp_stream, _) = listener.accept().await.unwrap();
             let (_, tcp_write) = tcp_stream.into_split();
@@ -117,9 +103,8 @@ mod tests_test {
         });
     }
 
-    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>) {
+    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>, addr : SocketAddr) {
         tokio::spawn(async move {
-            let addr = "127.0.0.1:2345";
             let socket = TcpStream::connect(addr).await.unwrap();
             let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());
             let mut deserialize = tokio_serde::SymmetricallyFramed::new(length_delimited, SymmetricalJson::default());
@@ -127,7 +112,7 @@ mod tests_test {
             //Action
             while let Some(msg) = deserialize.try_next().await.unwrap() {
                 match msg {
-                    Message::MsqlResponse(op) => {
+                    Message::MsqlResponse(_, op) => {
                         vertifying_queue.lock().await.push(op);
                     }
                     _other => {

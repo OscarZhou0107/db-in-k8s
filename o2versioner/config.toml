@@ -1,9 +1,9 @@
 [scheduler]
 addr = "127.0.0.1:1077"
-dbproxy_pool_size = 10
 dispatcher_queue_size = 500
 max_connection = 50
 sequencer_pool_size = 20
+transceiver_queue_size = 20
 
 [sequencer]
 addr = "127.0.0.1:9876"
@@ -11,8 +11,16 @@ max_connection = 50
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
-sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
+dbname = "Test"
+host = "localhost"
+password = "Abc@123"
+port = "5432"
+user = "postgres"
 
 [[dbproxy]]
-addr = "127.0.0.1:8877"
-sql_addr = "mysql://root:Rayh8768@localhost:3306/test"
+addr = "127.0.0.1:8876"
+dbname = "Test"
+host = "localhost"
+password = "Abc@123"
+port = "5432"
+user = "postgres"

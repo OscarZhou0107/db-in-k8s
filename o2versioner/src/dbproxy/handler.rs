@@ -1,23 +1,28 @@
-use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage};
+use super::core::{DbVersion, PendingQueue, QueryResult};
 use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
+use crate::util::config::DbProxyConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::net::{TcpListener, ToSocketAddrs};
+use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use tokio_postgres::Config;
 
-pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
-    //=====================================Continue an ongoing transaction=======================================//
+pub async fn main(conf: DbProxyConfig) {
+    let mut config = Config::new();
+    config.user(&conf.user);
+    config.password(conf.password);
+    config.host(&conf.host);
+    config.port(conf.port);
+    config.dbname(&conf.dbname);
+
     //Map that holds all ongoing transactions
     let transactions = Arc::new(Mutex::new(HashMap::new()));
 
     //Global version//
-    let mut mock_db = HashMap::new();
-    mock_db.insert("table1".to_string(), 0);
-    mock_db.insert("table2".to_string(), 0);
-    let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(mock_db)));
+    let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
     let version_2 = Arc::clone(&version);
 
     //PendingQueue
@@ -28,24 +33,11 @@ pub async fn main<A: ToSocketAddrs>(addr: A, sql_addr: &str) {
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
 
-    let listener = TcpListener::bind(addr).await.unwrap();
+    let listener = TcpListener::bind(conf.addr).await.unwrap();
     let (tcp_stream, _) = listener.accept().await.unwrap();
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
-    let mut config = tokio_postgres::Config::new();
-    config.user("postgres");
-    config.password("Rayh8768");
-    config.host("localhost");
-    config.port(5432);
-    config.dbname("Test");
-
-    Dispatcher::run(
-        pending_queue,
-        responder_sender,
-        config,
-        version,
-        transactions,
-    );
+    Dispatcher::run(pending_queue, responder_sender, config, version, transactions);
 
     Responder::run(responder_receiver, version_2, tcp_write);
 

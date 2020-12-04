@@ -1,20 +1,18 @@
-use crate::comm::scheduler_dbproxy::Message;
-use crate::comm::MsqlResponse;
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RWOperation, TxTableVN, TxVN};
+use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxVN};
+use crate::{comm::MsqlResponse, core::DbVN};
 use async_trait::async_trait;
 use bb8_postgres::{
-    bb8::{ManageConnection, Pool, PooledConnection},
+    bb8::{Pool, PooledConnection},
     PostgresConnectionManager,
 };
-use csv::*;
+use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use tokio_postgres::{tls::NoTlsStream, Client, Config, Connection, Error, NoTls, Socket};
+use tokio_postgres::{Config, NoTls, SimpleQueryMessage};
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -74,6 +72,51 @@ impl QueueMessage {
             versions: versions,
         }
     }
+
+    pub fn into_sqlresponse(self, raw: Result<Vec<SimpleQueryMessage>, tokio_postgres::error::Error>) -> QueryResult {
+        let result;
+        let succeed;
+        let writer = PostgreToCsvWriter::new(self.operation_type.clone());
+        match raw {
+            Ok(message) => {
+                result = writer.to_csv(message);
+                succeed = true;
+            }
+            Err(_) => {
+                result = "There was an error".to_string();
+                succeed = false;
+            }
+        }
+
+        let result_type;
+        let mut contained_newer_versions: TxVN = Default::default();
+
+        match self.operation_type {
+            Task::BEGIN => {
+                result_type = QueryResultType::BEGIN;
+                match self.versions {
+                    Some(versions) => {
+                        contained_newer_versions = versions;
+                    }
+                    None => {}
+                }
+            }
+            Task::READ | Task::WRITE => {
+                result_type = QueryResultType::QUERY;
+            }
+            Task::COMMIT | Task::ABORT => {
+                result_type = QueryResultType::END;
+            }
+        };
+
+        QueryResult {
+            identifier : self.identifier,
+            result: result,
+            result_type: result_type,
+            succeed: succeed,
+            contained_newer_versions: contained_newer_versions,
+        }
+    }
 }
 
 pub struct PendingQueue {
@@ -112,46 +155,27 @@ impl PendingQueue {
 }
 
 pub struct DbVersion {
-    table_versions: HashMap<String, u64>,
+    db_version: DbVN,
     notify: Arc<Notify>,
 }
 
 impl DbVersion {
-    pub fn new(table_versions: HashMap<String, u64>) -> Self {
+    pub fn new(db_versions: DbVN) -> Self {
         Self {
-            table_versions: table_versions,
+            db_version: db_versions,
             notify: Arc::new(Notify::new()),
         }
     }
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
-        transaction_version
-            .txtablevns
-            .iter()
-            .for_each(|t| match self.table_versions.get_mut(&t.table) {
-                Some(v) => *v = t.vn + 1,
-                None => println!("Table {} not found to release version.", t.table),
-            });
-        self.notify.notify_one();
-    }
-
-    pub fn release_on_tables(&mut self, tables: Vec<TxTableVN>) {
-        tables.iter().for_each(|t| match self.table_versions.get_mut(&t.table) {
-            Some(v) => *v = t.vn + 1,
-            None => println!("Table {} not found to release version.", t.table),
-        });
+        self.db_version
+            .release_version(transaction_version.into_dbvn_release_request());
         self.notify.notify_one();
     }
 
     pub fn violate_version(&self, transaction_version: Option<TxVN>) -> bool {
-        if let Some(versions) = transaction_version {
-            versions.txtablevns.iter().any(|t| {
-                if let Some(v) = self.table_versions.get(&t.table) {
-                    return *v < t.vn;
-                } else {
-                    return true;
-                }
-            });
+        if let Some(tx_version) = transaction_version {
+            return self.db_version.can_execute_query(&tx_version.txtablevns);
         }
         false
     }
@@ -220,7 +244,7 @@ impl PostgreToCsvWriter {
         Self { mode: mode, wrt: wrt }
     }
 
-    pub fn to_csv(mut self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
+    pub fn to_csv(self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
         match self.mode {
             Task::BEGIN => return "".to_string(),
             Task::READ => return self.convert_result_to_csv_string(message),
@@ -275,10 +299,11 @@ pub enum QueryResultType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct QueryResult {
+    pub identifier : SocketAddr,
     pub result: String,
     pub succeed: bool,
     pub result_type: QueryResultType,
-    pub contained_newer_versions: Vec<TxTableVN>,
+    pub contained_newer_versions: TxVN,
 }
 
 impl QueryResult {
@@ -320,23 +345,6 @@ pub enum Task {
     COMMIT,
 }
 
-fn test_helper_get_query_result_version_release() -> QueryResult {
-    QueryResult {
-        result: " ".to_string(),
-        result_type: QueryResultType::BEGIN,
-        succeed: true,
-        contained_newer_versions: Vec::new(),
-    }
-}
-
-fn test_helper_get_query_result_non_release() -> QueryResult {
-    QueryResult {
-        result: " ".to_string(),
-        result_type: QueryResultType::END,
-        succeed: true,
-        contained_newer_versions: Vec::new(),
-    }
-}
 //================================Test================================//
 
 // #[cfg(test)]
@@ -411,7 +419,7 @@ fn test_helper_get_query_result_non_release() -> QueryResult {
 #[test]
 #[ignore]
 fn postgres_write_test() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.block_on(async move {
         let mut config = tokio_postgres::Config::new();
@@ -456,7 +464,7 @@ fn postgres_write_test() {
 #[test]
 #[ignore]
 fn postgres_read_test() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
 
     rt.block_on(async move {
         let mut config = tokio_postgres::Config::new();
@@ -495,5 +503,3 @@ fn postgres_read_test() {
         println!("Converted string is: {}", csv);
     });
 }
-
-//}

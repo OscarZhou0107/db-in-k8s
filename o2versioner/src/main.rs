@@ -7,6 +7,7 @@ use tracing::info;
 pub fn init_logger() {
     let collector = tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
+        .with_target(false)
         .without_time()
         .finish();
     tracing::subscriber::set_global_default(collector).unwrap();
@@ -22,7 +23,13 @@ async fn main() {
     info!("{:?}", conf);
 
     if matches.is_present("dbproxy") {
-        dbproxy::main("127.0.0.1:2345", "mysql://root:Rayh8768@localhost:3306/test").await
+        let index: usize = matches.value_of("dbindex")
+        .unwrap()
+        .to_string()
+        .parse()
+        .unwrap();
+
+        dbproxy::main(conf.dbproxy.get(index).unwrap().clone()).await
     } else if matches.is_present("scheduler") {
         scheduler_main(conf).await
     } else if matches.is_present("sequencer") {
@@ -44,6 +51,11 @@ fn parse_args() -> ArgMatches<'static> {
                 .takes_value(true),
         )
         .arg(Arg::with_name("dbproxy").long("dbproxy").help("Run the dbproxy"))
+        .arg(
+            Arg::with_name("dbindex")
+                .long("dbindex")
+                .help("Indicate the index of dbproxy"),
+        )
         .arg(Arg::with_name("scheduler").long("scheduler").help("Run the scheduler"))
         .arg(Arg::with_name("sequencer").long("sequencer").help("Run the sequencer"))
         .group(

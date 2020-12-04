@@ -20,7 +20,17 @@ pub enum Message {
     /// A `Msql` request to dbproxy. `Option<TxVN> == None` for single-read transaction
     MsqlRequest(SocketAddr, Msql, Option<TxVN>),
     /// The repsone to the `MsqlRequest`
-    MsqlResponse(MsqlResponse),
+    MsqlResponse(SocketAddr, MsqlResponse),
     /// Response to an invalid request, for exmample, sending `MsqlResponse(MsqlResponse)` to the dbproxy
     Invalid,
+}
+
+impl Message {
+    pub fn get_client_addr(&self) -> Option<SocketAddr> {
+        match self {
+            Self::MsqlRequest(addr, _, _) => Some(addr.clone()),
+            Self::MsqlResponse(addr, _) => Some(addr.clone()),
+            _ => None,
+        }
+    }
 }

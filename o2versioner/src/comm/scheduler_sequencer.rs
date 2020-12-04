@@ -1,9 +1,14 @@
-use crate::core::{MsqlBeginTx, TxVN};
+use crate::core::{ClientMeta, MsqlBeginTx, TxVN};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, strum::AsRefStr, Serialize, Deserialize)]
 pub enum Message {
     Invalid,
-    RequestTxVN(MsqlBeginTx),
-    ReplyTxVN(TxVN),
+    RequestTxVN(ClientMeta, MsqlBeginTx),
+    ReplyTxVN(Option<TxVN>),
+    RequestBlock,
+    RequestUnblock,
+    ReplyBlockUnblock(String),
+    RequestStop,
+    ReplyStop,
 }

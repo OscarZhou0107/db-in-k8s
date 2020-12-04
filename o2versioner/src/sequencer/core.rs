@@ -38,29 +38,48 @@ impl TableVNRecord {
 /// Sequencer state
 pub struct State {
     vn_record: HashMap<String, TableVNRecord>,
+    is_vn_record_blocked: bool,
 }
 
 impl State {
     pub fn new() -> Self {
         Self {
             vn_record: HashMap::new(),
+            is_vn_record_blocked: false,
         }
     }
 
-    pub fn assign_vn(&mut self, msqlbegintx: MsqlBeginTx) -> TxVN {
+    /// If `is_vn_record_blocked() == true`, will return `None`;
+    /// Else, will return `Some<TxVN>`
+    pub fn assign_vn(&mut self, msqlbegintx: MsqlBeginTx) -> Option<TxVN> {
         let (tx, tableops) = msqlbegintx.unwrap();
 
-        TxVN {
-            tx,
-            txtablevns: tableops
-                .into_iter()
-                .map(|tableop| TxTableVN {
-                    table: tableop.table.clone(),
-                    vn: self.vn_record.entry(tableop.table).or_default().assign(&tableop.op),
-                    op: tableop.op,
-                })
-                .collect(),
+        if self.is_vn_record_blocked() {
+            None
+        } else {
+            Some(TxVN {
+                tx,
+                txtablevns: tableops
+                    .into_iter()
+                    .map(|tableop| TxTableVN {
+                        table: tableop.table.clone(),
+                        vn: self.vn_record.entry(tableop.table).or_default().assign(&tableop.op),
+                        op: tableop.op,
+                    })
+                    .collect(),
+            })
         }
+    }
+
+    pub fn is_vn_record_blocked(&self) -> bool {
+        self.is_vn_record_blocked
+    }
+
+    /// Sets the `is_vn_record_blocked`, and returns the previous value
+    pub fn set_vn_record_blocked(&mut self, is_vn_record_blocked: bool) -> bool {
+        let old = self.is_vn_record_blocked;
+        self.is_vn_record_blocked = is_vn_record_blocked;
+        old
     }
 }
 
@@ -217,7 +236,7 @@ mod tests_state {
                 TableOp::new("b", RWOperation::W),
                 TableOp::new("c", RWOperation::R)
             ]))),
-            TxVN {
+            Some(TxVN {
                 tx: None,
                 txtablevns: vec![
                     TxTableVN {
@@ -236,7 +255,7 @@ mod tests_state {
                         op: RWOperation::R,
                     }
                 ]
-            }
+            })
         );
 
         //                   a     b     c
@@ -247,7 +266,7 @@ mod tests_state {
                 TableOp::new("b", RWOperation::W),
                 TableOp::new("c", RWOperation::R)
             ]))),
-            TxVN {
+            Some(TxVN {
                 tx: None,
                 txtablevns: vec![
                     TxTableVN {
@@ -261,7 +280,7 @@ mod tests_state {
                         op: RWOperation::R,
                     }
                 ]
-            }
+            })
         );
 
         //                   a     b     c
@@ -272,7 +291,7 @@ mod tests_state {
                 TableOp::new("b", RWOperation::R),
                 TableOp::new("c", RWOperation::W)
             ]))),
-            TxVN {
+            Some(TxVN {
                 tx: None,
                 txtablevns: vec![
                     TxTableVN {
@@ -286,7 +305,7 @@ mod tests_state {
                         op: RWOperation::W,
                     }
                 ]
-            }
+            })
         );
 
         //                   a     b     c
@@ -298,7 +317,7 @@ mod tests_state {
                 TableOp::new("b", RWOperation::R),
                 TableOp::new("c", RWOperation::W)
             ],))),
-            TxVN {
+            Some(TxVN {
                 tx: None,
                 txtablevns: vec![
                     TxTableVN {
@@ -317,11 +336,81 @@ mod tests_state {
                         op: RWOperation::W,
                     }
                 ]
-            }
+            })
         );
 
         //                   a     b     c
         // next_for_read     1     2     4
         // next_for_write    2     4     4
+    }
+
+    #[test]
+    fn test_set_vn_record_blocked() {
+        let mut state = State::new();
+
+        //                   a     b     c
+        // next_for_read     0     0     0
+        // next_for_write    0     0     0
+        assert_eq!(
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("a", RWOperation::W),
+                TableOp::new("b", RWOperation::W),
+                TableOp::new("c", RWOperation::R)
+            ]))),
+            Some(TxVN {
+                tx: None,
+                txtablevns: vec![
+                    TxTableVN {
+                        table: String::from("a"),
+                        vn: 0,
+                        op: RWOperation::W,
+                    },
+                    TxTableVN {
+                        table: String::from("b"),
+                        vn: 0,
+                        op: RWOperation::W,
+                    },
+                    TxTableVN {
+                        table: String::from("c"),
+                        vn: 0,
+                        op: RWOperation::R,
+                    }
+                ]
+            })
+        );
+
+        let prev = state.set_vn_record_blocked(true);
+        assert_eq!(prev, false);
+        assert_eq!(
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("b", RWOperation::W),
+                TableOp::new("c", RWOperation::R)
+            ]))),
+            None
+        );
+
+        let prev = state.set_vn_record_blocked(false);
+        assert_eq!(prev, true);
+        assert_eq!(
+            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                TableOp::new("b", RWOperation::W),
+                TableOp::new("c", RWOperation::R)
+            ]))),
+            Some(TxVN {
+                tx: None,
+                txtablevns: vec![
+                    TxTableVN {
+                        table: String::from("b"),
+                        vn: 1,
+                        op: RWOperation::W,
+                    },
+                    TxTableVN {
+                        table: String::from("c"),
+                        vn: 0,
+                        op: RWOperation::R,
+                    }
+                ]
+            })
+        );
     }
 }

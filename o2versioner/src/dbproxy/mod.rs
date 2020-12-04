@@ -1,4 +1,3 @@
-#![allow(warnings)]
 pub mod core;
 pub mod dispatcher;
 mod handler;

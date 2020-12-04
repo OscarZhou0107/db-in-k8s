@@ -29,8 +29,8 @@ pub struct SchedulerConfig {
     #[serde(default)]
     pub max_connection: Option<u32>,
     pub sequencer_pool_size: u32,
-    pub dbproxy_pool_size: u32,
     pub dispatcher_queue_size: usize,
+    pub transceiver_queue_size: usize,
 }
 
 impl SchedulerConfig {
@@ -42,8 +42,6 @@ impl SchedulerConfig {
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct SequencerConfig {
     pub addr: String,
-    #[serde(default)]
-    pub admin_addr: Option<String>,
     #[serde(default)]
     pub max_connection: Option<u32>,
 }
@@ -57,7 +55,11 @@ impl SequencerConfig {
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct DbProxyConfig {
     pub addr: String,
-    pub sql_addr: String,
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    pub dbname: String,
 }
 
 impl DbProxyConfig {
@@ -83,22 +85,29 @@ mod tests_config {
                     admin_addr: None,
                     max_connection: Some(50),
                     sequencer_pool_size: 20,
-                    dbproxy_pool_size: 10,
-                    dispatcher_queue_size: 500
+                    dispatcher_queue_size: 500,
+                    transceiver_queue_size: 500
                 },
                 sequencer: SequencerConfig {
                     addr: String::from("127.0.0.1:9876"),
-                    admin_addr: None,
                     max_connection: Some(50),
                 },
                 dbproxy: vec![
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8876"),
-                        sql_addr: String::from("mysql://root:Rayh8768@localhost:3306/test")
+                        host: String::from("localhost"),
+                        port: 5432,
+                        user: String::from("postgres"),
+                        password: String::from("Abc@123"),
+                        dbname: String::from("Test"),
                     },
                     DbProxyConfig {
-                        addr: String::from("127.0.0.1:8877"),
-                        sql_addr: String::from("mysql://root:Rayh8768@localhost:3306/test")
+                        addr: String::from("127.0.0.1:8876"),
+                        host: String::from("localhost"),
+                        port: 5432,
+                        user: String::from("postgres"),
+                        password: String::from("Abc@123"),
+                        dbname: String::from("Test"),
                     }
                 ]
             }
