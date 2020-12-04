@@ -1,5 +1,5 @@
 use super::core::State;
-use crate::comm::scheduler_sequencer;
+use crate::comm::scheduler_sequencer::*;
 use crate::util::config::SequencerConfig;
 use crate::util::tcp;
 use futures::prelude::*;
@@ -61,18 +61,12 @@ async fn process_connection(
     let (tcp_read, tcp_write) = tcp_stream.split();
 
     // Delimit frames from bytes using a length header
-    let length_delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
-    let length_delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
+    let delimited_read = FramedRead::new(tcp_read, LengthDelimitedCodec::new());
+    let delimited_write = FramedWrite::new(tcp_write, LengthDelimitedCodec::new());
 
     // Deserialize/Serialize frames using JSON codec
-    let serded_read = SymmetricallyFramed::new(
-        length_delimited_read,
-        SymmetricalJson::<scheduler_sequencer::Message>::default(),
-    );
-    let serded_write = SymmetricallyFramed::new(
-        length_delimited_write,
-        SymmetricalJson::<scheduler_sequencer::Message>::default(),
-    );
+    let serded_read = SymmetricallyFramed::new(delimited_read, SymmetricalJson::<Message>::default());
+    let serded_write = SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
 
     // Process a stream of incoming messages from a single tcp connection
     serded_read
@@ -83,14 +77,14 @@ async fn process_connection(
             let process_req = async move {
                 Span::current().record("message", &msg.as_ref());
                 match msg {
-                    scheduler_sequencer::Message::RequestTxVN(client_meta, sqlbegintx) => {
+                    Message::RequestTxVN(client_meta, sqlbegintx) => {
                         Span::current().record("client", &&client_meta.to_string()[..]);
                         debug!("<- {:?}", sqlbegintx);
                         let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
                         debug!("-> {:?}", txvn);
-                        Ok(scheduler_sequencer::Message::ReplyTxVN(txvn))
+                        Ok(Message::ReplyTxVN(txvn))
                     }
-                    scheduler_sequencer::Message::RequestBlock => {
+                    Message::RequestBlock => {
                         let prev_is_blocked = state_cloned.lock().await.set_vn_record_blocked(true);
                         let status = if prev_is_blocked {
                             "is already blocked"
@@ -99,9 +93,9 @@ async fn process_connection(
                         };
 
                         warn!("{}", status);
-                        Ok(scheduler_sequencer::Message::ReplyBlockUnblock(String::from(status)))
+                        Ok(Message::ReplyBlockUnblock(String::from(status)))
                     }
-                    scheduler_sequencer::Message::RequestUnblock => {
+                    Message::RequestUnblock => {
                         let prev_is_blocked = state_cloned.lock().await.set_vn_record_blocked(false);
 
                         let status = if prev_is_blocked {
@@ -111,9 +105,9 @@ async fn process_connection(
                         };
 
                         warn!("{}", status);
-                        Ok(scheduler_sequencer::Message::ReplyBlockUnblock(String::from(status)))
+                        Ok(Message::ReplyBlockUnblock(String::from(status)))
                     }
-                    scheduler_sequencer::Message::RequestStop => {
+                    Message::RequestStop => {
                         warn!("Receiving stop request, will shutdown soon");
                         stop_tx_cloned
                             .lock()
@@ -122,11 +116,11 @@ async fn process_connection(
                             .expect("The StopTx is already used!")
                             .send(())
                             .unwrap();
-                        Ok(scheduler_sequencer::Message::ReplyStop)
+                        Ok(Message::ReplyStop)
                     }
                     other => {
                         warn!("<- Unsupported: {:?}", other);
-                        Ok(scheduler_sequencer::Message::Invalid)
+                        Ok(Message::Invalid)
                     }
                 }
             };

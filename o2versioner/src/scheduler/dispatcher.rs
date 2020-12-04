@@ -242,16 +242,14 @@ impl Dispatcher {
         (addr, Dispatcher { state, request_rx })
     }
 
-    #[instrument(name="dispatch", skip(self), fields(dbvn=field::Empty, dbproxy=field::Empty))]
+    #[instrument(name="dispatch", skip(self), fields(dbvn=field::Empty))]
     pub async fn run(mut self) {
         let num_dbvn_manager = Arc::get_mut(&mut self.state.dbvn_manager)
             .unwrap()
             .get_mut()
             .inner()
             .len();
-        let num_dbproxy_manager = self.state.dbproxy_manager.inner().len();
         Span::current().record("dbvn", &num_dbvn_manager);
-        Span::current().record("dbproxy", &num_dbproxy_manager);
 
         // Handle each Request concurrently
         let Dispatcher { state, request_rx } = self;
