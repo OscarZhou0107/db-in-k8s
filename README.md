@@ -55,7 +55,7 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] Sequencer
 - [x] DbProxy
 - [x] Msql interface
-- [ ] Better debugging and logging
+- [x] Better debugging and logging
 
 ### Features
 - [x] msql: simple sql
@@ -97,10 +97,6 @@ o2versioner
     - Receive a single request, process the request, and send one response back
   - Keep a central state for versions assigned for each table
   - Lifetime is till all incoming connections are closed if the max connection is set
-- Admin Handler (Optional)
-  - Only process a single incoming tcp connection at a time
-  - Receie a single request in raw bytes, process the request, and send one response back
-  - Supports remotely stopping the main handler for taking in any new connections
 
 
 ### Scheduler
@@ -119,7 +115,6 @@ o2versioner
   - Manages a pool connection to Sequencer
   - Lifetime is till all incoming connections are closed if the max connection is set
 - Dispatcher
-  - Manages a pool connection to each Dbproxy
   - Manages the DbVN for each Dbproxy
   - Receives request via `DispatcherAddr` object, which can send a request to the Dispatcher 
   - Request is sent from `DispatcherAddr` object, which includes a single-use `Oneshot::Sender` channel,
@@ -128,10 +123,13 @@ o2versioner
   the rest of the reponses are not sent back to the handler, but they are still needed to
   update the internal state of the Dispatcher
   - Lifetime is till all `DispatcherAddr` objects are dropped
+- Transceiver
+  - Manges a single `TcpStream` socket for a single dbproxy
 - Admin Handler (Optional)
   - Only process a single incoming tcp connection at a time
   - Receie a single request in raw bytes, process the request, and send one response back
   - Supports remotely stopping the main handler for taking in any new connections
+
 
 
 ## Notes for asynchronous
