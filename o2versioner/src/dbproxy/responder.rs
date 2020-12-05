@@ -28,7 +28,11 @@ impl Responder {
                             .await
                             .release_on_transaction(result.contained_newer_versions.clone());
                     }
-                    _ => {}
+                    _ => {
+                        if let Some(ref early_release) = result.contained_early_release_version {
+                            version.lock().await.release_on_early_release(early_release.clone());
+                        }
+                    }
                 }
 
                 serializer
@@ -82,6 +86,7 @@ mod tests_test {
             succeed: true,
             result_type: QueryResultType::BEGIN,
             contained_newer_versions: Default::default(),
+            contained_early_release_version : None,
         };
 
         //Prepare - Responder
