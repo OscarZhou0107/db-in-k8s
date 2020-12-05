@@ -47,7 +47,7 @@ impl Dispatcher {
                         match op_cloned.operation_type {
                             Task::BEGIN => {
                                 if !lock.contains_key(&op_cloned.identifier.client_addr) {
-                                    let (ts, tr) = mpsc::channel(1);
+                                    let (ts, tr) = mpsc::channel(100);
                                     lock.insert(op_cloned.identifier.client_addr.clone(), ts);
                                     Self::spawn_transaction(pool_cloned, tr, sender_cloned);
                                 };
@@ -190,6 +190,7 @@ mod tests_dispatcher {
             operation_type: Task::ABORT,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
+            early_release : None,
         });
         mock_ops.push(QueueMessage {
             identifier: RequestMeta {
@@ -200,6 +201,7 @@ mod tests_dispatcher {
             operation_type: Task::READ,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
+            early_release : None,
         });
         mock_ops.push(QueueMessage {
             identifier: RequestMeta {
@@ -210,6 +212,7 @@ mod tests_dispatcher {
             operation_type: Task::READ,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
+            early_release : None,
         });
         mock_ops.push(QueueMessage {
             identifier: RequestMeta {
@@ -220,6 +223,7 @@ mod tests_dispatcher {
             operation_type: Task::BEGIN,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
+            early_release : None,
         });
 
         helper_spawn_dispatcher(pending_queue, responder_sender, version, transactions);

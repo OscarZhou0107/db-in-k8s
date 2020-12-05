@@ -74,7 +74,7 @@ mod tests_msql_response {
     #[test]
     fn test_err() {
         let msqlbegintx = Msql::BeginTx(MsqlBeginTx::default());
-        let msqlquery = Msql::Query(MsqlQuery::new("", TableOps::default()).unwrap());
+        let msqlquery = Msql::Query(MsqlQuery::new("", TableOps::default(), EarlyReleaseTables::default()).unwrap());
         let msqlendtx = Msql::EndTx(MsqlEndTx::commit());
 
         assert_eq!(MsqlResponse::err("a", &msqlbegintx), MsqlResponse::begintx_err("a"));

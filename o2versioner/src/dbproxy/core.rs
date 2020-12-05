@@ -1,4 +1,4 @@
-use crate::comm::MsqlResponse;
+use crate::{comm::MsqlResponse, core::{DbVNReleaseRequest, EarlyReleaseTables}};
 use crate::core::DbVN;
 use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
@@ -36,12 +36,14 @@ pub struct QueueMessage {
     pub operation_type: Task,
     pub query: String,
     pub versions: Option<TxVN>,
+    pub early_release : Option<EarlyReleaseTables>
 }
 
 impl QueueMessage {
     pub fn new(identifier: RequestMeta, request: Msql, versions: Option<TxVN>) -> Self {
         let operation_type;
         let mut query_string = String::new();
+        let mut early_release = None;
 
         match request {
             Msql::BeginTx(_) => {
@@ -50,6 +52,9 @@ impl QueueMessage {
 
             Msql::Query(op) => {
                 operation_type = Task::READ;
+                if op.has_early_release() {
+                    early_release = Some(op.early_release_tables().clone());
+                }
                 query_string = op.into_msqlfinalstring().into_inner();
             }
 
@@ -63,11 +68,14 @@ impl QueueMessage {
             },
         }
 
+    
+
         QueueMessage {
             identifier: identifier,
             operation_type: operation_type,
             query: query_string,
             versions: versions,
+            early_release: early_release
         }
     }
 
@@ -113,6 +121,7 @@ impl QueueMessage {
             result_type: result_type,
             succeed: succeed,
             contained_newer_versions: contained_newer_versions,
+            contained_early_release_version: self.early_release,
         }
     }
 }
@@ -166,8 +175,11 @@ impl DbVersion {
     }
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
-        self.db_version
-            .release_version(transaction_version.into_dbvn_release_request());
+        self.release_on_request(transaction_version.into_dbvn_release_request());
+    }
+
+    pub fn release_on_request(&mut self, release_request: DbVNReleaseRequest) {
+        self.db_version.release_version(release_request);
         self.notify.notify_one();
     }
 
@@ -302,6 +314,7 @@ pub struct QueryResult {
     pub succeed: bool,
     pub result_type: QueryResultType,
     pub contained_newer_versions: TxVN,
+    pub contained_early_release_version: Option<EarlyReleaseTables>
 }
 
 impl QueryResult {
@@ -331,6 +344,13 @@ impl QueryResult {
         };
 
         message
+    }
+
+    pub fn flush_early_release(&mut self) -> Result<DbVNReleaseRequest, &'static str> {
+        if let Some(early_release) = & self.contained_early_release_version {
+            return self.contained_newer_versions.early_release_request(early_release.clone())
+        }
+        Err("No available early release")
     }
 }
 
@@ -520,7 +540,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -530,7 +557,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::from(""),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -540,7 +574,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -550,7 +591,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -581,7 +629,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -591,7 +646,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -601,7 +663,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -611,7 +680,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -633,4 +709,4 @@ mod tests {
         println!("Number of tasks is: {}", ready_tasks.len());
         assert!(ready_tasks.len() == 2);
     }
-}
+    }

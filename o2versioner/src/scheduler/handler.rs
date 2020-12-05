@@ -301,42 +301,50 @@ async fn process_msql(
     Span::current().record("id", &conn_state.current_request_id().await);
 
     // Start the RequestRecord
-    let reqrecord = RequestRecord::start(&msql);
-    let msqlresponse = match Legality::check(&msql, conn_state.current_txvn()) {
-        Legality::Critical(e) => {
-            warn!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
-            MsqlResponse::err(e, &msql)
-        }
-        Legality::Panic(e) => {
-            error!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
-            panic!("{}", e);
-        }
-        _ => match msql {
-            Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
-            Msql::Query(_) => {
-                if conn_state.current_txvn().is_none() {
-                    warn!("Single R/W query");
-                    // Construct a new MsqlBeginTx
-                    let msqlbegintx = MsqlBeginTx::from(msql.try_get_query().unwrap().tableops().clone());
-                    process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await;
-                    // Execute the query
-                    let resp = process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await;
-                    // Construct a new MsqlEndTx
-                    let msqlendtx = Msql::EndTx(MsqlEndTx::commit());
-                    process_endtx(msqlendtx, conn_state, &dispatcher_addr).await;
-                    resp
-                } else {
-                    process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await
-                }
+    let reqrecord = RequestRecord::start(&msql, conn_state.current_txvn());
+    let msqlresponse = match msql {
+        Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
+        Msql::Query(_) => {
+            if conn_state.current_txvn().is_none() {
+                warn!("Single R/W query");
+                // Construct a new MsqlBeginTx
+                let msqlbegintx = MsqlBeginTx::from(msql.try_get_query().unwrap().tableops().clone());
+                process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await;
+                // Execute the query
+                let resp = process_query(msql, conn_state, &dispatcher_addr).await;
+                // Construct a new MsqlEndTx
+                let msqlendtx = Msql::EndTx(MsqlEndTx::commit());
+                process_endtx(msqlendtx, conn_state, &dispatcher_addr).await;
+                resp
+            } else {
+                process_query(msql, conn_state, &dispatcher_addr).await
             }
-            Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
-        },
+        }
+        Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
     };
 
     // Store the RequestRecord
-    conn_state.push_request_record(reqrecord.finish(&msqlresponse)).await;
+    conn_state
+        .push_request_record(reqrecord.finish(&msqlresponse, conn_state.current_txvn()))
+        .await;
 
     scheduler_api::Message::Reply(msqlresponse)
+}
+
+/// Helper function to check the legality of the current `Msql` request,
+/// this should be called after legalization
+fn process_msql_legality(msql: &Msql, txvn_opt: &Option<TxVN>) -> Result<(), MsqlResponse> {
+    match Legality::final_check(msql, txvn_opt) {
+        Legality::Critical(e) => {
+            warn!("{} {:?} {:?}", e, msql, txvn_opt);
+            Err(MsqlResponse::err(e, msql))
+        }
+        Legality::Panic(e) => {
+            error!("{} {:?} {:?}", e, msql, txvn_opt);
+            panic!("{}", e);
+        }
+        _ => Ok(()),
+    }
 }
 
 async fn process_begintx(
@@ -344,6 +352,10 @@ async fn process_begintx(
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
 ) -> MsqlResponse {
+    if let Err(msqlresponse) = process_msql_legality(&Msql::BeginTx(msqlbegintx.clone()), conn_state.current_txvn()) {
+        return msqlresponse;
+    }
+
     assert!(conn_state.current_txvn().is_none());
 
     let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
@@ -373,9 +385,12 @@ async fn process_begintx(
 async fn process_query(
     msql: Msql,
     conn_state: &mut ConnectionState,
-    _sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> MsqlResponse {
+    if let Err(msqlresponse) = process_msql_legality(&msql, conn_state.current_txvn()) {
+        return msqlresponse;
+    }
+
     assert!(conn_state.current_txvn().is_some());
 
     dispatcher_addr
@@ -401,6 +416,10 @@ async fn process_endtx(
     conn_state: &mut ConnectionState,
     dispatcher_addr: &Arc<DispatcherAddr>,
 ) -> MsqlResponse {
+    if let Err(msqlresponse) = process_msql_legality(&msql, conn_state.current_txvn()) {
+        return msqlresponse;
+    }
+
     let txvn = conn_state.replace_txvn(None);
     assert!(txvn.is_some());
 

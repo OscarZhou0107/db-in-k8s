@@ -7,11 +7,16 @@ use std::net::SocketAddr;
 pub struct RequestRecordStart {
     req: Msql,
     req_timestamp: DateTime<Utc>,
+    initial_txvn: Option<TxVN>,
 }
 
 impl RequestRecordStart {
-    pub fn finish(self, res: &MsqlResponse) -> RequestRecord {
-        let RequestRecordStart { req, req_timestamp } = self;
+    pub fn finish(self, res: &MsqlResponse, final_txvn: &Option<TxVN>) -> RequestRecord {
+        let RequestRecordStart {
+            req,
+            req_timestamp,
+            initial_txvn,
+        } = self;
 
         assert!(
             (req.is_begintx() && res.is_begintx())
@@ -23,8 +28,10 @@ impl RequestRecordStart {
         RequestRecord {
             req,
             req_timestamp,
+            initial_txvn,
             res: res.clone(),
             res_timestamp: Utc::now(),
+            final_txvn: final_txvn.clone(),
         }
     }
 }
@@ -33,15 +40,23 @@ impl RequestRecordStart {
 pub struct RequestRecord {
     req: Msql,
     req_timestamp: DateTime<Utc>,
+    initial_txvn: Option<TxVN>,
     res: MsqlResponse,
     res_timestamp: DateTime<Utc>,
+    final_txvn: Option<TxVN>,
 }
 
 impl RequestRecord {
-    pub fn start(req: &Msql) -> RequestRecordStart {
+    /// Construct a builder object for `RequestRecord`.
+    /// Once the builder `RequestRecordStart` is constructed, it will create a initial timestamp.
+    /// Once the operation finishes and all data for the `RequestRecord` is ready,
+    /// the builder object can be converted into the final `RequestRecord` by `RequestRecordStart::finish`,
+    /// which will create final timestamp.
+    pub fn start(req: &Msql, initial_txvn: &Option<TxVN>) -> RequestRecordStart {
         RequestRecordStart {
             req: req.clone(),
             req_timestamp: Utc::now(),
+            initial_txvn: initial_txvn.clone(),
         }
     }
 
@@ -51,6 +66,14 @@ impl RequestRecord {
 
     pub fn reponse_info(&self) -> (&MsqlResponse, &DateTime<Utc>) {
         (&self.res, &self.res_timestamp)
+    }
+
+    pub fn inital_txvn(&self) -> &Option<TxVN> {
+        &self.initial_txvn
+    }
+
+    pub fn final_txvn(&self) -> &Option<TxVN> {
+        &self.final_txvn
     }
 
     pub fn elapsed(&self) -> chrono::Duration {
@@ -84,14 +107,17 @@ impl ClientRecord {
         }
     }
 
+    /// Get the client_addr that this `ClientRecord` is tracking
     pub fn client_addr(&self) -> SocketAddr {
         self.client_addr.clone()
     }
 
+    /// Get the slices for all `RequestRecord`
     pub fn records(&self) -> &[RequestRecord] {
         &self.records
     }
 
+    /// Append a new `RequestRecord` to the end of the list
     pub fn push(&mut self, req_record: RequestRecord) {
         self.records.push(req_record)
     }

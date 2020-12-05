@@ -19,19 +19,35 @@ pub enum AccessPattern {
     Mixed,
 }
 
+/// Helper function
+fn remove_whitespace(s: &mut String) {
+    s.retain(|c| !c.is_whitespace());
+}
+
 /// Representing the access mode for `Self::table`, can be either `RWOperation::R` or `RWOperation::W`
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TableOp {
-    pub table: String,
-    pub op: RWOperation,
+    table: String,
+    op: RWOperation,
 }
 
 impl TableOp {
     pub fn new<S: Into<String>>(table: S, op: RWOperation) -> Self {
-        Self {
-            table: table.into(),
-            op,
-        }
+        let mut table = table.into();
+        remove_whitespace(&mut table);
+        Self { table, op }
+    }
+
+    pub fn table(&self) -> &str {
+        &self.table
+    }
+
+    pub fn op(&self) -> RWOperation {
+        self.op
+    }
+
+    pub fn unwrap(self) -> (String, RWOperation) {
+        (self.table, self.op)
     }
 }
 
@@ -181,6 +197,109 @@ where
                 })
                 .filter_map(|token_op| token_op),
         )
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EarlyReleaseTables(Vec<String>);
+
+impl Default for EarlyReleaseTables {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl EarlyReleaseTables {
+    /// Get a ref to the internal storage
+    pub fn get(&self) -> &[String] {
+        &self.0[..]
+    }
+
+    /// Convert to a `Vec<String>`
+    pub fn into_vec(self) -> Vec<String> {
+        self.0
+    }
+
+    /// Append a table, will validate all entires again
+    pub fn add_table<S: Into<String>>(mut self, table: S) -> Self {
+        let mut table = table.into();
+        remove_whitespace(&mut table);
+        self.0.push(table);
+        Self::from_iter(self)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        return self.0.is_empty();
+    }
+}
+
+impl IntoIterator for EarlyReleaseTables {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<S> FromIterator<S> for EarlyReleaseTables
+where
+    S: Into<String>,
+{
+    /// Convert a `String` like `IntoIterator` object into `EarlyReleaseTables`
+    fn from_iter<I: IntoIterator<Item = S>>(iter: I) -> Self {
+        Self(
+            iter.into_iter()
+                .map(|s| {
+                    let mut s = s.into();
+                    remove_whitespace(&mut s);
+                    s
+                })
+                .filter(|s| !s.is_empty())
+                .sorted()
+                .dedup()
+                .collect(),
+        )
+    }
+}
+
+impl<S> From<S> for EarlyReleaseTables
+where
+    S: Into<String>,
+{
+    /// Convert the input `Into<String>` into `TableOps`
+    ///
+    /// # Examples
+    /// ```
+    /// use o2versioner::core::EarlyReleaseTables;
+    /// assert_eq!(
+    ///     EarlyReleaseTables::from("  TABLE_0   TABLE_1 ".to_owned()).into_vec(),
+    ///     vec!["TABLE_0".to_owned(), "TABLE_1".to_owned()]
+    /// );
+    /// ```
+    fn from(str_like: S) -> Self {
+        Self::from_iter(str_like.into().split_whitespace())
+    }
+}
+
+/// Unit test fot `TableOp`
+#[cfg(test)]
+mod tests_tableop {
+    use super::*;
+    #[test]
+    fn test_new() {
+        assert_eq!(
+            TableOp::new("table0", RWOperation::R).unwrap(),
+            (String::from("table0"), RWOperation::R)
+        );
+        assert_eq!(
+            TableOp::new("table0 table1", RWOperation::R).unwrap(),
+            (String::from("table0table1"), RWOperation::R)
+        );
+        assert_eq!(
+            TableOp::new(" table0 table1 ", RWOperation::R).unwrap(),
+            (String::from("table0table1"), RWOperation::R)
+        );
     }
 }
 
@@ -470,5 +589,107 @@ mod tests_tableops {
             .access_pattern(),
             AccessPattern::WriteOnly
         );
+    }
+}
+
+/// Unit test for `EarlyReleaseTables`
+#[cfg(test)]
+mod tests_early_release_tables {
+    use super::*;
+
+    #[test]
+    fn test_from_iter() {
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["table_0", "table_1", "table_0"]).into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec![String::from("table_1"), String::from("table_0")]).into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec![String::from("table_0"), String::from("table_1")]).into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec![String::from("table_0 aaa"), String::from("table_1")]).into_vec(),
+            vec!["table_0aaa".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(Vec::<String>::new()).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(EarlyReleaseTables::from_iter(vec![""]).into_vec(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_from_string() {
+        assert_eq!(
+            EarlyReleaseTables::from("table_0  table_1 table_0 ").into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from("  table_1  table_0".to_owned()).into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+
+        assert_eq!(
+            EarlyReleaseTables::from("  TABLE_0   TABLE_1 ".to_owned()).into_vec(),
+            vec!["TABLE_0".to_owned(), "TABLE_1".to_owned()]
+        );
+
+        assert_eq!(
+            EarlyReleaseTables::from("   ".to_owned()).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(EarlyReleaseTables::from("".to_owned()).into_vec(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_add_table() {
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("table_1")
+                .into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("table_1")
+                .add_table("table_0")
+                .into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("Table_1")
+                .add_table("Table_0")
+                .into_vec(),
+            vec!["Table_0".to_owned(), "Table_1".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("Table_1 bbb")
+                .add_table("Table_0 aaa")
+                .into_vec(),
+            vec!["Table_0aaa".to_owned(), "Table_1bbb".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default().add_table("  ").into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::default().add_table("").into_vec(),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn test_is_empty() {
+        assert!(!EarlyReleaseTables::default().add_table("Table_1 bbb").is_empty());
+        assert!(EarlyReleaseTables::default().is_empty());
+        assert!(EarlyReleaseTables::default().add_table("").is_empty());
     }
 }

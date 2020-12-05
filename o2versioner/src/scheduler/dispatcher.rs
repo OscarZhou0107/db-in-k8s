@@ -104,8 +104,6 @@ impl State {
             }
         };
 
-        let is_endtx = request.command.is_endtx();
-
         let num_dbproxy = dbproxy_addrs.len();
         let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
 
@@ -115,7 +113,7 @@ impl State {
             txvn,
         } = request;
 
-        let msg = Message::MsqlRequest(request_meta, command, txvn.clone());
+        let msg = Message::MsqlRequest(request_meta, command.clone(), txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply_ch));
 
         // Send all requests to transceivers
@@ -151,9 +149,11 @@ impl State {
         // Wait for responses from transceivers concurrently
         stream::iter(addr_receipts)
             .for_each_concurrent(None, move |(dbproxy_addr, transceiver_receipt)| {
+                let command_cloned = command.clone();
                 let txvn_cloned = txvn.clone();
                 let shared_reply_channel_cloned = shared_reply_channel.clone();
                 async move {
+                    let is_endtx = command_cloned.is_endtx();
                     let msqlresponse = transceiver_receipt
                         .wait_request()
                         .and_then(|res| match res.msg {
@@ -169,18 +169,30 @@ impl State {
                         })
                         .await;
 
-                    // if this is a EndTx, need to release the version and notifier other queries waiting on versions
-                    let txvn = if is_endtx {
-                        self.release_version(
-                            &dbproxy_addr,
-                            txvn_cloned
-                                .expect("EndTx must include Some(TxVN)")
-                                .into_dbvn_release_request(),
-                        )
-                        .await;
-                        None
-                    } else {
-                        txvn_cloned
+                    // Release table versions
+                    let txvn = match command_cloned {
+                        Msql::Query(query) if query.has_early_release() && txvn_cloned.is_some() => {
+                            let mut txvn = txvn_cloned.unwrap();
+                            let (_, _, ertables) = query.unwrap();
+                            self.release_version(
+                                &dbproxy_addr,
+                                txvn.early_release_request(ertables)
+                                    .expect("Early release requesting tables not in TxVN"),
+                            )
+                            .await;
+                            Some(txvn)
+                        }
+                        Msql::EndTx(_) => {
+                            self.release_version(
+                                &dbproxy_addr,
+                                txvn_cloned
+                                    .expect("EndTx must include Some(TxVN)")
+                                    .into_dbvn_release_request(),
+                            )
+                            .await;
+                            None
+                        }
+                        _ => txvn_cloned,
                     };
 
                     // If the oneshot channel is not consumed, consume it to send the reply back to handler
