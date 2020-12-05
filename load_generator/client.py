@@ -170,6 +170,8 @@ class Client:
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
             time.sleep(TT)
+        
+        return 1
 
     '''
     ==================================================================================================================
@@ -915,4 +917,7 @@ if __name__ == "__main__":
         sys.exit()
 
     newClient = Client(int(args.c_id), int(args.port), mix)
-    newClient.run()
+    if newClient.run():
+        sys.exit(0)
+    else:
+        sys.exit(1)

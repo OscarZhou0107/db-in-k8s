@@ -43,7 +43,7 @@ def launch_client(cids, pid):
                 if p.poll() is not None: # not None == finished
                     if p.returncode != 0: # abnoraml exit of a child process -> kill everything
                                         # default return code is 0
-                        print("process {} abnormal exit {}".format(os.getpid(), p.returncode))
+                        print("process {} abnormal exit".format(os.getpid()))
                         print(procs[p])
                         os.killpg(pid, signal.SIGTERM)
                     # else: correctly exited
@@ -87,8 +87,7 @@ if __name__ == "__main__":
                 print("All clients finished")
     
 
-    # TODO:
-    # - change error code in client: err 1; empty 2
+
     # - add log so that we know what happened at abnormal exit
 
     

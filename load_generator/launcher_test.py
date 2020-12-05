@@ -57,12 +57,11 @@ if __name__ == "__main__":
                         print(procs[p])
                         os.killpg(os.getpid(), signal.SIGTERM)
                     else: # correctly exited
-                        print("about to remove {}".format(procs[p]))
                         procs.pop(p)
                         break
                 else:
                     time.sleep(.1)
-                    
+    # Note: to debug, remove try and except
     except:
         print("Run into exception, terminate parent process to terminate children")
         os.killpg(os.getpid(), signal.SIGTERM)
