@@ -34,9 +34,6 @@ impl TxTableVN {
 }
 
 /// Version numbers of tables declared by a transaction
-///
-/// TODO: For table being early-released, pop them from `TxVN`
-/// into `DbVNReleaseRequest`.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
     pub tx: Option<String>,
@@ -79,7 +76,22 @@ impl TxVN {
         }
     }
 
-    /// Translate `TxVN` into multiple `DbVNReleaseRequest`
+    /// Find a Vec<&TxTableVN> of the argument `EarlyReleaseTables` from the `TxVN` if they *ALL* match
+    pub fn get_from_ertables(&self, ertables: &EarlyReleaseTables) -> Result<Vec<TxTableVN>, &'static str> {
+        let res: Vec<_> = ertables
+            .get()
+            .iter()
+            .filter_map(|ertable| self.txtablevns.iter().find(|txtablevn| txtablevn.table == *ertable))
+            .cloned()
+            .collect();
+        if res.len() != ertables.get().len() {
+            Err("Some tables in the EarlyReleaseTables are not assigned a VN in TxVN")
+        } else {
+            Ok(res)
+        }
+    }
+
+    /// Translate `TxVN` into `DbVNReleaseRequest`
     pub fn into_dbvn_release_request(self) -> DbVNReleaseRequest {
         DbVNReleaseRequest(
             self.txtablevns
@@ -88,6 +100,19 @@ impl TxVN {
                 .map(|txtablevn| txtablevn.table)
                 .collect(),
         )
+    }
+
+    /// Remove tables from `EarlyReleaseTables` from `TxVN`, and translate those tables into `DbVNReleaseRequest`
+    /// If any table from `EarlyReleaseTables` is not found in `TxVN`, `Err(reason: &'static str)` is returned
+    pub fn early_release_request(&mut self, ertables: EarlyReleaseTables) -> Result<DbVNReleaseRequest, &'static str> {
+        self.get_from_ertables(&ertables)?;
+        self.txtablevns = self
+            .txtablevns
+            .iter()
+            .filter(|txtablevn| !ertables.get().contains(&txtablevn.table))
+            .cloned()
+            .collect();
+        Ok(DbVNReleaseRequest(ertables.into_vec()))
     }
 }
 
@@ -121,7 +146,7 @@ mod tests_txvn {
     use std::iter::FromIterator;
 
     #[test]
-    fn test_get_tableop() {
+    fn test_get_from_tableop() {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
@@ -146,7 +171,7 @@ mod tests_txvn {
     }
 
     #[test]
-    fn test_get_tableops() {
+    fn test_get_from_tableops() {
         let txvn = TxVN {
             tx: None,
             txtablevns: vec![
@@ -215,7 +240,7 @@ mod tests_txvn {
 
         assert_eq!(
             txvn.get_from_tableops(&TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R),])),
-            Ok(vec![TxTableVN::new("t0", 0, RWOperation::R),])
+            Ok(vec![TxTableVN::new("t0", 0, RWOperation::R)])
         );
 
         assert_eq!(
@@ -236,6 +261,51 @@ mod tests_txvn {
     }
 
     #[test]
+    fn test_get_from_ertables() {
+        let txvn = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
+            ],
+        };
+
+        assert_eq!(
+            txvn.get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t0", "t1"])),
+            Ok(vec![
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W)
+            ])
+        );
+
+        assert_eq!(
+            txvn.get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t1", "t0"])),
+            Ok(vec![
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
+            ])
+        );
+
+        assert_eq!(
+            txvn.get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t0"])),
+            Ok(vec![TxTableVN::new("t0", 0, RWOperation::R)])
+        );
+
+        assert_eq!(
+            txvn.get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t1"])),
+            Ok(vec![TxTableVN::new("t1", 2, RWOperation::W)])
+        );
+
+        assert!(txvn
+            .get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t3"]))
+            .is_err());
+
+        assert!(txvn
+            .get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t2", "t0"]))
+            .is_err());
+    }
+
+    #[test]
     fn test_into_dbvn_release_request() {
         let txvn = TxVN {
             tx: None,
@@ -249,5 +319,25 @@ mod tests_txvn {
             txvn.into_dbvn_release_request(),
             DbVNReleaseRequest(vec![String::from("t0"), String::from("t1")]),
         );
+    }
+
+    #[test]
+    fn test_early_release_request() {
+        let mut txvn = TxVN {
+            tx: None,
+            txtablevns: vec![
+                TxTableVN::new("t0", 0, RWOperation::R),
+                TxTableVN::new("t1", 2, RWOperation::W),
+                TxTableVN::new("t2", 5, RWOperation::R),
+            ],
+        };
+
+        assert!(txvn.early_release_request(EarlyReleaseTables::from("t0 t3")).is_err());
+
+        assert_eq!(
+            txvn.early_release_request(EarlyReleaseTables::from("t0 t2")),
+            Ok(DbVNReleaseRequest(vec![String::from("t0"), String::from("t2")]))
+        );
+        assert_eq!(txvn.txtablevns, vec![TxTableVN::new("t1", 2, RWOperation::W)]);
     }
 }

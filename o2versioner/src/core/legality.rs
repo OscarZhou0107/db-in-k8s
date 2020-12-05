@@ -25,18 +25,14 @@ impl Legality {
                 }
             }
             Msql::Query(query) => {
-                if txvn_opt.is_none() {
-                    // Self::Panic("Does not support single un-transactioned query for now")
-                    Self::Legal
+                let txvn = txvn_opt.as_ref().unwrap();
+                if query.tableops().access_pattern() == AccessPattern::Mixed {
+                    Self::Critical("Does not support query with mixed R and W")
+                } else if let Err(_) = txvn.get_from_tableops(&query.tableops()) {
+                    Self::Critical("Query is using tables not declared in the BeginTx")
+                // } else if {
                 } else {
-                    let txvn = txvn_opt.as_ref().unwrap();
-                    if query.tableops().access_pattern() == AccessPattern::Mixed {
-                        Self::Critical("Does not support query with mixed R and W")
-                    } else if let Err(_) = txvn.get_from_tableops(&query.tableops()) {
-                        Self::Critical("Query is using tables not declared in the BeginTx")
-                    } else {
-                        Self::Legal
-                    }
+                    Self::Legal
                 }
             }
             Msql::EndTx(_endtx) => {
