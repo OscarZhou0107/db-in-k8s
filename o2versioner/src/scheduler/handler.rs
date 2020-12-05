@@ -301,7 +301,7 @@ async fn process_msql(
     Span::current().record("id", &conn_state.current_request_id().await);
 
     // Start the RequestRecord
-    let reqrecord = RequestRecord::start(&msql);
+    let reqrecord = RequestRecord::start(&msql, conn_state.current_txvn());
     let msqlresponse = match Legality::check(&msql, conn_state.current_txvn()) {
         Legality::Critical(e) => {
             warn!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
@@ -334,7 +334,9 @@ async fn process_msql(
     };
 
     // Store the RequestRecord
-    conn_state.push_request_record(reqrecord.finish(&msqlresponse)).await;
+    conn_state
+        .push_request_record(reqrecord.finish(&msqlresponse, conn_state.current_txvn()))
+        .await;
 
     scheduler_api::Message::Reply(msqlresponse)
 }
