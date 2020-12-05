@@ -130,12 +130,6 @@ impl DbVN {
             *self.0.entry(table).or_default() += 1;
         });
     }
-
-    pub fn release_early_version(&mut self, release_request: EarlyReleaseTables) {
-        release_request.into_iter().for_each(|table| {
-            *self.0.entry(table).or_default() += 1;
-        });
-    }
 }
 
 #[cfg(test)]

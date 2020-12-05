@@ -1,4 +1,4 @@
-use crate::{core::EarlyReleaseTables, comm::MsqlResponse};
+use crate::{comm::MsqlResponse, core::{DbVNReleaseRequest, EarlyReleaseTables}};
 use crate::core::DbVN;
 use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
@@ -175,13 +175,11 @@ impl DbVersion {
     }
 
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
-        self.db_version
-            .release_version(transaction_version.into_dbvn_release_request());
-        self.notify.notify_one();
+        self.release_on_request(transaction_version.into_dbvn_release_request());
     }
 
-    pub fn release_on_early_release(&mut self, early_release_version: EarlyReleaseTables) {
-        self.db_version.release_early_version(early_release_version);
+    pub fn release_on_request(&mut self, release_request: DbVNReleaseRequest) {
+        self.db_version.release_version(release_request);
         self.notify.notify_one();
     }
 
@@ -346,6 +344,13 @@ impl QueryResult {
         };
 
         message
+    }
+
+    pub fn flush_early_release(&mut self) -> Result<DbVNReleaseRequest, &'static str> {
+        if let Some(early_release) = & self.contained_early_release_version {
+            return self.contained_newer_versions.early_release_request(early_release.clone())
+        }
+        Err("No available early release")
     }
 }
 
