@@ -23,12 +23,7 @@ async fn main() {
     info!("{:?}", conf);
 
     if matches.is_present("dbproxy") {
-        let index: usize = matches.value_of("dbindex")
-        .unwrap()
-        .to_string()
-        .parse()
-        .unwrap();
-
+        let index: usize = matches.value_of("dbindex").unwrap().to_string().parse().unwrap();
         dbproxy::main(conf.dbproxy.get(index).unwrap().clone()).await
     } else if matches.is_present("scheduler") {
         scheduler_main(conf).await
@@ -50,11 +45,17 @@ fn parse_args() -> ArgMatches<'static> {
                 .help("Sets the config file")
                 .takes_value(true),
         )
-        .arg(Arg::with_name("dbproxy").long("dbproxy").help("Run the dbproxy"))
+        .arg(
+            Arg::with_name("dbproxy")
+                .long("dbproxy")
+                .help("Run the dbproxy")
+                .requires("dbindex"),
+        )
         .arg(
             Arg::with_name("dbindex")
                 .long("dbindex")
-                .help("Indicate the index of dbproxy"),
+                .help("Indicate the index of dbproxy")
+                .index(1),
         )
         .arg(Arg::with_name("scheduler").long("scheduler").help("Run the scheduler"))
         .arg(Arg::with_name("sequencer").long("sequencer").help("Run the sequencer"))
