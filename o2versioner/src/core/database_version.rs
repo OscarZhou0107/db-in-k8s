@@ -19,6 +19,7 @@ impl DbTableVN {
 }
 
 /// Version number of all tables on a single database instance
+#[derive(Debug)]
 pub struct DbVN(HashMap<String, VN>);
 
 impl Default for DbVN {

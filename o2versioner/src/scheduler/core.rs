@@ -1,24 +1,56 @@
+use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
 use tracing::warn;
+
+#[derive(Debug, Clone)]
+/// A collection of shared variables
+pub struct State {
+    dbvn_manager: Arc<RwLock<DbVNManager>>,
+    client_records: Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>>,
+}
+
+impl State {
+    pub fn new(dbvn_manager: DbVNManager) -> Self {
+        Self {
+            dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
+            client_records: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    pub fn share_dbvn_manager(&self) -> Arc<RwLock<DbVNManager>> {
+        self.dbvn_manager.clone()
+    }
+
+    pub async fn share_client_record(&self, client: SocketAddr) -> Arc<RwLock<ClientRecord>> {
+        self.client_records
+            .lock()
+            .await
+            .entry(client.clone())
+            .or_insert_with(|| Arc::new(RwLock::new(ClientRecord::new(client))))
+            .clone()
+    }
+}
 
 #[derive(Debug)]
 pub struct ConnectionState {
     client_meta: ClientMeta,
     cur_txvn: Option<TxVN>,
-    current_request_id: usize,
+    client_record: Arc<RwLock<ClientRecord>>,
 }
 
 impl ConnectionState {
-    pub fn new(client_addr: SocketAddr) -> Self {
+    pub fn new(client_addr: SocketAddr, client_record: Arc<RwLock<ClientRecord>>) -> Self {
         Self {
             client_meta: ClientMeta::new(client_addr),
             cur_txvn: None,
-            current_request_id: 0,
+            client_record,
         }
     }
 
@@ -40,15 +72,17 @@ impl ConnectionState {
         old_txvn
     }
 
-    pub fn current_request_id(&self) -> usize {
-        self.current_request_id
+    pub async fn current_request_id(&self) -> usize {
+        self.client_record.read().await.records().len()
     }
 
-    pub fn increment_request_id(&mut self) {
-        self.current_request_id += 1;
+    pub async fn push_request_record(&self, request_record: RequestRecord) {
+        self.client_record.write().await.push(request_record)
     }
 }
 
+/// `Dbproxy_addr` -> `DvVN`
+#[derive(Debug)]
 pub struct DbVNManager(HashMap<SocketAddr, DbVN>);
 
 impl FromIterator<SocketAddr> for DbVNManager {
@@ -142,7 +176,11 @@ mod tests_connection_state {
 
     #[test]
     fn test_replace_txvn() {
-        let mut conn_state = ConnectionState::new("127.0.0.1:6666".parse().unwrap());
+        let client_addr: SocketAddr = "127.0.0.1:6666".parse().unwrap();
+        let mut conn_state = ConnectionState::new(
+            client_addr.clone(),
+            Arc::new(RwLock::new(ClientRecord::new(client_addr))),
+        );
         assert_eq!(*conn_state.current_txvn(), None);
         assert_eq!(conn_state.replace_txvn(Some(TxVN::default())), None);
         assert_eq!(*conn_state.current_txvn(), Some(TxVN::default()));

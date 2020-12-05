@@ -1,5 +1,6 @@
 use super::core::*;
 use super::dispatcher::*;
+use super::logging::*;
 use super::transceiver::*;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
@@ -14,7 +15,7 @@ use std::iter::FromIterator;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
@@ -31,6 +32,9 @@ use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument
 /// connections.
 #[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Config) {
+    // Create the main state
+    let state = State::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()));
+
     // The current task completes as soon as start_tcplistener finishes,
     // which happens when it reaches the max_conn_till_dropped if not None,
     // which is really depending on the incoming connections into Scheduler.
@@ -56,7 +60,7 @@ pub async fn main(conf: Config) {
     // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
-        Arc::new(RwLock::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()))),
+        state.share_dbvn_manager(),
         DbproxyManager::from_iter(transceiver_addrs),
     );
 
@@ -84,12 +88,16 @@ pub async fn main(conf: Config) {
             conf.scheduler.to_addr(),
             move |tcp_stream| {
                 let sequencer_socket_pool = sequencer_socket_pool.clone();
+                let state_cloned = state.clone();
                 // Connection/session specific storage
                 // Note: this closure contains one copy of dispatcher_addr
                 // Then, for each connection, a new dispatcher_addr is cloned
                 let dispatcher_addr = Arc::new(dispatcher_addr.clone());
                 async move {
-                    process_connection(tcp_stream, sequencer_socket_pool, dispatcher_addr).await;
+                    let client_addr = tcp_stream.peer_addr().unwrap();
+                    let conn_state =
+                        ConnectionState::new(client_addr.clone(), state_cloned.share_client_record(client_addr).await);
+                    process_connection(tcp_stream, conn_state, sequencer_socket_pool, dispatcher_addr).await;
                 }
             },
             conf.scheduler.max_connection,
@@ -130,9 +138,10 @@ pub async fn main(conf: Config) {
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-#[instrument(name="conn", skip(socket, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
+#[instrument(name="conn", skip(socket, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
 async fn process_connection(
     mut socket: TcpStream,
+    conn_state: ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
 ) {
@@ -154,7 +163,7 @@ async fn process_connection(
     // the socket is dedicated for one session only, opposed to being shared for multiple sessions.
     // At any given point, there is at most one transaction.
     // Connection/session specific storage
-    let conn_state = Arc::new(Mutex::new(ConnectionState::new(client_addr)));
+    let conn_state = Arc::new(Mutex::new(conn_state));
     let conn_state_cloned = conn_state.clone();
 
     // Process a stream of incoming messages from a single tcp connection
@@ -204,7 +213,6 @@ async fn process_request(
     // Not creating any critical session indeed, process_msql will always be executing in serial
     let mut conn_state_guard = conn_state.lock().await;
     Span::current().record("message", &msg.as_ref());
-    Span::current().record("id", &conn_state_guard.current_request_id());
 
     let response = match msg {
         scheduler_api::Message::RequestMsql(msql) => {
@@ -224,8 +232,6 @@ async fn process_request(
     };
     debug!("-> {:?}", response);
 
-    conn_state_guard.increment_request_id();
-
     response
     // conn_state_guard should be dropped here
 }
@@ -238,11 +244,14 @@ async fn process_msql(
 ) -> scheduler_api::Message {
     Span::current().record("cmd", &msql.as_ref());
     Span::current().record("txid", &conn_state.client_meta().current_txid());
+    Span::current().record("id", &conn_state.current_request_id().await);
 
-    match Legality::check(&msql, conn_state.current_txvn()) {
+    // Start the RequestRecord
+    let reqrecord = RequestRecord::start(&msql);
+    let msqlresponse = match Legality::check(&msql, conn_state.current_txvn()) {
         Legality::Critical(e) => {
             warn!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
-            scheduler_api::Message::Reply(MsqlResponse::err(e, &msql))
+            MsqlResponse::err(e, &msql)
         }
         Legality::Panic(e) => {
             error!("{} {:?} {:?}", e, msql, conn_state.current_txvn());
@@ -253,14 +262,19 @@ async fn process_msql(
             Msql::Query(_) => process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await,
             Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
         },
-    }
+    };
+
+    // Store the RequestRecord
+    conn_state.push_request_record(reqrecord.finish(&msqlresponse)).await;
+
+    scheduler_api::Message::Reply(msqlresponse)
 }
 
 async fn process_begintx(
     msqlbegintx: MsqlBeginTx,
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
-) -> scheduler_api::Message {
+) -> MsqlResponse {
     assert!(conn_state.current_txvn().is_none());
 
     let mut sequencer_socket = sequencer_socket_pool.get().await.unwrap();
@@ -282,10 +296,7 @@ async fn process_begintx(
                 _ => Err(String::from("Invalid response from Sequencer")),
             }
         })
-        .map_ok_or_else(
-            |e| scheduler_api::Message::Reply(MsqlResponse::begintx_err(e)),
-            |_| scheduler_api::Message::Reply(MsqlResponse::begintx_ok()),
-        )
+        .map_ok_or_else(|e| MsqlResponse::begintx_err(e), |_| MsqlResponse::begintx_ok())
         .instrument(info_span!("<->sequencer"))
         .await
 }
@@ -295,7 +306,7 @@ async fn process_query(
     conn_state: &mut ConnectionState,
     _sequencer_socket_pool: &Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: &Arc<DispatcherAddr>,
-) -> scheduler_api::Message {
+) -> MsqlResponse {
     assert!(conn_state.current_txvn().is_some());
 
     dispatcher_addr
@@ -303,14 +314,14 @@ async fn process_query(
             conn_state.client_meta().clone(),
             msql,
             conn_state.current_txvn().clone(),
-            conn_state.current_request_id(),
+            conn_state.current_request_id().await,
         ))
         .map_ok_or_else(
-            |e| scheduler_api::Message::Reply(MsqlResponse::query_err(e)),
+            |e| MsqlResponse::query_err(e),
             |res| {
                 let DispatcherReply { msql_res, txvn_res } = res;
                 conn_state.replace_txvn(txvn_res);
-                scheduler_api::Message::Reply(msql_res)
+                msql_res
             },
         )
         .await
@@ -320,7 +331,7 @@ async fn process_endtx(
     msql: Msql,
     conn_state: &mut ConnectionState,
     dispatcher_addr: &Arc<DispatcherAddr>,
-) -> scheduler_api::Message {
+) -> MsqlResponse {
     let txvn = conn_state.replace_txvn(None);
     assert!(txvn.is_some());
 
@@ -329,16 +340,16 @@ async fn process_endtx(
             conn_state.client_meta().clone(),
             msql,
             txvn,
-            conn_state.current_request_id(),
+            conn_state.current_request_id().await,
         ))
         .map_ok_or_else(
-            |e| scheduler_api::Message::Reply(MsqlResponse::endtx_err(e)),
+            |e| MsqlResponse::endtx_err(e),
             |res| {
                 let DispatcherReply { msql_res, txvn_res } = res;
                 let existing = conn_state.replace_txvn(txvn_res);
                 assert!(existing.is_none());
                 conn_state.client_meta_as_mut().transaction_finished();
-                scheduler_api::Message::Reply(msql_res)
+                msql_res
             },
         )
         .await

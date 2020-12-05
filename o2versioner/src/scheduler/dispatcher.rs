@@ -294,12 +294,8 @@ impl Dispatcher {
     }
 
     #[instrument(name="dispatch", skip(self), fields(dbvn=field::Empty))]
-    pub async fn run(mut self) {
-        let num_dbvn_manager = Arc::get_mut(&mut self.state.dbvn_manager)
-            .unwrap()
-            .get_mut()
-            .inner()
-            .len();
+    pub async fn run(self) {
+        let num_dbvn_manager = self.state.dbvn_manager.read().await.inner().len();
         Span::current().record("dbvn", &num_dbvn_manager);
 
         let Dispatcher { state, request_rx } = self;

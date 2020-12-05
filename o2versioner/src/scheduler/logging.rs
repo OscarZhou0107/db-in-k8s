@@ -29,6 +29,7 @@ impl RequestRecordStart {
     }
 }
 
+#[derive(Debug)]
 pub struct RequestRecord {
     req: Msql,
     req_timestamp: DateTime<Utc>,
@@ -69,6 +70,7 @@ impl RequestRecord {
     }
 }
 
+#[derive(Debug)]
 pub struct ClientRecord {
     client_addr: SocketAddr,
     records: Vec<RequestRecord>,
@@ -80,6 +82,10 @@ impl ClientRecord {
             client_addr,
             records: Vec::new(),
         }
+    }
+
+    pub fn client_addr(&self) -> SocketAddr {
+        self.client_addr.clone()
     }
 
     pub fn records(&self) -> &[RequestRecord] {
