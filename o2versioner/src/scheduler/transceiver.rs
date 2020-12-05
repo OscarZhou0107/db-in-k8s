@@ -117,6 +117,6 @@ impl Transceiver {
 
         tokio::try_join!(reader_handle, request_rx_handle).unwrap();
 
-        info!("all communications done");
+        info!("DIES");
     }
 }

@@ -4,7 +4,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tracing::{field, info, info_span, instrument, warn, Instrument, Span};
-use unicase::UniCase;
 
 /// Helper function to bind to a `TcpListener` as an admin port and forward all incomming `TcpStream` to `connection_handler`.
 ///
@@ -13,7 +12,7 @@ use unicase::UniCase;
 /// 2. `admin_command_handler` is a `FnMut` closure takes in `String` and returns `Future<Output = (String, bool)>`,
 /// with `String` represents the reply response, and `bool` denotes whether to continue the `TcpListener`.
 /// 3. The returned `String` should not have any newline characters
-#[instrument(name="admin:listen", skip(addr, admin_command_handler), fields(message=field::Empty))]
+#[instrument(name="listen", skip(addr, admin_command_handler), fields(message=field::Empty))]
 pub async fn start_admin_tcplistener<A, C, Fut>(addr: A, mut admin_command_handler: C)
 where
     A: ToSocketAddrs,
@@ -75,26 +74,14 @@ where
     warn!("Service terminated, have a good night");
 }
 
-/// A very basic admin command handler
-pub async fn basic_admin_command_handler(command: String) -> (String, bool) {
-    let command = UniCase::new(command);
-    info!("Recevied {}", command);
-    if command == UniCase::new(String::from("kill"))
-        || command == UniCase::new(String::from("exit"))
-        || command == UniCase::new(String::from("quit"))
-    {
-        ("Terminating server".into(), false)
-    } else {
-        (format!("Unknown command: {}", command), true)
-    }
-}
-
 /// Unit test for `start_admin_tcplistener`
 #[cfg(test)]
 mod tests_start_admin_tcplistener {
     use super::*;
     use crate::util::tests_helper::*;
+    use std::iter::FromIterator;
     use tokio::net::TcpStream;
+    use unicase::UniCase;
 
     #[tokio::test]
     async fn test_admin_tcplistener() {
@@ -102,7 +89,14 @@ mod tests_start_admin_tcplistener {
 
         let admin_addr = "127.0.0.1:27643";
 
-        let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, basic_admin_command_handler));
+        let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, |msg| async {
+            let command = UniCase::new(msg);
+            if Vec::from_iter(vec!["kill", "exit", "quit"].into_iter().map(|s| s.into())).contains(&command) {
+                (String::from("Terminating"), false)
+            } else {
+                (format!("Unknown command: {}", command), true)
+            }
+        }));
         let client_handle = tokio::spawn(async move {
             let mut tcp_stream = TcpStream::connect(admin_addr).await.unwrap();
             let res = mock_ascii_client(&mut tcp_stream, vec!["help", "exit"]).await;

@@ -42,4 +42,25 @@ impl MsqlResponse {
     pub fn endtx_ok<S: Into<String>>(ok: S) -> Self {
         Self::EndTx(Ok(ok.into()))
     }
+
+    pub fn is_begintx(&self) -> bool {
+        match self {
+            Self::BeginTx(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_query(&self) -> bool {
+        match self {
+            Self::Query(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_endtx(&self) -> bool {
+        match self {
+            Self::EndTx(_) => true,
+            _ => false,
+        }
+    }
 }

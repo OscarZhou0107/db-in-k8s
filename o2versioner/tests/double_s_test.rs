@@ -91,7 +91,7 @@ async fn run_double_s() {
     let conf = Config {
         scheduler: SchedulerConfig {
             addr: String::from(scheduler_addr),
-            admin_addr: None,
+            admin_addr: Some(String::from("127.0.0.1:24251")),
             max_connection: None,
             sequencer_pool_size: 10,
             dispatcher_queue_size: 1,
@@ -264,7 +264,8 @@ where
                     .await;
             }
         },
-        None,
+        // Single socket
+        Some(1),
         None,
     )
     .await;

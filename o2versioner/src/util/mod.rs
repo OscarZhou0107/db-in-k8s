@@ -1,4 +1,3 @@
-pub mod admin_handler;
 pub mod config;
 pub mod executor_addr;
 pub mod tcp;
