@@ -8,6 +8,7 @@ use bb8_postgres::{
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
