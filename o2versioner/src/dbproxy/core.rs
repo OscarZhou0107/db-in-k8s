@@ -519,25 +519,41 @@ mod tests {
         let mut queue = PendingQueue::new();
 
         let message4 = QueueMessage::new(
-            "127.0.0.4:8080".parse().unwrap(),
+            RequestMeta {
+                client_addr : "127.0.0.4:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             None,
         );
 
         let message3 = QueueMessage::new(
-            "127.0.0.3:8080".parse().unwrap(),
+            RequestMeta {
+                client_addr : "127.0.0.3:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             Some(TxVN::default()),
         );
 
         let message2 = QueueMessage::new(
-            "127.0.0.2:8080".parse().unwrap(),
+            RequestMeta {
+                client_addr : "127.0.0.2:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             Some(TxVN::default()),
         );
 
         let message1 = QueueMessage::new(
-            "127.0.0.1:8080".parse().unwrap(),
+             RequestMeta {
+                client_addr : "127.0.0.1:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             None,
         );
@@ -559,7 +575,7 @@ mod tests {
     }
 
 #[tokio::test]
-async fn pending_queue_task_order_test(){
+async fn pending_queue_task_order_test_2(){
 
     let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
     let mut queue = PendingQueue::new();

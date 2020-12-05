@@ -60,7 +60,7 @@ mod tests_test {
     async fn test_send_items_to_from_multiple_channel() {
         
         let addr = RequestMeta {
-            client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            client_addr :  "127.0.0.1:8080".parse().unwrap(),
             cur_txid : 0,
             request_id : 0
         };
