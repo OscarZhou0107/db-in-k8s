@@ -1,3 +1,4 @@
+use futures::TryFutureExt;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
@@ -67,6 +68,11 @@ where
 
     /// Send a `Request` to the executor, and waits for a `Request::ReplyType`
     pub async fn request(&self, request: Request) -> Result<Request::ReplyType, String> {
+        self.request_nowait(request).and_then(|rx| rx.wait_request()).await
+    }
+
+    /// Send a `Request` to the executor, but does not wait for a `Request::ReplyType`
+    pub async fn request_nowait(&self, request: Request) -> Result<ExecutorAddrRequestReceipt<Request>, String> {
         // Create a reply oneshot channel
         let (tx, rx) = oneshot::channel();
 
@@ -77,10 +83,24 @@ where
         };
 
         // Send the request
-        self.request_tx.send(req_wrapper).await.map_err(|e| e.to_string())?;
+        self.request_tx
+            .send(req_wrapper)
+            .await
+            .map_err(|e| e.to_string())
+            .map(|_| ExecutorAddrRequestReceipt(rx))
+    }
+}
 
+/// Received as a receipt for the request, which was sent via `ExecutorAddr::request_nowait`.
+pub struct ExecutorAddrRequestReceipt<Request: ExecutorRequest>(oneshot::Receiver<Request::ReplyType>);
+
+impl<Request> ExecutorAddrRequestReceipt<Request>
+where
+    Request: ExecutorRequest,
+{
+    pub async fn wait_request(self) -> Result<Request::ReplyType, String> {
         // Wait for the reply
-        rx.await.map_err(|e| e.to_string())
+        self.0.await.map_err(|e| e.to_string())
     }
 }
 

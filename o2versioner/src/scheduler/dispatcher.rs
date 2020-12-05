@@ -8,7 +8,7 @@ use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Notify, RwLock};
-use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Response sent from dispatcher to handler
 #[derive(Debug)]
@@ -122,23 +122,45 @@ impl State {
         let msg = Message::MsqlRequest(client_meta.client_addr(), command, txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply_ch));
 
-        // Each communication with dbproxy is spawned as a separate task
-        dbproxy_tasks_stream
-            .for_each_concurrent(None, move |(dbproxy_addr, transceiver_addr)| {
-                let msg_cloned = msg.clone();
-                let txvn_cloned = txvn.clone();
-                let shared_reply_channel_cloned = shared_reply_channel.clone();
-                let process = async move {
-                    Span::current().record("message", &&dbproxy_addr.to_string()[..]);
-                    debug!("-> {:?}", msg_cloned);
-
-                    let msqlresponse = transceiver_addr
-                        .request(TransceiverRequest {
-                            dbproxy_addr,
-                            dbproxy_msg: msg_cloned,
+        // Send all requests to transceivers
+        let addr_receipts: Vec<_> = dbproxy_tasks_stream
+            .then(move |(dbproxy_addr, transceiver_addr)| {
+                let msg = msg.clone();
+                let dbproxy_addr_clone = dbproxy_addr.clone();
+                debug!("-> {:?}", msg);
+                async move {
+                    transceiver_addr
+                        .request_nowait(TransceiverRequest {
+                            dbproxy_addr: dbproxy_addr.clone(),
+                            dbproxy_msg: msg,
                             current_request_id,
                         })
-                        .inspect_err(|e| warn!("Cannot send: {:?}", e))
+                        .inspect_err(|e| error!("Cannot send: {:?}", e))
+                        .map_ok(|receipt| (dbproxy_addr, receipt))
+                        .await
+                }
+                .instrument(info_span!("->dbproxy", N = num_dbproxy, message = %dbproxy_addr_clone))
+            })
+            .filter_map(|r| async move {
+                match r {
+                    Err(_) => None,
+                    Ok(r) => Some(r),
+                }
+            })
+            .collect()
+            .await;
+
+        // Must join here before continue, so that the next query from the same user in the same transaction won't
+        // get ahead of current query by any chances
+
+        // Wait for responses from transceivers concurrently
+        stream::iter(addr_receipts)
+            .for_each_concurrent(None, move |(dbproxy_addr, transceiver_receipt)| {
+                let txvn_cloned = txvn.clone();
+                let shared_reply_channel_cloned = shared_reply_channel.clone();
+                async move {
+                    let msqlresponse = transceiver_receipt
+                        .wait_request()
                         .and_then(|res| {
                             // if current_request_id != res.current_request_id {
                             //     error!(
@@ -158,16 +180,13 @@ impl State {
                                 _ => future::err(String::from("Invalid response from Dbproxy")),
                             }
                         })
-                        .map_ok_or_else(
-                            |e| {
-                                if is_endtx {
-                                    MsqlResponse::endtx_err(e)
-                                } else {
-                                    MsqlResponse::query_err(e)
-                                }
-                            },
-                            |msqlresponse| msqlresponse,
-                        )
+                        .unwrap_or_else(|e| {
+                            if is_endtx {
+                                MsqlResponse::endtx_err(e)
+                            } else {
+                                MsqlResponse::query_err(e)
+                            }
+                        })
                         .await;
 
                     // if this is a EndTx, need to release the version and notifier other queries waiting on versions
@@ -193,11 +212,9 @@ impl State {
                     } else {
                         debug!("Not reply to handler: {:?}", msqlresponse);
                     }
-                };
-
-                process.instrument(info_span!("<->dbproxy", message = field::Empty))
+                }
+                .instrument(info_span!("<-dbproxy", N = num_dbproxy, message = %dbproxy_addr))
             })
-            .instrument(info_span!("dbproxies", message = num_dbproxy))
             .await;
 
         info!("all tasks done");
