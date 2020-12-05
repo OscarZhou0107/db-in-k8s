@@ -8,9 +8,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     c_id = args.c_id
-
+    print("{} started".format(c_id))
     if c_id == 0:
         time.sleep(3)
-        sys.exit(1)
+        print("{} finished".format(c_id))
+        #sys.exit(1)
     else:
-        time.sleep(10)
+        time.sleep(3)
+        print("{} finished".format(c_id))
