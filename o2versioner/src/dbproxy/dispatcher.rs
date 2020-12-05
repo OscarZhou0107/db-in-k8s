@@ -2,11 +2,13 @@ use super::core::{
     DbVersion, PendingQueue, QueryResult, QueueMessage, Task,
 };
 
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::JoinHandle};
+use futures::prelude::*;
 use std::sync::Arc;
 //use mysql_async::Pool;
 use std::net::SocketAddr;
-use tokio::sync::Mutex;
+use futures::StreamExt;
+use tokio::{sync::Mutex, stream};
 use tokio::sync::Notify;
 use tokio::sync::mpsc;
 
@@ -60,16 +62,29 @@ impl Dispatcher {
                         };
                     });
                 }
+                let mut senders : Arc<Mutex<HashMap<SocketAddr,Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
                 {
                     let lock = transactions.lock().await;
-
-                    operations.iter().for_each(|op| {
-                        let op_cloned = op.clone();
-                        let sender_cloned = lock.get(&op_cloned.identifier).unwrap().clone();
-
-                        Self::spawn_unblock_send(sender_cloned, op_cloned);
+                    let mut lock_2 = senders.lock().await;
+                   
+                    operations
+                    .iter()
+                    .for_each(|op| {
+                        if !lock_2.contains_key(&op.identifier) {
+                            lock_2.insert(op.identifier.clone(), lock.get(&op.identifier).unwrap().clone());
+                        }
                     });
                 }
+
+                {
+                    let lock = senders.lock().await;
+                    stream::iter(operations)
+                    .for_each(|op| async {
+                        let op = op;
+                        lock.get(&op.clone().identifier).unwrap().send(op.clone()).await;
+                    }).await;
+                }
+             
             }
         });
     }
@@ -114,12 +129,6 @@ impl Dispatcher {
                     }
                 }
             }
-        });
-    }
-
-    fn spawn_unblock_send(sender: Sender<QueueMessage>, op: QueueMessage) {
-        tokio::spawn(async move {
-            let _ = sender.send(op).await;
         });
     }
 
