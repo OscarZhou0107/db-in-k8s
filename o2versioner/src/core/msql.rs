@@ -119,15 +119,18 @@ impl MsqlBeginTx {
 ///
 /// # Examples
 /// ```
-/// use o2versioner::core::{MsqlQuery, TableOps};
-///
-/// MsqlQuery::new("SELECT * FROM table0, table1;", TableOps::from("READ table0 table1"))
-///     .unwrap();
+/// use o2versioner::core::{EarlyReleaseTables, MsqlQuery, TableOps};
+/// MsqlQuery::new(
+///     "SELECT * FROM table0, table1;",
+///     TableOps::from("READ table0 table1"),
+///     EarlyReleaseTables::from("table0"))
+/// .unwrap();
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MsqlQuery {
     query: String,
     tableops: TableOps,
+    ertables: EarlyReleaseTables,
 }
 
 impl IntoMsqlFinalString for MsqlQuery {
@@ -138,13 +141,18 @@ impl IntoMsqlFinalString for MsqlQuery {
 
 impl MsqlQuery {
     /// Create a new query, `tableops` must correctly annotate the `query`
-    pub fn new<S: Into<String>>(query: S, tableops: TableOps) -> Result<Self, &'static str> {
+    pub fn new<S: Into<String>>(
+        query: S,
+        tableops: TableOps,
+        ertables: EarlyReleaseTables,
+    ) -> Result<Self, &'static str> {
         if let AccessPattern::Mixed = tableops.access_pattern() {
             Err("Only read-only or write-only Msql query is supported, but not the mixed!")
         } else {
             Ok(Self {
                 query: query.into(),
                 tableops,
+                ertables,
             })
         }
     }
@@ -159,9 +167,19 @@ impl MsqlQuery {
         &self.tableops
     }
 
-    /// Unwrap into (query: String, tableops: TableOps)
-    pub fn unwrap(self) -> (String, TableOps) {
-        (self.query, self.tableops)
+    /// Get a ref to the `EarlyReleaseTables` of the query
+    pub fn early_release_tables(&self) -> &EarlyReleaseTables {
+        &self.ertables
+    }
+
+    /// Check whether the query has early release request
+    pub fn has_early_release(&self) -> bool {
+        !self.ertables.is_empty()
+    }
+
+    /// Unwrap into (query: String, tableops: TableOps, ertables: EarlyReleaseTables)
+    pub fn unwrap(self) -> (String, TableOps, EarlyReleaseTables) {
+        (self.query, self.tableops, self.ertables)
     }
 }
 
@@ -329,9 +347,16 @@ impl TryFrom<MsqlText> for Msql {
                     .set_name(tx)
                     .set_tableops(TableOps::from(tableops)),
             )),
-            MsqlText::Query { query, tableops } => {
-                MsqlQuery::new(query, TableOps::from(tableops)).map(|mq| Self::Query(mq))
-            }
+            MsqlText::Query {
+                query,
+                tableops,
+                ertables,
+            } => MsqlQuery::new(
+                query,
+                TableOps::from(tableops),
+                EarlyReleaseTables::from(ertables.unwrap_or(String::from(""))),
+            )
+            .map(|mq| Self::Query(mq)),
             MsqlText::EndTx { tx, mode } => Ok(Self::EndTx(MsqlEndTx::from(mode).set_name(tx))),
         }
     }
@@ -344,9 +369,32 @@ impl TryFrom<MsqlText> for Msql {
 /// `MsqlText` needs to be converted into `Msql` first.
 ///
 /// # Examples - Json conversion
+///
+/// `MsqlText::Query`
 /// ```
 /// use o2versioner::core::{MsqlEndTxMode, MsqlText};
+/// // "op":"query" suggests MsqlText::Query
+/// let query_str = r#"
+/// {
+///     "op":"query",
+///     "query":"select * from t;",
+///     "tableops":"read t",
+///     "ertables":"t0 t1 t2"
+/// }"#;
+/// let query: MsqlText = serde_json::from_str(query_str).unwrap();
+/// assert_eq!(
+///     query,
+///     MsqlText::Query {
+///         query: String::from("select * from t;"),
+///         tableops: String::from("read t"),
+///         ertables: Some(String::from("t0 t1 t2"))
+///     }
+/// );
+/// ```
 ///
+/// Skipping optional values, `MsqlText::Query`
+/// ```
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 /// // "op":"query" suggests MsqlText::Query
 /// let query_str = r#"
 /// {
@@ -359,10 +407,15 @@ impl TryFrom<MsqlText> for Msql {
 ///     query,
 ///     MsqlText::Query {
 ///         query: String::from("select * from t;"),
-///         tableops: String::from("read t")
+///         tableops: String::from("read t"),
+///         ertables: None
 ///     }
 /// );
-///
+/// ```
+/// 
+/// `MsqlText::BeginTx`
+/// ```
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 /// // "op":"begin_tx" suggests MsqlText::BeginTx
 /// // Use null for Option<String>::None
 /// let begintx_str = r#"
@@ -379,7 +432,11 @@ impl TryFrom<MsqlText> for Msql {
 ///         tableops: String::from("read table0 write table1 read table2")
 ///     }
 /// );
+/// ```
 ///
+/// Skipping optional values, `MsqlText::BeginTx`
+/// ```
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 /// // Can also skip the value for Option<String>::None
 /// let begintx_str = r#"
 /// {
@@ -394,7 +451,11 @@ impl TryFrom<MsqlText> for Msql {
 ///         tableops: String::from("read table0 write table1 read table2")
 ///     }
 /// );
+/// ```
 ///
+/// `MsqlText::EndTx`
+/// ```
+/// use o2versioner::core::{MsqlEndTxMode, MsqlText};
 /// // "op":"end_tx" suggests MsqlText::EndTx
 /// // Simply enter the value for Option<String>::Some(String)
 /// // Use "commit" for MsqlEndTxMode::Commit
@@ -425,6 +486,8 @@ pub enum MsqlText {
     Query {
         query: String,
         tableops: String,
+        #[serde(default)]
+        ertables: Option<String>,
     },
     EndTx {
         #[serde(default)]
@@ -445,14 +508,16 @@ impl MsqlText {
         }
     }
 
-    pub fn query<S1, S2>(query: S1, tableops: S2) -> Self
+    pub fn query<S1, S2, S3>(query: S1, tableops: S2, ertables: Option<S3>) -> Self
     where
         S1: Into<String>,
         S2: Into<String>,
+        S3: Into<String>,
     {
         Self::Query {
             query: query.into(),
             tableops: tableops.into(),
+            ertables: ertables.map(|s| s.into()),
         }
     }
 
@@ -498,7 +563,8 @@ mod tests_into_msqlfinalstring {
             MsqlFinalString::from(
                 MsqlQuery::new(
                     "select * from table0 where true;",
-                    TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
+                    TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)]),
+                    EarlyReleaseTables::default()
                 )
                 .unwrap()
             ),
@@ -508,6 +574,7 @@ mod tests_into_msqlfinalstring {
         let mfs: MsqlFinalString = MsqlQuery::new(
             "update table1 set name=\"ray\" where id = 20;",
             TableOps::from_iter(vec![TableOp::new("table1", RWOperation::W)]),
+            EarlyReleaseTables::from("table table1"),
         )
         .unwrap()
         .into();
@@ -542,7 +609,8 @@ mod tests_into_msqlfinalstring {
             MsqlFinalString::from(Msql::Query(
                 MsqlQuery::new(
                     "select * from table0 where true;",
-                    TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
+                    TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)]),
+                    EarlyReleaseTables::default()
                 )
                 .unwrap()
             )),
@@ -564,13 +632,15 @@ mod tests_msqlquery {
     fn test_new() {
         assert!(MsqlQuery::new(
             "Select * from table0;",
-            TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
+            TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)]),
+            EarlyReleaseTables::from_iter(vec!["t0", "t1"])
         )
         .is_ok());
 
         assert!(MsqlQuery::new(
             "Update table1 set name=\"ray\" where id = 20;",
-            TableOps::from_iter(vec![TableOp::new("table1", RWOperation::W)])
+            TableOps::from_iter(vec![TableOp::new("table1", RWOperation::W)]),
+            EarlyReleaseTables::from("t0 t1")
         )
         .is_ok());
 
@@ -579,7 +649,8 @@ mod tests_msqlquery {
             TableOps::from_iter(vec![
                 TableOp::new("table0", RWOperation::W),
                 TableOp::new("table1", RWOperation::R)
-            ])
+            ]),
+            EarlyReleaseTables::default()
         )
         .is_err());
     }
@@ -606,11 +677,13 @@ mod tests_msql {
         assert_eq!(
             Msql::try_from(MsqlText::Query {
                 query: String::from("select * from table0;"),
-                tableops: String::from("read table0")
+                tableops: String::from("read table0"),
+                ertables: Some(String::from(""))
             }),
             MsqlQuery::new(
                 "select * from table0;",
-                TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)])
+                TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)]),
+                EarlyReleaseTables::default()
             )
             .map(|q| Msql::Query(q))
         );
@@ -627,21 +700,30 @@ mod tests_msql {
     #[test]
     fn test_is_begintx() {
         assert!(Msql::BeginTx(MsqlBeginTx::default()).is_begintx());
-        assert!(!Msql::Query(MsqlQuery::new("selet * from ray;", TableOps::default()).unwrap()).is_begintx());
+        assert!(!Msql::Query(
+            MsqlQuery::new("selet * from ray;", TableOps::default(), EarlyReleaseTables::default()).unwrap()
+        )
+        .is_begintx());
         assert!(!Msql::EndTx(MsqlEndTx::rollback()).is_begintx());
     }
 
     #[test]
     fn test_is_query() {
         assert!(!Msql::BeginTx(MsqlBeginTx::default()).is_query());
-        assert!(Msql::Query(MsqlQuery::new("selet * from ray;", TableOps::default()).unwrap()).is_query());
+        assert!(Msql::Query(
+            MsqlQuery::new("selet * from ray;", TableOps::default(), EarlyReleaseTables::default()).unwrap()
+        )
+        .is_query());
         assert!(!Msql::EndTx(MsqlEndTx::rollback()).is_query());
     }
 
     #[test]
     fn test_is_endtx() {
         assert!(!Msql::BeginTx(MsqlBeginTx::default()).is_endtx());
-        assert!(!Msql::Query(MsqlQuery::new("selet * from ray;", TableOps::default()).unwrap()).is_endtx());
+        assert!(!Msql::Query(
+            MsqlQuery::new("selet * from ray;", TableOps::default(), EarlyReleaseTables::default()).unwrap()
+        )
+        .is_endtx());
         assert!(Msql::EndTx(MsqlEndTx::rollback()).is_endtx());
     }
 }

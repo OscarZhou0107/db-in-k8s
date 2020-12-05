@@ -520,7 +520,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -530,7 +537,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::from(""),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -540,7 +554,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -550,7 +571,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -581,7 +609,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 
@@ -591,7 +626,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -601,7 +643,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             Some(TxVN::default()),
         );
 
@@ -611,7 +660,14 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
-            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Msql::Query(
+                MsqlQuery::new(
+                    "select * from tbltest",
+                    TableOps::from("READ table0 table1"),
+                    EarlyReleaseTables::default(),
+                )
+                .unwrap(),
+            ),
             None,
         );
 

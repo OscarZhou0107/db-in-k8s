@@ -56,6 +56,7 @@ async fn test_dbproxy_end_to_end() {
             MsqlQuery::new(
                 "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
                 TableOps::from("READ T1"),
+                EarlyReleaseTables::default(),
             )
             .unwrap(),
         ),
@@ -179,6 +180,7 @@ async fn test_dbproxy_end_to_end_2() {
             MsqlQuery::new(
                 "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
                 TableOps::from("READ T1"),
+                EarlyReleaseTables::default(),
             )
             .unwrap(),
         ),

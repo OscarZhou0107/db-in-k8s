@@ -255,6 +255,7 @@ where
                     remove_whitespace(&mut s);
                     s
                 })
+                .filter(|s| !s.is_empty())
                 .sorted()
                 .dedup()
                 .collect(),
@@ -614,6 +615,11 @@ mod tests_early_release_tables {
             EarlyReleaseTables::from_iter(vec![String::from("table_0 aaa"), String::from("table_1")]).into_vec(),
             vec!["table_0aaa".to_owned(), "table_1".to_owned()]
         );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(Vec::<String>::new()).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(EarlyReleaseTables::from_iter(vec![""]).into_vec(), Vec::<String>::new());
     }
 
     #[test]
@@ -631,6 +637,12 @@ mod tests_early_release_tables {
             EarlyReleaseTables::from("  TABLE_0   TABLE_1 ".to_owned()).into_vec(),
             vec!["TABLE_0".to_owned(), "TABLE_1".to_owned()]
         );
+
+        assert_eq!(
+            EarlyReleaseTables::from("   ".to_owned()).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(EarlyReleaseTables::from("".to_owned()).into_vec(), Vec::<String>::new());
     }
 
     #[test]
@@ -664,11 +676,20 @@ mod tests_early_release_tables {
                 .into_vec(),
             vec!["Table_0aaa".to_owned(), "Table_1bbb".to_owned()]
         );
+        assert_eq!(
+            EarlyReleaseTables::default().add_table("  ").into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::default().add_table("").into_vec(),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
     fn test_is_empty() {
         assert!(!EarlyReleaseTables::default().add_table("Table_1 bbb").is_empty());
         assert!(EarlyReleaseTables::default().is_empty());
+        assert!(EarlyReleaseTables::default().add_table("").is_empty());
     }
 }
