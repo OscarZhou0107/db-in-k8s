@@ -1,3 +1,4 @@
+use super::admin_handler::*;
 use super::core::*;
 use super::dispatcher::*;
 use super::logging::*;
@@ -5,13 +6,13 @@ use super::transceiver::*;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
-use crate::util::admin_handler::*;
 use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
@@ -20,6 +21,7 @@ use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
+use unicase::UniCase;
 
 /// Main entrance for the Scheduler from appserver
 ///
@@ -83,11 +85,12 @@ pub async fn main(conf: Config) {
     };
 
     // Launch main handler as a new task
+    let sequencer_socket_pool_clone = sequencer_socket_pool.clone();
     let handler_handle = tokio::spawn(
         tcp::start_tcplistener(
             conf.scheduler.to_addr(),
             move |tcp_stream| {
-                let sequencer_socket_pool = sequencer_socket_pool.clone();
+                let sequencer_socket_pool = sequencer_socket_pool_clone.clone();
                 let state_cloned = state.clone();
                 // Connection/session specific storage
                 // Note: this closure contains one copy of dispatcher_addr
@@ -111,14 +114,8 @@ pub async fn main(conf: Config) {
 
     // Allow scheduler to be terminated by admin
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
-        let admin_addr = admin_addr.clone();
-        let admin_handle = tokio::spawn({
-            let admin = async move {
-                start_admin_tcplistener(admin_addr, basic_admin_command_handler).await;
-                stop_tx.unwrap().send(()).unwrap();
-            };
-            admin.in_current_span()
-        });
+        let admin_handle =
+            tokio::spawn(admin(admin_addr.parse().unwrap(), stop_tx, sequencer_socket_pool).in_current_span());
 
         // main_handle can either run to finish or be the result
         // of the above stop_tx.send()
@@ -132,6 +129,63 @@ pub async fn main(conf: Config) {
     } else {
         main_handle.await.unwrap();
     }
+
+    info!("DIES");
+}
+
+#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool))]
+async fn admin(
+    admin_addr: SocketAddr,
+    stop_tx: Option<oneshot::Sender<()>>,
+    sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
+) {
+    start_admin_tcplistener(admin_addr, move |msg| {
+        let sequencer_socket_pool = sequencer_socket_pool.clone();
+        async move {
+            let command = UniCase::new(msg);
+            if command == UniCase::new("block") || command == UniCase::new("unblock") {
+                let m = if command == UniCase::new("block") {
+                    scheduler_sequencer::Message::RequestBlock
+                } else {
+                    scheduler_sequencer::Message::RequestUnblock
+                };
+                let reply = tcp::send_and_receive_single_as_json(&mut sequencer_socket_pool.get().await.unwrap(), m)
+                    .map_err(|e| e.to_string())
+                    .and_then(|res| match res {
+                        scheduler_sequencer::Message::ReplyBlockUnblock(m) => future::ok(m),
+                        _ => future::ok(String::from("Invalid response from Sequencer")),
+                    })
+                    .map_ok_or_else(|e| e, |m| m)
+                    .await;
+                (reply, true)
+            } else if Vec::from_iter(vec!["kill", "exit", "quit"].into_iter().map(|s| s.into())).contains(&command) {
+                let reply = format!(
+                    "Scheduler is going to Stop. {}",
+                    tcp::send_and_receive_single_as_json(
+                        &mut sequencer_socket_pool.get().await.unwrap(),
+                        scheduler_sequencer::Message::RequestStop,
+                    )
+                    .map_err(|e| e.to_string())
+                    .and_then(|res| match res {
+                        scheduler_sequencer::Message::ReplyStop => {
+                            future::ok(String::from("Sequencer received Stop"))
+                        }
+                        _ => future::ok(String::from("Invalid response from Sequencer")),
+                    })
+                    .map_ok_or_else(|e| e, |m| m)
+                    .await
+                );
+                (reply, false)
+            } else {
+                (format!("Unknown command: {}", command), true)
+            }
+        }
+    })
+    .await;
+
+    stop_tx.unwrap().send(()).unwrap();
+
+    info!("DIES");
 }
 
 /// Process the `tcp_stream` for a single connection

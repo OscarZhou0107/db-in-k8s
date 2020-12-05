@@ -307,6 +307,6 @@ impl Dispatcher {
             })
             .await;
 
-        info!("Scheduler dispatcher terminated after finishing all requests");
+        info!("DIES");
     }
 }

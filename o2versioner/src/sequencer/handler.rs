@@ -9,7 +9,7 @@ use tokio::sync::{oneshot, Mutex};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Main entrance for Sequencer
 ///
@@ -42,6 +42,7 @@ pub async fn main(conf: SequencerConfig) {
     );
 
     handler_handle.await.unwrap();
+    info!("DIES");
 }
 
 /// Process the `tcp_stream` for a single connection
