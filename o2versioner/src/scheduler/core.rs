@@ -10,7 +10,8 @@ use tokio::sync::{Mutex, RwLock};
 use tracing::warn;
 
 #[derive(Debug, Clone)]
-/// A collection of shared variables
+/// A collection of shared variables across
+/// the entire scheduler
 pub struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     client_records: Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>>,
@@ -39,6 +40,9 @@ impl State {
 }
 
 #[derive(Debug)]
+/// Data relating to a specific client connection.
+/// This state should only have a single copy, and
+/// should not need to be accessed concurrently
 pub struct ConnectionState {
     client_meta: ClientMeta,
     cur_txvn: Option<TxVN>,

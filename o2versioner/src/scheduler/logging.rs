@@ -47,6 +47,11 @@ pub struct RequestRecord {
 }
 
 impl RequestRecord {
+    /// Construct a builder object for `RequestRecord`.
+    /// Once the builder `RequestRecordStart` is constructed, it will create a initial timestamp.
+    /// Once the operation finishes and all data for the `RequestRecord` is ready,
+    /// the builder object can be converted into the final `RequestRecord` by `RequestRecordStart::finish`,
+    /// which will create final timestamp.
     pub fn start(req: &Msql, initial_txvn: &Option<TxVN>) -> RequestRecordStart {
         RequestRecordStart {
             req: req.clone(),
@@ -102,14 +107,17 @@ impl ClientRecord {
         }
     }
 
+    /// Get the client_addr that this `ClientRecord` is tracking
     pub fn client_addr(&self) -> SocketAddr {
         self.client_addr.clone()
     }
 
+    /// Get the slices for all `RequestRecord`
     pub fn records(&self) -> &[RequestRecord] {
         &self.records
     }
 
+    /// Append a new `RequestRecord` to the end of the list
     pub fn push(&mut self, req_record: RequestRecord) {
         self.records.push(req_record)
     }
