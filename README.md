@@ -65,8 +65,8 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] Begin tx stmt
 - [x] Query stmt
 - [x] Commit&Abort tx stmt
+- [x] Single write (and unoptimized single read)
 - [ ] Single read
-- [ ] Single write
 - [ ] Early release
 
 
