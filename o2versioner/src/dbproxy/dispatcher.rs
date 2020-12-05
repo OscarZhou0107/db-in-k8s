@@ -75,7 +75,12 @@ impl Dispatcher {
                     stream::iter(operations)
                         .for_each(|op| async {
                             let op = op;
-                            lock.get(&op.clone().identifier).unwrap().send(op.clone()).await;
+                            lock.get(&op.clone().identifier)
+                                .unwrap()
+                                .send(op.clone())
+                                .await
+                                .map_err(|e| e.to_string())
+                                .unwrap();
                         })
                         .await;
                 }
