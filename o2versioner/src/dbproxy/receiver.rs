@@ -19,11 +19,11 @@ impl Receiver {
         tokio::spawn(async move {
             while let Some(msg) = deserializer.try_next().await.unwrap() {
                 match msg {
-                    Message::MsqlRequest(addr, request, versions) => {
+                    Message::MsqlRequest(meta, request, versions) => {
                         pending_queue
                             .lock()
                             .await
-                            .push(QueueMessage::new(addr, request, versions));
+                            .push(QueueMessage::new(meta, request, versions));
                     }
                     _ => println!("nope"),
                 }
@@ -55,7 +55,11 @@ mod tests_receiver {
         let pending_queue_2 = Arc::clone(&pending_queue);
 
         let item = Message::MsqlRequest(
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            RequestMeta {
+                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
             None,
         );
@@ -87,7 +91,11 @@ mod tests_receiver {
         let pending_queue_2 = Arc::clone(&pending_queue);
 
         let item = Message::MsqlRequest(
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            RequestMeta {
+                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
             None,
         );

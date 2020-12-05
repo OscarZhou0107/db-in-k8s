@@ -41,11 +41,11 @@ impl Responder {
 #[cfg(test)]
 mod tests_test {
     use super::Responder;
-    use crate::comm::scheduler_dbproxy::Message;
+    use crate::{comm::scheduler_dbproxy::Message, core::RequestMeta};
     use crate::comm::MsqlResponse;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
-    use std::{sync::Arc, net::SocketAddr};
+    use std::{net::IpAddr, net::SocketAddr, sync::Arc, net::Ipv4Addr};
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
@@ -55,8 +55,12 @@ mod tests_test {
 
     #[tokio::test]
     async fn test_send_items_to_from_multiple_channel() {
-        let details = "127.0.0.1:2346";
-        let addr : SocketAddr = details.parse().expect("Unable to parse socket address");
+        
+        let addr = RequestMeta {
+            client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            cur_txid : 0,
+            request_id : 0
+        };
         
         //Prepare - Mock db related context
        
@@ -79,8 +83,8 @@ mod tests_test {
         };
 
         //Prepare - Responder
-        helper_spawn_responder(version.clone(), responder_receiver, addr.clone());
-        helper_spawn_mock_client(verifying_queue, addr);
+        helper_spawn_responder(version.clone(), responder_receiver, addr.client_addr.clone());
+        helper_spawn_mock_client(verifying_queue, addr.client_addr);
 
         let worker_num: u32 = 5;
         //Action - Spwan worker thread to send response

@@ -32,7 +32,11 @@ async fn test_dbproxy_end_to_end() {
         },
     ];
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.3:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::BeginTx(
             MsqlBeginTx::default()
                 .set_name(Some("tx3"))
@@ -43,7 +47,11 @@ async fn test_dbproxy_end_to_end() {
     messages.push(item);
 
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.2:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::Query(
             MsqlQuery::new("SELECT name, age, designation, salary FROM public.tbltest;".to_string(), TableOps::from("READ T1")).unwrap()
         ),
@@ -52,7 +60,11 @@ async fn test_dbproxy_end_to_end() {
     messages.push(item);
 
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.2:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::BeginTx(
             MsqlBeginTx::default()
                 .set_name(Some("tx2"))
@@ -63,7 +75,11 @@ async fn test_dbproxy_end_to_end() {
     messages.push(item);
 
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.1:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::BeginTx(
             MsqlBeginTx::default()
                 .set_name(Some("tx1"))
@@ -131,7 +147,11 @@ async fn test_dbproxy_end_to_end_2() {
         },
     ];
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.3:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::BeginTx(
             MsqlBeginTx::default()
                 .set_name(Some("tx3"))
@@ -142,7 +162,11 @@ async fn test_dbproxy_end_to_end_2() {
     messages.push(item);
 
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.2:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::Query(
             MsqlQuery::new("SELECT name, age, designation, salary FROM public.tbltest;".to_string(), TableOps::from("READ T1")).unwrap()
         ),
@@ -151,7 +175,11 @@ async fn test_dbproxy_end_to_end_2() {
     messages.push(item);
 
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.2:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::BeginTx(
             MsqlBeginTx::default()
                 .set_name(Some("tx2"))
@@ -162,7 +190,11 @@ async fn test_dbproxy_end_to_end_2() {
     messages.push(item);
 
     let item = Message::MsqlRequest(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        RequestMeta {
+            client_addr : "127.0.0.1:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        },
         Msql::BeginTx(
             MsqlBeginTx::default()
                 .set_name(Some("tx1"))

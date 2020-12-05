@@ -52,9 +52,9 @@ impl Dispatcher {
 
                         match op_cloned.operation_type {
                             Task::BEGIN => {
-                                if !lock.contains_key(&op_cloned.identifier) {
+                                if !lock.contains_key(&op_cloned.identifier.client_addr) {
                                     let (ts, tr): (Sender<QueueMessage>, Receiver<QueueMessage>) = mpsc::channel(1);
-                                    lock.insert(op_cloned.identifier.clone(), ts);
+                                    lock.insert(op_cloned.identifier.client_addr.clone(), ts);
                                     Self::spawn_transaction(pool_cloned, tr, sender_cloned);
                                 };
                             }
@@ -70,8 +70,8 @@ impl Dispatcher {
                     operations
                     .iter()
                     .for_each(|op| {
-                        if !lock_2.contains_key(&op.identifier) {
-                            lock_2.insert(op.identifier.clone(), lock.get(&op.identifier).unwrap().clone());
+                        if !lock_2.contains_key(&op.identifier.client_addr) {
+                            lock_2.insert(op.identifier.client_addr.clone(), lock.get(&op.identifier.client_addr).unwrap().clone());
                         }
                     });
                 }
@@ -81,7 +81,7 @@ impl Dispatcher {
                     stream::iter(operations)
                     .for_each(|op| async {
                         let op = op;
-                        lock.get(&op.clone().identifier).unwrap().send(op.clone()).await;
+                        lock.get(&op.clone().identifier.client_addr).unwrap().send(op.clone()).await;
                     }).await;
                 }
              
@@ -183,25 +183,41 @@ mod tests_dispatcher {
 
         let mut mock_ops = Vec::new();
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            identifier : RequestMeta {
+                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid : 0,
+                request_id : 0
+            },
             operation_type : Task::ABORT,
             query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            identifier : RequestMeta {
+                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid : 0,
+                request_id : 0
+            },
             operation_type : Task::READ,
             query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            identifier : RequestMeta {
+                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid : 0,
+                request_id : 0
+            },
             operation_type : Task::READ,
             query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            identifier : RequestMeta {
+                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid : 0,
+                request_id : 0
+            },
             operation_type : Task::BEGIN,
             query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
             versions: None,
