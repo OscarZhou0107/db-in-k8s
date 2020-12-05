@@ -17,12 +17,14 @@ Cristiana Amza, Alan L. Cox and Willy Zwaenepoel
 
 ## How to use build and run
 
+
 ### To build and run
 ```sh
 cargo run --bin dbproxy_exe
 cargo run --bin scheduler_exe
 cargo run --bin sequencer_exe
 ```
+
 
 ### To build and test
 ```sh
@@ -33,22 +35,27 @@ cargo test -- --show-output
 cargo test -- --nocapture
 ```
 
+
 ### To build the entire library
 ```sh
 cargo build
 ```
+
 
 ### To check the entire library
 ```sh
 cargo check
 ```
 
+
 ### To check number of lines for Rust
 ```sh
 find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 ```
 
+
 ## Progress
+
 
 ### Framework
 - [x] Scheduler
@@ -56,6 +63,7 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] DbProxy
 - [x] Msql interface
 - [x] Better debugging and logging
+
 
 ### Features
 - [x] msql: simple sql
@@ -85,7 +93,9 @@ o2versioner
 └── tests         # system level testing
 ```
 
+
 ## Architecture
+
 
 ### Sequencer
 - `sequenecer::main()` - main entrance
@@ -116,20 +126,36 @@ o2versioner
   - Lifetime is till all incoming connections are closed if the max connection is set
 - Dispatcher
   - Manages the DbVN for each Dbproxy
-  - Receives request via `DispatcherAddr` object, which can send a request to the Dispatcher 
-  - Request is sent from `DispatcherAddr` object, which includes a single-use `Oneshot::Sender` channel,
-  for replying back to the handler
+  - A single event loop for receiving requests from handler via `DispatcherAddr` object 
+  - Request is sent via `DispatcherAddr` object to the eventloop. The request also includes
+  a single-use `Oneshot::Sender` channel for replying back to the handler
   - Only reply back the handler the response received from the first Dbproxy replying,
   the rest of the reponses are not sent back to the handler, but they are still needed to
   update the internal state of the Dispatcher
   - Lifetime is till all `DispatcherAddr` objects are dropped
+  - Incoming queries are executed concurrently
+  - For each query, the query is sent to each transceiver in serial. After all queries
+  are sent to all transceivers, waiting for the trasceiver replies concurrently. Since
+  no dbproxy replies are able to arrive before all requests are sent to transceiver,
+  this guarantees the query ordering within the same transaction.
 - Transceiver
-  - Manges a single `TcpStream` socket for a single dbproxy
+  - Manges a single `TcpStream` socket for a single dbproxy. The socket
+  is used for reading and writing to dbproxy concurrently.
+  - `TransceiverAddr` mechanism works same as `DispathcerAddr`
+  - Two separate event loops in serial:
+    - Receiving request from dispatcher and forwards to dbproxy
+    - Receiving response from dbproxy and forwards to dispatcher
+  - For each client (with the single dbproxy), a `LinkedList` is used as a FIFO queue
+  for tracking the outstanding requests. Push front upon transmitting and pop back upon receiving.
+  The outgoing request and incoming response all have `RequestMeta` that can uniquely identify
+  a request for each client, this is used to make sure that dbproxy does not reorder the queries
+  within a single transaction.
 - Admin Handler (Optional)
   - Only process a single incoming tcp connection at a time
-  - Receie a single request in raw bytes, process the request, and send one response back
-  - Supports remotely stopping the main handler for taking in any new connections
-
+  - Receive a single request in raw bytes, process the request, and send one response back
+  - Supports remotely stopping the main handler for taking in any new connections, this also
+  stops the sequencer from taking in any new connections
+  - Can send Block and Unblock request to sequencer to block new transactions
 
 
 ## Notes for asynchronous
@@ -171,6 +197,7 @@ similar to a thread join.
     }
 })
 ```
+
 
 ### Notes for `trait Stream<Item=T>`
 1. `trait Stream` does not imply `trait Future`, they are different.
