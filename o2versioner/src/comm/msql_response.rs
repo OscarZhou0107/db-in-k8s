@@ -64,3 +64,28 @@ impl MsqlResponse {
         }
     }
 }
+
+/// Unit test for `MsqlResponse`
+#[cfg(test)]
+mod tests_msql_response {
+    use super::*;
+    use crate::core::*;
+
+    #[test]
+    fn test_err() {
+        let msqlbegintx = Msql::BeginTx(MsqlBeginTx::default());
+        let msqlquery = Msql::Query(MsqlQuery::new("", TableOps::default()).unwrap());
+        let msqlendtx = Msql::EndTx(MsqlEndTx::commit());
+
+        assert_eq!(MsqlResponse::err("a", &msqlbegintx), MsqlResponse::begintx_err("a"));
+        assert_eq!(MsqlResponse::err("a", &msqlquery), MsqlResponse::query_err("a"));
+        assert_eq!(MsqlResponse::err("a", &msqlendtx), MsqlResponse::endtx_err("a"));
+    }
+
+    #[test]
+    fn test_ok() {
+        assert!(MsqlResponse::begintx_ok().is_begintx());
+        assert!(MsqlResponse::query_ok("a").is_query());
+        assert!(MsqlResponse::endtx_ok("a").is_endtx());
+    }
+}
