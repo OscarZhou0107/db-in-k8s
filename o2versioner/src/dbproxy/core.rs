@@ -1,4 +1,4 @@
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxVN};
+use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, MsqlQuery, TableOps, TxVN};
 use crate::{comm::MsqlResponse, core::DbVN};
 use async_trait::async_trait;
 use bb8_postgres::{
@@ -8,7 +8,7 @@ use bb8_postgres::{
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
@@ -502,4 +502,61 @@ fn postgres_read_test() {
 
         println!("Converted string is: {}", csv);
     });
+}
+
+#[tokio::test]
+async fn pending_queue_task_order_test(){
+
+    let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
+    let mut queue = PendingQueue::new();
+
+    let message4 = QueueMessage::new(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 4)), 8080),
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        None
+    );
+
+    let message3 = QueueMessage::new(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)), 8080),
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        Some(TxVN::default())
+    );
+
+    let message2 = QueueMessage::new(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        Some(TxVN::default())
+    );
+
+    let message1 = QueueMessage::new(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        None
+    );
+
+    queue.push(message1);
+    queue.push(message2);
+    queue.push(message3);
+    queue.push(message4);
+
+    let ready_tasks = queue.get_all_version_ready_task(&mut dbversion).await;
+
+    ready_tasks
+    .iter()
+    .for_each(|task| {
+        println!("{}",task.identifier);
+    });
+
+    queue.queue
+    .iter()
+    .for_each(|task| {
+        println!("{}",task.identifier);
+    });
+
+    println!("Number of tasks is: {}",ready_tasks.len());
+    assert!(ready_tasks.len() == 2);
 }
