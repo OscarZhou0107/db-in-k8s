@@ -7,6 +7,8 @@ from random import uniform
 import argparse
 import json
 import sys
+import logging
+import os
 
 import web_to_sql
 import con_data
@@ -89,34 +91,51 @@ class Client:
         self.curr = "home"
         self.max_time = datetime.datetime.now() + datetime.timedelta(seconds=MAX_TIME)
         self.mix = mix
-        self.new_session = True # will be updated in doHome
         self.load = False # will be updated in getName in doHome -> if True, existing customer with info loaded
         self.soc = None # will be updated once run() is called on a client
         self.shopping_id = None # will be updated in createEmptyCart in doShopCart
         self.c_uname = None # will be updated by getUserName in doCustReg, or by createNewCustomer in doBuyReq
+        
+        # set up logging
+        # check if the log folder exist
+        if not os.path.isdir("./logs"):
+            os.mkdir("./logs")
+        logname = "./logs/client_" + str(c_id) + "_process_" + str(os.getpid()) + ".log"
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s,%(msecs)d %(name)s [%(levelname)s] %(message)s',
+            # write to both stdout and log file
+            handlers=[
+                logging.FileHandler(logname, mode="w"),
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
+        # set name for this logger
+        self.logger = logging.getLogger("client_" + str(c_id) + "_process_" + str(os.getpid()))
 
     def run(self):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.soc.connect((HOST, self.port))
-        print("Client {} connected at port {}".format(self.c_id, self.port))
-        # 
+        self.logger.info("Client {} in process {} connected at port {}".format(self.c_id, os.getpid(), self.port))
+
         while datetime.datetime.now() < self.max_time:
             curr_index = con_data.states.index(self.curr)
-            print("=======================================")
-            print("Entering webpage {}".format(self.curr))
+            self.logger.debug("=======================================")
+            self.logger.info("Entering webpage {}".format(self.curr))
 
             # send BEGIN to start the transaction
             begin = web_to_sql.getBegin(self.curr)
-            if DEBUG:
-                print("### Sending data: BEGIN")
-                print(begin)
+            self.logger.info("### Sending data: BEGIN")
+            self.logger.debug(begin)
             self.soc.sendall(jsonToByte(begin))
+
+            # receive response to BEGIN
             data = byteToJson(self.soc.recv(2**24))
-            if DEBUG:
-                print("### Receiving data: BEGIN")
-                print(data)
+            self.logger.info("### Receiving data: BEGIN")
+            self.logger.debug(data)
+
             if OK not in data["reply"]["BeginTx"]:
-                print("Response contains error, terminating...")
+                self.logger.error("Begin response contains error, terminating...")
                 return 0
             
             if self.curr == 'adminConf':
@@ -149,22 +168,24 @@ class Client:
                 okay = self.doShopCart()
             
             if not okay:
-                print("Response contains error, terminating...")
+                self.logger.error("Response during {} contains error, crashing server...".format(self.curr))
                 crash = web_to_sql.getCrash(self.curr)
                 self.soc.sendall(jsonToByte(crash))
                 return 0
 
+            # send commit to end current transaction
             commit = web_to_sql.getCommit()
-            if DEBUG:
-                print("### Sending data: COMMIT")
-                print(commit)
+            self.logger.info("### Sending data: COMMIT")
+            self.logger.debug(commit)
             self.soc.sendall(jsonToByte(commit))
+
+            # receive reponse to commit
             data = byteToJson(self.soc.recv(2**24))
-            if DEBUG:
-                print("### Receiving data: COMMIT")
-                print(data)
+            self.logger.info("### Receiving data: COMMIT")
+            self.logger.debug(data)
+
             if OK not in data["reply"]["EndTx"]:
-                print("Response contains error, terminating...")
+                self.logger.error("End response contains error, terminating...")
                 return 0
             
             # determine next state
@@ -216,6 +237,9 @@ class Client:
         if self.isErr(response):
             return False
         # add exactly 5 items into related
+        if self.isEmpty(response):
+            return True # bypass the rest
+
         num = len(response)
         related = []
         if num >= 5:
@@ -268,6 +292,9 @@ class Client:
         # ReadResponse - SELECT c_discount
         if self.isErr(response):
             return False
+        if self.isEmpty(response):
+            return True # bypass the rest
+
         discount = int(response[0][0])
 
         # getCart
@@ -301,6 +328,9 @@ class Client:
                 # ReadResponse - SELECT c_addr_id
                 if self.isErr(response):
                     return False
+                if self.isEmpty(response):
+                    return True # bypass the rest
+
                 ship_addr_id = response[0][0]
 
             # enterOrder (sequence)
@@ -310,6 +340,9 @@ class Client:
             # ReadResponse - SELECT c_addr_id
             if self.isErr(response):
                 return False
+            if self.isEmpty(response):
+                return True # bypass the rest
+
             c_addr_id = response[0][0]
 
             #   b. enterOrderMaxId
@@ -318,6 +351,9 @@ class Client:
             # ReadResponse - SELECT count(o_id)
             if self.isErr(response):
                 return False
+            if self.isEmpty(response):
+                return False # count has to have a number
+            
             o_id = response[0][0] + 1
 
             #   c. enterOrderInsert
@@ -350,6 +386,9 @@ class Client:
                 # ReadResponse - SELECT i_stock
                 if self.isErr(response):
                     return False
+                if self.isEmpty(response):
+                    return True # bypass the rest
+
                 stock = response[0][0]
 
                 # setStock
@@ -430,6 +469,8 @@ class Client:
             # ReadResponse - SELECT max(c_id)
             if self.isErr(response):
                 return False
+            if self.isEmpty(response):
+                return False # max has to have a number
             max_id = response[0][0] + 1
 
             #   3. createNewCustomer
@@ -478,13 +519,15 @@ class Client:
         # ReadResponse - SELECT c_uname
         if self.isErr(response):
             return False
+        if self.isEmpty(response):
+            return True # bypass the rest
         self.c_uname = response[0][0]
 
         return True
 
     def doHome(self): # state 6
         # say hello - getName - c_id, shopping_id
-        if self.new_session: # only getName when it is a new_session
+        if not self.load: # only getName if it is a new connection or if the customer is not in the db
             query = sql.replaceVars(sql.sqlNameToCommand["getName"], 1, [self.c_id])
             response = self.send_query_and_receive_response(query, "getName")
             # ReadResponse - if not empty, existing customer, load data
@@ -492,8 +535,7 @@ class Client:
                 return False
             if not self.isEmpty(response):
                 self.load = True
-            self.new_session = False
- 
+
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -620,6 +662,8 @@ class Client:
             # ReadResponse - read COUNT
             if self.isErr(response):
                 return False
+            if self.isEmpty(response):
+                return False # count has to have a number
             self.shopping_id = int(response[0][0])
 
             # 2. createEmptyCartInsertV2
@@ -670,6 +714,8 @@ class Client:
         # ReadResponse - read COUNT
         if self.isErr(response):
             return False
+        if self.isEmpty(response):
+            return False # count has to have a number
         count = int(response[0][0])
 
         if count == 0:
@@ -679,10 +725,11 @@ class Client:
             # ReadResponse - read SELECT i_related1
             r_id = int(response[0][0])
 
-            response = addItem(r_id)
-            if self.isErr(response):
-                return False
-        
+            if not self.isEmpty(response):
+                response = addItem(r_id)
+                if self.isErr(response):
+                    return False
+            
         # 4. resetCartTime
         query = sql.replaceVars(sql.sqlNameToCommand["resetCartTime"], 1, [self.shopping_id])
         response = self.send_query_and_receive_response(query, "resetCartTime")
@@ -735,21 +782,23 @@ class Client:
             }
         })
         
-        if DEBUG:
-            print("### Sending data: {}".format(name))
-            print(query)
-            print(serialized)
+        self.logger.info("### Sending data: QUERY {}".format(name))
+        self.logger.info(query)
+        self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
         response = byteToJson(self.soc.recv(2**24))
-        if DEBUG:
-            print("### Receiving data: {}".format(response))
+        self.logger.info("### Receiving data: Query {}".format(name))
+        self.logger.debug(response)
+
 
         if OK not in response["reply"]["Query"]:
+            self.logger.error("Response to {} contains error".format(name))
             return "Err"
 
         csv = response["reply"]["Query"][OK]
         if not csv:
+            self.logger.warning("Response to {} is empty".format(name))
             return "Empty"
 
         # TODO: will get result in .csv, parse to list -> result[row][col]
@@ -758,17 +807,11 @@ class Client:
         return result
     
     def isErr(self, response):
-        if response == "Err":
-            return True
-        else:
-            return False
+        return response == "Err"
     
     def isEmpty(self, response):
-        if response == "Empty":
-            return True
-        else:
-            return False
-    
+        return response == "Empty"
+
     def processCart(self, response, discount):
         cart = {"lines":[], "sc_sub_total":0, "sc_total":0, "total_items":0}
         # process each cart line
@@ -877,6 +920,8 @@ class Client:
                 # ReadResponse - SELECT max(addr_id)
                 if self.isErr(response):
                     return response
+                if self.isEmpty(response):
+                    return False # max has to have a number
                 addr_id = response[0][0] + 1
 
                 #   d. enterAddressInsert
@@ -893,13 +938,13 @@ class Client:
 
 
 if __name__ == "__main__":
-    # use port 56728
+    # use port 56728 for testing
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int)
     parser.add_argument("--c_id", type=int)
     parser.add_argument("--mix", type=int, default=0)
     args = parser.parse_args()
-    print(args)
+
     if args.mix == 0:
         mix = con_data.fake
     elif args.mix == 1:
@@ -918,6 +963,6 @@ if __name__ == "__main__":
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
-        sys.exit(0)
+        sys.exit(0) # no Err in the time period
     else:
         sys.exit(1)
