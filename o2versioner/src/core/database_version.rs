@@ -30,7 +30,10 @@ impl Default for DbVN {
 
 impl DbVN {
     pub fn get_from_tableop(&self, tableop: &TableOp) -> DbTableVN {
-        DbTableVN::new(&tableop.table, self.0.get(&tableop.table).cloned().unwrap_or_default())
+        DbTableVN::new(
+            tableop.table(),
+            self.0.get(tableop.table()).cloned().unwrap_or_default(),
+        )
     }
 
     pub fn get_from_tableops(&self, tableops: &TableOps) -> Vec<DbTableVN> {

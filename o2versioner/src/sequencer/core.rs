@@ -62,9 +62,13 @@ impl State {
                 txtablevns: tableops
                     .into_iter()
                     .map(|tableop| TxTableVN {
-                        table: tableop.table.clone(),
-                        vn: self.vn_record.entry(tableop.table).or_default().assign(&tableop.op),
-                        op: tableop.op,
+                        table: tableop.table().to_string(),
+                        vn: self
+                            .vn_record
+                            .entry(tableop.table().to_string())
+                            .or_default()
+                            .assign(&tableop.op()),
+                        op: tableop.op(),
                     })
                     .collect(),
             })

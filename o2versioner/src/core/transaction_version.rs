@@ -26,9 +26,9 @@ impl TxTableVN {
     /// If `TableOp` is of `RWOperation::R`, then only need to match the name with `TxTableVN`;
     /// If `TableOp` is of `RWOperation::W`, then need to match both the name and also the operation (ie., `RWOperation::W`) with `TxTableVN`
     pub fn match_with(&self, tableop: &TableOp) -> bool {
-        match tableop.op {
-            RWOperation::R => self.table == tableop.table,
-            RWOperation::W => self.table == tableop.table && self.op == tableop.op,
+        match tableop.op() {
+            RWOperation::R => self.table == tableop.table(),
+            RWOperation::W => self.table == tableop.table() && self.op == tableop.op(),
         }
     }
 }
