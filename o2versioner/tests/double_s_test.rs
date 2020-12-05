@@ -157,12 +157,26 @@ async fn run_double_s() {
         Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
     ];
 
+    let tx3 = vec![Message::RequestMsqlText(MsqlText::query(
+        "select * from w1;",
+        "read w1",
+    ))];
+
+    let tx4 = vec![Message::RequestMsqlText(MsqlText::query(
+        "update w3 set name=\"ray\" where id = 22;",
+        "write w3",
+    ))];
+
     let msgs0 = [
+        tx3.clone(),
+        tx4.clone(),
         tx0.clone(),
         tx1.clone(),
+        tx4.clone(),
+        tx4.clone(),
         tx2.clone(),
-        tx1.clone(),
         tx0.clone(),
+        tx3.clone(),
         tx2.clone(),
     ]
     .concat();
@@ -176,12 +190,16 @@ async fn run_double_s() {
     });
 
     let msgs1 = [
+        tx4.clone(),
+        tx3.clone(),
         tx2.clone(),
         tx0.clone(),
         tx1.clone(),
         tx0.clone(),
+        tx3.clone(),
         tx2.clone(),
         tx1.clone(),
+        tx4.clone(),
     ]
     .concat();
     let tester_handle_1 = tokio::spawn(async move {

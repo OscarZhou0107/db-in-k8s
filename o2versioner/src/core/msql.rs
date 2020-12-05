@@ -274,6 +274,13 @@ impl Msql {
         }
     }
 
+    pub fn try_get_begintx(&self) -> Result<&MsqlBeginTx, ()> {
+        match &self {
+            Self::BeginTx(x) => Ok(x),
+            _ => Err(()),
+        }
+    }
+
     pub fn is_query(&self) -> bool {
         match self {
             Self::Query(_) => true,
@@ -281,10 +288,24 @@ impl Msql {
         }
     }
 
+    pub fn try_get_query(&self) -> Result<&MsqlQuery, ()> {
+        match &self {
+            Self::Query(x) => Ok(x),
+            _ => Err(()),
+        }
+    }
+
     pub fn is_endtx(&self) -> bool {
         match self {
             Self::EndTx(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn try_get_endtx(&self) -> Result<&MsqlEndTx, ()> {
+        match &self {
+            Self::EndTx(x) => Ok(x),
+            _ => Err(()),
         }
     }
 }

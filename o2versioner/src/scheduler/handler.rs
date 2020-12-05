@@ -313,7 +313,22 @@ async fn process_msql(
         }
         _ => match msql {
             Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
-            Msql::Query(_) => process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await,
+            Msql::Query(_) => {
+                if conn_state.current_txvn().is_none() {
+                    warn!("Single R/W query");
+                    // Construct a new MsqlBeginTx
+                    let msqlbegintx = MsqlBeginTx::from(msql.try_get_query().unwrap().tableops().clone());
+                    process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await;
+                    // Execute the query
+                    let resp = process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await;
+                    // Construct a new MsqlEndTx
+                    let msqlendtx = Msql::EndTx(MsqlEndTx::commit());
+                    process_endtx(msqlendtx, conn_state, &dispatcher_addr).await;
+                    resp
+                } else {
+                    process_query(msql, conn_state, &sequencer_socket_pool, &dispatcher_addr).await
+                }
+            }
             Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
         },
     };
