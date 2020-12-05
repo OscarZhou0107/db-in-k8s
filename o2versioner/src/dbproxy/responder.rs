@@ -30,7 +30,10 @@ impl Responder {
                 }
 
                 serializer
-                    .send(Message::MsqlResponse(result.identifier.clone(),result.into_msql_response()))
+                    .send(Message::MsqlResponse(
+                        result.identifier.clone(),
+                        result.into_msql_response(),
+                    ))
                     .await
                     .unwrap();
             }
@@ -45,7 +48,7 @@ mod tests_test {
     use crate::comm::MsqlResponse;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use futures::prelude::*;
-    use std::{sync::Arc, net::SocketAddr};
+    use std::{net::SocketAddr, sync::Arc};
     use tokio::net::TcpListener;
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
@@ -56,10 +59,8 @@ mod tests_test {
     #[tokio::test]
     async fn test_send_items_to_from_multiple_channel() {
         let details = "127.0.0.1:2346";
-        let addr : SocketAddr = details.parse().expect("Unable to parse socket address");
-        
+        let addr: SocketAddr = details.parse().expect("Unable to parse socket address");
         //Prepare - Mock db related context
-       
         let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         //Prepare - Network
         let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
@@ -93,7 +94,7 @@ mod tests_test {
         assert!(true);
     }
 
-    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>, addr : SocketAddr) {
+    fn helper_spawn_responder(version: Arc<Mutex<DbVersion>>, receiver: mpsc::Receiver<QueryResult>, addr: SocketAddr) {
         tokio::spawn(async move {
             let listener = TcpListener::bind(addr).await.unwrap();
             let (tcp_stream, _) = listener.accept().await.unwrap();
@@ -103,7 +104,7 @@ mod tests_test {
         });
     }
 
-    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>, addr : SocketAddr) {
+    fn helper_spawn_mock_client(vertifying_queue: Arc<Mutex<Vec<MsqlResponse>>>, addr: SocketAddr) {
         tokio::spawn(async move {
             let socket = TcpStream::connect(addr).await.unwrap();
             let length_delimited = FramedRead::new(socket, LengthDelimitedCodec::new());

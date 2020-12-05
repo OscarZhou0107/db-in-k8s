@@ -1,14 +1,13 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
+use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
 use futures::StreamExt;
+use mpsc::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::Notify;
 use tokio::{stream, sync::Mutex};
-
-use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
-use mpsc::*;
 use tokio_postgres::NoTls;
 
 pub struct Dispatcher {}
