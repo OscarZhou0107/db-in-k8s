@@ -28,9 +28,12 @@ impl Legality {
                 let txvn = txvn_opt.as_ref().unwrap();
                 if query.tableops().access_pattern() == AccessPattern::Mixed {
                     Self::Critical("Does not support query with mixed R and W")
-                } else if let Err(_) = txvn.get_from_tableops(&query.tableops()) {
+                } else if txvn.get_from_tableops(&query.tableops()).is_err() {
                     Self::Critical("Query is using tables not declared in the BeginTx")
-                // } else if {
+                } else if txvn.get_from_ertables(&query.early_release_tables()).is_err() {
+                    Self::Critical(
+                        "Tables marked for early release was not declared in the BeginTx or has already been released",
+                    )
                 } else {
                     Self::Legal
                 }
