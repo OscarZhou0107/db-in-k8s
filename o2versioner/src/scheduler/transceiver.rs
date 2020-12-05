@@ -78,7 +78,8 @@ impl Transceiver {
                         Message::MsqlResponse(client_addr, _msqlresponse) => {
                             Span::current().record("client", &&client_addr.to_string()[..]);
                             let mut guard = outstanding_req_clone.lock().await;
-                            let queue = guard.get_mut(&client_addr).expect("No client addr in outstanding_req");
+                            //Note: Ray has hacked this
+                            let queue = guard.get_mut(&client_addr.client_addr).expect("No client addr in outstanding_req");
                             let request_wrapper = queue.pop_back().expect("No record in outstanding_req");
                             let (_request, reply_ch) = request_wrapper.unwrap();
                             info!("conn fifo has {} after Pop back", queue.len());

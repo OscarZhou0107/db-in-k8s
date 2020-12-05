@@ -1,4 +1,4 @@
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxVN};
+use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxVN, RequestMeta};
 use crate::{comm::MsqlResponse, core::DbVN};
 use async_trait::async_trait;
 use bb8_postgres::{
@@ -34,14 +34,14 @@ impl PostgresSqlConnPool {
 
 #[derive(Clone)]
 pub struct QueueMessage {
-    pub identifier: SocketAddr,
+    pub identifier: RequestMeta,
     pub operation_type: Task,
     pub query: String,
     pub versions: Option<TxVN>,
 }
 
 impl QueueMessage {
-    pub fn new(identifier: SocketAddr, request: Msql, versions: Option<TxVN>) -> Self {
+    pub fn new(identifier: RequestMeta, request: Msql, versions: Option<TxVN>) -> Self {
         let operation_type;
         let mut query_string = String::new();
 
@@ -299,7 +299,7 @@ pub enum QueryResultType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct QueryResult {
-    pub identifier: SocketAddr,
+    pub identifier : RequestMeta,
     pub result: String,
     pub succeed: bool,
     pub result_type: QueryResultType,
@@ -418,6 +418,8 @@ pub enum Task {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     use super::*;
     use crate::core::*;
 
@@ -517,25 +519,41 @@ mod tests {
         let mut queue = PendingQueue::new();
 
         let message4 = QueueMessage::new(
-            "127.0.0.4:8080".parse().unwrap(),
+            RequestMeta {
+                client_addr : "127.0.0.4:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             None,
         );
 
         let message3 = QueueMessage::new(
-            "127.0.0.3:8080".parse().unwrap(),
+            RequestMeta {
+                client_addr : "127.0.0.3:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             Some(TxVN::default()),
         );
 
         let message2 = QueueMessage::new(
-            "127.0.0.2:8080".parse().unwrap(),
+            RequestMeta {
+                client_addr : "127.0.0.2:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             Some(TxVN::default()),
         );
 
         let message1 = QueueMessage::new(
-            "127.0.0.1:8080".parse().unwrap(),
+             RequestMeta {
+                client_addr : "127.0.0.1:8080".parse().unwrap(),
+                cur_txid : 0,
+                request_id : 0
+            },
             Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
             None,
         );
@@ -554,8 +572,79 @@ mod tests {
         queue.queue.iter().for_each(|task| {
             println!("{}", task.identifier);
         });
-
-        println!("Number of tasks is: {}", ready_tasks.len());
-        assert!(ready_tasks.len() == 2);
     }
+
+#[tokio::test]
+async fn pending_queue_task_order_test_2(){
+
+    let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
+    let mut queue = PendingQueue::new();
+
+    let message4 = QueueMessage::new(
+        RequestMeta {
+            client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 4)), 8080),
+            cur_txid : 0,
+            request_id : 0
+        },
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        None
+    );
+
+    let message3 = QueueMessage::new(
+        RequestMeta {
+            client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)), 8080),
+            cur_txid : 0,
+            request_id : 0
+        },
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        Some(TxVN::default())
+    );
+
+    let message2 = QueueMessage::new(
+        RequestMeta {
+            client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
+            cur_txid : 0,
+            request_id : 0
+        },
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        Some(TxVN::default())
+    );
+
+    let message1 = QueueMessage::new(
+         RequestMeta {
+            client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            cur_txid : 0,
+            request_id : 0
+        },
+        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
+        .unwrap()),
+        None
+    );
+
+    queue.push(message1);
+    queue.push(message2);
+    queue.push(message3);
+    queue.push(message4);
+
+    let ready_tasks = queue.get_all_version_ready_task(&mut dbversion).await;
+
+    ready_tasks
+    .iter()
+    .for_each(|task| {
+        println!("{}",task.identifier);
+    });
+
+    queue.queue
+    .iter()
+    .for_each(|task| {
+        println!("{}",task.identifier);
+    });
+
+    println!("Number of tasks is: {}",ready_tasks.len());
+    assert!(ready_tasks.len() == 2);
+}
+
 }

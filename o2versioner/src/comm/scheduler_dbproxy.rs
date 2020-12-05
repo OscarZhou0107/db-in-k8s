@@ -18,9 +18,9 @@ pub enum Error {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
     /// A `Msql` request to dbproxy. `Option<TxVN> == None` for single-read transaction
-    MsqlRequest(SocketAddr, Msql, Option<TxVN>),
+    MsqlRequest(RequestMeta, Msql, Option<TxVN>),
     /// The repsone to the `MsqlRequest`
-    MsqlResponse(SocketAddr, MsqlResponse),
+    MsqlResponse(RequestMeta, MsqlResponse),
     /// Response to an invalid request, for exmample, sending `MsqlResponse(MsqlResponse)` to the dbproxy
     Invalid,
 }
@@ -28,8 +28,8 @@ pub enum Message {
 impl Message {
     pub fn get_client_addr(&self) -> Option<SocketAddr> {
         match self {
-            Self::MsqlRequest(addr, _, _) => Some(addr.clone()),
-            Self::MsqlResponse(addr, _) => Some(addr.clone()),
+            Self::MsqlRequest(addr, _, _) => Some(addr.client_addr.clone()),
+            Self::MsqlResponse(addr, _) => Some(addr.client_addr.clone()),
             _ => None,
         }
     }

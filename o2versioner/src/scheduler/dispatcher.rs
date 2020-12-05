@@ -119,7 +119,14 @@ impl State {
             current_request_id,
         } = request;
 
-        let msg = Message::MsqlRequest(client_meta.client_addr(), command, txvn.clone());
+        //Note: Ray has hacked this
+        let mock_meta = RequestMeta {
+            client_addr : "127.0.0.1:8080".parse().unwrap(),
+            cur_txid : 0,
+            request_id : 0
+        };
+
+        let msg = Message::MsqlRequest(mock_meta, command, txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply_ch));
 
         // Send all requests to transceivers
