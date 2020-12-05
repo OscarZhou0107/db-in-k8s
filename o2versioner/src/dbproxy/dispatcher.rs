@@ -1,13 +1,13 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
-use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
-use futures::StreamExt;
-use mpsc::*;
+use bb8_postgres::bb8::Pool;
+use bb8_postgres::PostgresConnectionManager;
+use futures::prelude::*;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use tokio::{stream, sync::Mutex};
 use tokio_postgres::NoTls;
 
 pub struct Dispatcher {}
@@ -47,7 +47,7 @@ impl Dispatcher {
                         match op_cloned.operation_type {
                             Task::BEGIN => {
                                 if !lock.contains_key(&op_cloned.identifier.client_addr) {
-                                    let (ts, tr): (Sender<QueueMessage>, Receiver<QueueMessage>) = mpsc::channel(1);
+                                    let (ts, tr) = mpsc::channel(1);
                                     lock.insert(op_cloned.identifier.client_addr.clone(), ts);
                                     Self::spawn_transaction(pool_cloned, tr, sender_cloned);
                                 };
@@ -56,17 +56,18 @@ impl Dispatcher {
                         };
                     });
                 }
-                let senders: Arc<Mutex<HashMap<SocketAddr, Sender<QueueMessage>>>> =
+                let senders: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> =
                     Arc::new(Mutex::new(HashMap::new()));
                 {
                     let lock = transactions.lock().await;
                     let mut lock_2 = senders.lock().await;
-                   
-                    operations
-                    .iter()
-                    .for_each(|op| {
+
+                    operations.iter().for_each(|op| {
                         if !lock_2.contains_key(&op.identifier.client_addr) {
-                            lock_2.insert(op.identifier.client_addr.clone(), lock.get(&op.identifier.client_addr).unwrap().clone());
+                            lock_2.insert(
+                                op.identifier.client_addr.clone(),
+                                lock.get(&op.identifier.client_addr).unwrap().clone(),
+                            );
                         }
                     });
                 }
@@ -91,8 +92,8 @@ impl Dispatcher {
 
     fn spawn_transaction(
         pool: Pool<PostgresConnectionManager<NoTls>>,
-        mut rec: Receiver<QueueMessage>,
-        sender: Sender<QueryResult>,
+        mut rec: mpsc::Receiver<QueueMessage>,
+        sender: mpsc::Sender<QueryResult>,
     ) {
         tokio::spawn(async move {
             {
@@ -181,43 +182,43 @@ mod tests_dispatcher {
 
         let mut mock_ops = Vec::new();
         mock_ops.push(QueueMessage {
-            identifier : RequestMeta {
-                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid : 0,
-                request_id : 0
+            identifier: RequestMeta {
+                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid: 0,
+                request_id: 0,
             },
-            operation_type : Task::ABORT,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            operation_type: Task::ABORT,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : RequestMeta {
-                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid : 0,
-                request_id : 0
+            identifier: RequestMeta {
+                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid: 0,
+                request_id: 0,
             },
-            operation_type : Task::READ,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            operation_type: Task::READ,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : RequestMeta {
-                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid : 0,
-                request_id : 0
+            identifier: RequestMeta {
+                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid: 0,
+                request_id: 0,
             },
-            operation_type : Task::READ,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            operation_type: Task::READ,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : RequestMeta {
-                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid : 0,
-                request_id : 0
+            identifier: RequestMeta {
+                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                cur_txid: 0,
+                request_id: 0,
             },
-            operation_type : Task::BEGIN,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            operation_type: Task::BEGIN,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
 

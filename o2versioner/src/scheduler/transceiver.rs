@@ -17,7 +17,6 @@ use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span}
 pub struct TransceiverRequest {
     pub dbproxy_addr: SocketAddr,
     pub dbproxy_msg: Message,
-    pub current_request_id: usize,
 }
 
 #[derive(Debug)]
@@ -73,23 +72,29 @@ impl Transceiver {
         let outstanding_req_clone = outstanding_req.clone();
         let reader_task = async move {
             while let Some(msg) = serded_read.try_next().await.unwrap() {
-                let task = async {
+                async {
                     match &msg {
-                        Message::MsqlResponse(client_addr, _msqlresponse) => {
-                            Span::current().record("client", &&client_addr.to_string()[..]);
+                        Message::MsqlResponse(arrived_request_meta, _msqlresponse) => {
+                            Span::current().record("message", &&arrived_request_meta.to_string()[..]);
                             let mut guard = outstanding_req_clone.lock().await;
-                            //Note: Ray has hacked this
-                            let queue = guard.get_mut(&client_addr.client_addr).expect("No client addr in outstanding_req");
-                            let request_wrapper = queue.pop_back().expect("No record in outstanding_req");
-                            let (_request, reply_ch) = request_wrapper.unwrap();
+                            let queue = guard
+                                .get_mut(&arrived_request_meta.client_addr)
+                                .expect("No client addr in outstanding_req");
+                            let (popped_request, reply_ch) =
+                                queue.pop_back().expect("No record in outstanding_req").unwrap();
                             info!("conn fifo has {} after Pop back", queue.len());
+                            let popped_request_meta = popped_request.dbproxy_msg.try_get_request_meta().unwrap();
+
+                            assert_eq!(popped_request_meta, arrived_request_meta);
+
                             debug!("-> {:?}", msg);
                             reply_ch.unwrap().send(TransceiverReply { msg }).unwrap();
                         }
                         other => warn!("Unsupported {:?}", other),
                     };
-                };
-                task.instrument(info_span!("reply", client = field::Empty)).await;
+                }
+                .instrument(info_span!("<-dbproxy", message = field::Empty))
+                .await;
             }
         };
         let reader_handle = tokio::spawn(reader_task.in_current_span());
@@ -99,8 +104,10 @@ impl Transceiver {
             while let Some(request) = request_rx.next().await {
                 let task = async {
                     let dbproxy_msg = request.request().dbproxy_msg.clone();
-                    let client_addr = dbproxy_msg.get_client_addr().clone().unwrap();
-                    Span::current().record("client", &&client_addr.to_string()[..]);
+                    let meta = dbproxy_msg.try_get_request_meta().unwrap();
+                    let client_addr = meta.client_addr.clone();
+                    Span::current().record("message", &&meta.to_string()[..]);
+
                     debug!("-> {:?}", dbproxy_msg);
                     let mut guard = outstanding_req.lock().await;
                     let queue = guard.entry(client_addr.clone()).or_default();
@@ -111,7 +118,7 @@ impl Transceiver {
                         SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
                     serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
                 };
-                task.instrument(info_span!("request", client = field::Empty)).await;
+                task.instrument(info_span!("->dbproxy", message = field::Empty)).await;
             }
         };
         let request_rx_handle = tokio::spawn(request_rx_task.in_current_span());

@@ -35,7 +35,7 @@ impl ClientMeta {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RequestMeta {
     pub client_addr: SocketAddr,
     pub cur_txid: usize,

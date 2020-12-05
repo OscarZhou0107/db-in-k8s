@@ -1,10 +1,11 @@
 use super::core::{PendingQueue, QueueMessage};
 use crate::comm::scheduler_dbproxy::Message;
+use futures::prelude::*;
 use std::sync::Arc;
 use tokio::net::tcp::OwnedReadHalf;
-use tokio::stream::StreamExt;
 use tokio::sync::Mutex;
-use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 
 pub struct Receiver {}
@@ -56,11 +57,15 @@ mod tests_receiver {
 
         let item = Message::MsqlRequest(
             RequestMeta {
-                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid : 0,
-                request_id : 0
+                client_addr: "127.0.0.1:8080".parse().unwrap(),
+                cur_txid: 0,
+                request_id: 0,
             },
-            Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
+            Msql::BeginTx(
+                MsqlBeginTx::default()
+                    .set_name(Some("tx0"))
+                    .set_tableops(TableOps::from("READ WRIte")),
+            ),
             None,
         );
 
@@ -92,11 +97,15 @@ mod tests_receiver {
 
         let item = Message::MsqlRequest(
             RequestMeta {
-                client_addr :  SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid : 0,
-                request_id : 0
+                client_addr: "127.0.0.1:8080".parse().unwrap(),
+                cur_txid: 0,
+                request_id: 0,
             },
-            Msql::BeginTx(MsqlBeginTx::default().set_name(Some("tx0")).set_tableops(TableOps::from("READ WRIte"))),
+            Msql::BeginTx(
+                MsqlBeginTx::default()
+                    .set_name(Some("tx0"))
+                    .set_tableops(TableOps::from("READ WRIte")),
+            ),
             None,
         );
 

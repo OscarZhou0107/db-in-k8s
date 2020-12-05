@@ -28,10 +28,9 @@ impl DispatcherReply {
 
 /// DispatcherRequest sent from handler to dispatcher
 pub struct DispatcherRequest {
-    client_meta: ClientMeta,
+    request_meta: RequestMeta,
     command: Msql,
     txvn: Option<TxVN>,
-    current_request_id: usize,
 }
 
 impl ExecutorRequest for DispatcherRequest {
@@ -41,10 +40,9 @@ impl ExecutorRequest for DispatcherRequest {
 impl DispatcherRequest {
     pub fn new(client_meta: ClientMeta, command: Msql, txvn: Option<TxVN>, current_request_id: usize) -> Self {
         Self {
-            client_meta,
+            request_meta: RequestMeta::new(&client_meta, current_request_id),
             command,
             txvn,
-            current_request_id,
         }
     }
 }
@@ -66,12 +64,11 @@ impl State {
         }
     }
 
-    #[instrument(name="execute", skip(self, request), fields(message=field::Empty, id=field::Empty, cmd=field::Empty, op=field::Empty))]
+    #[instrument(name="execute", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
     async fn execute(&self, request: RequestWrapper<DispatcherRequest>) {
         let (request, reply_ch) = request.unwrap();
 
-        Span::current().record("message", &&request.client_meta.to_string()[..]);
-        Span::current().record("id", &request.current_request_id);
+        Span::current().record("message", &&request.request_meta.to_string()[..]);
         Span::current().record("cmd", &request.command.as_ref());
         debug!("<- {:?} {:?}", request.command, request.txvn);
 
@@ -113,20 +110,12 @@ impl State {
         let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
 
         let DispatcherRequest {
-            client_meta,
+            request_meta,
             command,
             txvn,
-            current_request_id,
         } = request;
 
-        //Note: Ray has hacked this
-        let mock_meta = RequestMeta {
-            client_addr : "127.0.0.1:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
-        };
-
-        let msg = Message::MsqlRequest(mock_meta, command, txvn.clone());
+        let msg = Message::MsqlRequest(request_meta, command, txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply_ch));
 
         // Send all requests to transceivers
@@ -140,7 +129,6 @@ impl State {
                         .request_nowait(TransceiverRequest {
                             dbproxy_addr: dbproxy_addr.clone(),
                             dbproxy_msg: msg,
-                            current_request_id,
                         })
                         .inspect_err(|e| error!("Cannot send: {:?}", e))
                         .map_ok(|receipt| (dbproxy_addr, receipt))
@@ -168,24 +156,9 @@ impl State {
                 async move {
                     let msqlresponse = transceiver_receipt
                         .wait_request()
-                        .and_then(|res| {
-                            // if current_request_id != res.current_request_id {
-                            //     error!(
-                            //         "Incorrect reply from transceiver, owned request_id={}, received request_id={}",
-                            //         current_request_id, res.current_request_id
-                            //     );
-                            //     panic!("Mismatched reply from transceiver");
-                            // } else {
-                            //     debug!(
-                            //         "owned request_id={}, received request_id={}",
-                            //         current_request_id, res.current_request_id
-                            //     );
-                            // }
-
-                            match res.msg {
-                                Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
-                                _ => future::err(String::from("Invalid response from Dbproxy")),
-                            }
+                        .and_then(|res| match res.msg {
+                            Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
+                            _ => future::err(String::from("Invalid response from Dbproxy")),
                         })
                         .unwrap_or_else(|e| {
                             if is_endtx {

@@ -1,16 +1,13 @@
 use futures::prelude::*;
 use o2versioner::comm::scheduler_dbproxy::Message;
-use o2versioner::{
-    comm::MsqlResponse,
-    core::{Msql, MsqlBeginTx, RWOperation, TableOps},
-};
-use o2versioner::{core::MsqlQuery, dbproxy};
-use o2versioner::{core::*, util::config::DbProxyConfig};
-use std::{net::IpAddr, net::Ipv4Addr, net::SocketAddr, time::Duration};
-use tokio::{
-    net::{tcp::OwnedWriteHalf, TcpStream},
-    time::sleep,
-};
+use o2versioner::comm::MsqlResponse;
+use o2versioner::core::*;
+use o2versioner::dbproxy;
+use o2versioner::util::config::DbProxyConfig;
+use std::net::SocketAddr;
+use std::time::Duration;
+use tokio::net::{tcp::OwnedWriteHalf, TcpStream};
+use tokio::time::sleep;
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
@@ -36,9 +33,9 @@ async fn test_dbproxy_end_to_end() {
     ];
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.3:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.3:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::BeginTx(
             MsqlBeginTx::default()
@@ -51,9 +48,9 @@ async fn test_dbproxy_end_to_end() {
 
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.2:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.2:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::Query(
             MsqlQuery::new(
@@ -68,9 +65,9 @@ async fn test_dbproxy_end_to_end() {
 
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.2:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.2:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::BeginTx(
             MsqlBeginTx::default()
@@ -83,9 +80,9 @@ async fn test_dbproxy_end_to_end() {
 
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.1:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.1:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::BeginTx(
             MsqlBeginTx::default()
@@ -159,9 +156,9 @@ async fn test_dbproxy_end_to_end_2() {
     ];
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.3:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.3:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::BeginTx(
             MsqlBeginTx::default()
@@ -174,9 +171,9 @@ async fn test_dbproxy_end_to_end_2() {
 
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.2:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.2:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::Query(
             MsqlQuery::new(
@@ -191,9 +188,9 @@ async fn test_dbproxy_end_to_end_2() {
 
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.2:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.2:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::BeginTx(
             MsqlBeginTx::default()
@@ -206,9 +203,9 @@ async fn test_dbproxy_end_to_end_2() {
 
     let item = Message::MsqlRequest(
         RequestMeta {
-            client_addr : "127.0.0.1:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.1:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         },
         Msql::BeginTx(
             MsqlBeginTx::default()

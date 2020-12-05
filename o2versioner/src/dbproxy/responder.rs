@@ -2,9 +2,11 @@ use super::core::{DbVersion, QueryResult, QueryResultType};
 use crate::comm::scheduler_dbproxy::Message;
 use futures::SinkExt;
 use std::sync::Arc;
+use tokio::net::tcp::OwnedWriteHalf;
+use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-use tokio::{net::tcp::OwnedWriteHalf, sync::mpsc};
-use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
+use tokio_serde::formats::SymmetricalJson;
+use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
 pub struct Responder {}
@@ -44,9 +46,9 @@ impl Responder {
 #[cfg(test)]
 mod tests_test {
     use super::Responder;
-    use crate::{comm::scheduler_dbproxy::Message, core::RequestMeta};
     use crate::comm::MsqlResponse;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
+    use crate::{comm::scheduler_dbproxy::Message, core::RequestMeta};
     use futures::prelude::*;
     use std::{net::SocketAddr, sync::Arc};
     use tokio::net::TcpListener;
@@ -58,13 +60,11 @@ mod tests_test {
 
     #[tokio::test]
     async fn test_send_items_to_from_multiple_channel() {
-        
         let addr = RequestMeta {
-            client_addr :  "127.0.0.1:8080".parse().unwrap(),
-            cur_txid : 0,
-            request_id : 0
+            client_addr: "127.0.0.1:8080".parse().unwrap(),
+            cur_txid: 0,
+            request_id: 0,
         };
-        
         //Prepare - Mock db related context
         let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         //Prepare - Network

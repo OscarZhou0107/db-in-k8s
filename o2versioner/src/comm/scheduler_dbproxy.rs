@@ -1,7 +1,6 @@
 use super::msql_response::MsqlResponse;
 use crate::core::*;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
 
 pub enum EndTx {
     Commit,
@@ -26,11 +25,11 @@ pub enum Message {
 }
 
 impl Message {
-    pub fn get_client_addr(&self) -> Option<SocketAddr> {
+    pub fn try_get_request_meta(&self) -> Result<&RequestMeta, ()> {
         match self {
-            Self::MsqlRequest(addr, _, _) => Some(addr.client_addr.clone()),
-            Self::MsqlResponse(addr, _) => Some(addr.client_addr.clone()),
-            _ => None,
+            Self::MsqlRequest(meta, _, _) => Ok(meta),
+            Self::MsqlResponse(meta, _) => Ok(meta),
+            _ => Err(()),
         }
     }
 }
