@@ -1,4 +1,4 @@
-#![allow(warnings)]
+#![allow(dead_code)]
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use chrono::{DateTime, Utc};
