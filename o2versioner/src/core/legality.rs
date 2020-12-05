@@ -26,7 +26,8 @@ impl Legality {
             }
             Msql::Query(query) => {
                 if txvn_opt.is_none() {
-                    Self::Panic("Does not support single un-transactioned query for now")
+                    // Self::Panic("Does not support single un-transactioned query for now")
+                    Self::Legal
                 } else {
                     let txvn = txvn_opt.as_ref().unwrap();
                     if query.tableops().access_pattern() == AccessPattern::Mixed {
