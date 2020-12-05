@@ -1,16 +1,11 @@
-use super::core::{
-    DbVersion, PendingQueue, QueryResult, QueueMessage, Task,
-};
-
-use std::{collections::HashMap, thread::JoinHandle};
-use futures::prelude::*;
-use std::sync::Arc;
-//use mysql_async::Pool;
-use std::net::SocketAddr;
+use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
 use futures::StreamExt;
-use tokio::{sync::Mutex, stream};
-use tokio::sync::Notify;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::sync::Notify;
+use tokio::{stream, sync::Mutex};
 
 use bb8_postgres::{bb8::Pool, PostgresConnectionManager};
 use mpsc::*;
@@ -62,14 +57,13 @@ impl Dispatcher {
                         };
                     });
                 }
-                let mut senders : Arc<Mutex<HashMap<SocketAddr,Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
+                let senders: Arc<Mutex<HashMap<SocketAddr, Sender<QueueMessage>>>> =
+                    Arc::new(Mutex::new(HashMap::new()));
                 {
                     let lock = transactions.lock().await;
                     let mut lock_2 = senders.lock().await;
-                   
-                    operations
-                    .iter()
-                    .for_each(|op| {
+
+                    operations.iter().for_each(|op| {
                         if !lock_2.contains_key(&op.identifier) {
                             lock_2.insert(op.identifier.clone(), lock.get(&op.identifier).unwrap().clone());
                         }
@@ -79,12 +73,12 @@ impl Dispatcher {
                 {
                     let lock = senders.lock().await;
                     stream::iter(operations)
-                    .for_each(|op| async {
-                        let op = op;
-                        lock.get(&op.clone().identifier).unwrap().send(op.clone()).await;
-                    }).await;
+                        .for_each(|op| async {
+                            let op = op;
+                            lock.get(&op.clone().identifier).unwrap().send(op.clone()).await;
+                        })
+                        .await;
                 }
-             
             }
         });
     }
@@ -120,9 +114,7 @@ impl Dispatcher {
                         }
                     }
 
-                    let _ = sender
-                        .send(operation.into_sqlresponse(raw))
-                        .await;
+                    let _ = sender.send(operation.into_sqlresponse(raw)).await;
 
                     if finish {
                         break;
@@ -147,8 +139,8 @@ mod tests_dispatcher {
     use super::Dispatcher;
     use crate::core::RWOperation;
     use crate::core::*;
-    use crate::dbproxy::core::{DbVersion, PendingQueue, QueueMessage, QueryResult, Task};
-    use std::{collections::HashMap, net::IpAddr, net::SocketAddr, sync::Arc, net::Ipv4Addr};
+    use crate::dbproxy::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
+    use std::{collections::HashMap, net::IpAddr, net::Ipv4Addr, net::SocketAddr, sync::Arc};
     use tokio::sync::mpsc;
     use tokio::sync::Mutex;
 
@@ -156,7 +148,8 @@ mod tests_dispatcher {
     #[ignore]
     async fn test_receive_response_from_new_transactions() {
         //Prepare - Network
-        let transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
+        let transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         let transactions_2 = Arc::clone(&transactions);
 
         //Global version//
@@ -168,7 +161,6 @@ mod tests_dispatcher {
         //Responder sender and receiver
         let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
             mpsc::channel(100);
-       
         let mut mock_vs = Vec::new();
         mock_vs.push(TxTableVN {
             table: "table2".to_string(),
@@ -183,27 +175,27 @@ mod tests_dispatcher {
 
         let mut mock_ops = Vec::new();
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-            operation_type : Task::ABORT,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            identifier: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type: Task::ABORT,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-            operation_type : Task::READ,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            identifier: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type: Task::READ,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-            operation_type : Task::READ,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            identifier: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type: Task::READ,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
         mock_ops.push(QueueMessage {
-            identifier : SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-            operation_type : Task::BEGIN,
-            query : "SELECT name, age, designation, salary FROM public.tbltest;".to_string(), 
+            identifier: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            operation_type: Task::BEGIN,
+            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
         });
 
@@ -223,24 +215,23 @@ mod tests_dispatcher {
         assert!(transactions_2.lock().await.len() == 1);
     }
 
-    fn helper_spawn_dispatcher(pending_queue : Arc<Mutex<PendingQueue>>, sender : mpsc::Sender<QueryResult>, version : Arc<Mutex<DbVersion>>, transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>){
-       
+    fn helper_spawn_dispatcher(
+        pending_queue: Arc<Mutex<PendingQueue>>,
+        sender: mpsc::Sender<QueryResult>,
+        version: Arc<Mutex<DbVersion>>,
+        transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
+    ) {
         let mut config = tokio_postgres::Config::new();
         config.user("postgres");
         config.password("Abc@123");
         config.host("localhost");
         config.port(5432);
         config.dbname("Test");
-    
-        Dispatcher::run(
-            pending_queue,
-            sender,
-            config,
-            version,
-            transactions)
+
+        Dispatcher::run(pending_queue, sender, config, version, transactions)
     }
 
-    async fn helper_mock_client(pending_queue : Arc<Mutex<PendingQueue>>, mut messages : Vec<QueueMessage>){
+    async fn helper_mock_client(pending_queue: Arc<Mutex<PendingQueue>>, mut messages: Vec<QueueMessage>) {
         while !messages.is_empty() {
             pending_queue.lock().await.push(messages.pop().unwrap());
         }

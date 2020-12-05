@@ -1,4 +1,4 @@
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, MsqlQuery, TableOps, TxVN};
+use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, TxVN};
 use crate::{comm::MsqlResponse, core::DbVN};
 use async_trait::async_trait;
 use bb8_postgres::{
@@ -8,7 +8,7 @@ use bb8_postgres::{
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
@@ -110,7 +110,7 @@ impl QueueMessage {
         };
 
         QueryResult {
-            identifier : self.identifier,
+            identifier: self.identifier,
             result: result,
             result_type: result_type,
             succeed: succeed,
@@ -299,7 +299,7 @@ pub enum QueryResultType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct QueryResult {
-    pub identifier : SocketAddr,
+    pub identifier: SocketAddr,
     pub result: String,
     pub succeed: bool,
     pub result_type: QueryResultType,
@@ -416,147 +416,146 @@ pub enum Task {
 //         assert!(!db_version.violate_version(operation));
 //     }
 
-#[test]
-#[ignore]
-fn postgres_write_test() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::*;
 
-    rt.block_on(async move {
-        let mut config = tokio_postgres::Config::new();
-        config.user("postgres");
-        config.password("Rayh8768");
-        config.host("localhost");
-        config.port(5432);
-        config.dbname("Test");
+    #[test]
+    #[ignore]
+    fn postgres_write_test() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
 
-        let size: u32 = 50;
-        let manager = PostgresConnectionManager::new(config, NoTls);
-        let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
+        rt.block_on(async move {
+            let mut config = tokio_postgres::Config::new();
+            config.user("postgres");
+            config.password("Rayh8768");
+            config.host("localhost");
+            config.port(5432);
+            config.dbname("Test");
 
-        let conn = pool.get().await.unwrap();
-        conn.simple_query("START TRANSACTION;").await.unwrap();
-        let result = conn
-            .simple_query("INSERT INTO tbltest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999)")
-            .await
-            .unwrap();
-        conn.simple_query("COMMIT;").await.unwrap();
+            let size: u32 = 50;
+            let manager = PostgresConnectionManager::new(config, NoTls);
+            let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
 
-        result.iter().for_each(|q_message| match q_message {
-            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
-                let len = query_row.len();
-                for index in 0..len {
-                    println!("value is : {}", query_row.get(index).unwrap().to_string());
+            let conn = pool.get().await.unwrap();
+            conn.simple_query("START TRANSACTION;").await.unwrap();
+            let result = conn
+                .simple_query(
+                    "INSERT INTO tbltest (name, age, designation, salary) VALUES ('haha', 100, 'Manager', 99999)",
+                )
+                .await
+                .unwrap();
+            conn.simple_query("COMMIT;").await.unwrap();
+
+            result.iter().for_each(|q_message| match q_message {
+                tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                    let len = query_row.len();
+                    for index in 0..len {
+                        println!("value is : {}", query_row.get(index).unwrap().to_string());
+                    }
                 }
-            }
-            tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
-                println!("Command result is : {}", complete_status);
-            }
-            _ => {}
+                tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                    println!("Command result is : {}", complete_status);
+                }
+                _ => {}
+            });
+
+            let writer = PostgreToCsvWriter::new(Task::WRITE);
+            let csv = writer.to_csv(result);
+
+            println!("Converted string is: {}", csv);
+        });
+    }
+
+    #[test]
+    #[ignore]
+    fn postgres_read_test() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        rt.block_on(async move {
+            let mut config = tokio_postgres::Config::new();
+            config.user("postgres");
+            config.password("Rayh8768");
+            config.host("localhost");
+            config.port(5432);
+            config.dbname("Test");
+
+            let size: u32 = 50;
+            let manager = PostgresConnectionManager::new(config, NoTls);
+            let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
+
+            let conn = pool.get().await.unwrap();
+            let result = conn
+                .simple_query("SELECT name, age, designation, salary FROM public.tbltest;")
+                .await
+                .unwrap();
+
+            result.iter().for_each(|q_message| match q_message {
+                tokio_postgres::SimpleQueryMessage::Row(query_row) => {
+                    let len = query_row.len();
+                    for index in 0..len {
+                        println!("value is : {}", query_row.get(index).unwrap().to_string());
+                    }
+                }
+                tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
+                    println!("Command result is : {}", complete_status);
+                }
+                _ => {}
+            });
+
+            let writer = PostgreToCsvWriter::new(Task::READ);
+            let csv = writer.to_csv(result);
+
+            println!("Converted string is: {}", csv);
+        });
+    }
+
+    #[tokio::test]
+    async fn pending_queue_task_order_test() {
+        let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
+        let mut queue = PendingQueue::new();
+
+        let message4 = QueueMessage::new(
+            "127.0.0.4:8080".parse().unwrap(),
+            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            None,
+        );
+
+        let message3 = QueueMessage::new(
+            "127.0.0.3:8080".parse().unwrap(),
+            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Some(TxVN::default()),
+        );
+
+        let message2 = QueueMessage::new(
+            "127.0.0.2:8080".parse().unwrap(),
+            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            Some(TxVN::default()),
+        );
+
+        let message1 = QueueMessage::new(
+            "127.0.0.1:8080".parse().unwrap(),
+            Msql::Query(MsqlQuery::new("select * from tbltest", TableOps::from("READ table0 table1")).unwrap()),
+            None,
+        );
+
+        queue.push(message1);
+        queue.push(message2);
+        queue.push(message3);
+        queue.push(message4);
+
+        let ready_tasks = queue.get_all_version_ready_task(&mut dbversion).await;
+
+        ready_tasks.iter().for_each(|task| {
+            println!("{}", task.identifier);
         });
 
-        let writer = PostgreToCsvWriter::new(Task::WRITE);
-        let csv = writer.to_csv(result);
-
-        println!("Converted string is: {}", csv);
-    });
-}
-
-#[test]
-#[ignore]
-fn postgres_read_test() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    rt.block_on(async move {
-        let mut config = tokio_postgres::Config::new();
-        config.user("postgres");
-        config.password("Rayh8768");
-        config.host("localhost");
-        config.port(5432);
-        config.dbname("Test");
-
-        let size: u32 = 50;
-        let manager = PostgresConnectionManager::new(config, NoTls);
-        let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
-
-        let conn = pool.get().await.unwrap();
-        let result = conn
-            .simple_query("SELECT name, age, designation, salary FROM public.tbltest;")
-            .await
-            .unwrap();
-
-        result.iter().for_each(|q_message| match q_message {
-            tokio_postgres::SimpleQueryMessage::Row(query_row) => {
-                let len = query_row.len();
-                for index in 0..len {
-                    println!("value is : {}", query_row.get(index).unwrap().to_string());
-                }
-            }
-            tokio_postgres::SimpleQueryMessage::CommandComplete(complete_status) => {
-                println!("Command result is : {}", complete_status);
-            }
-            _ => {}
+        queue.queue.iter().for_each(|task| {
+            println!("{}", task.identifier);
         });
 
-        let writer = PostgreToCsvWriter::new(Task::READ);
-        let csv = writer.to_csv(result);
-
-        println!("Converted string is: {}", csv);
-    });
-}
-
-#[tokio::test]
-async fn pending_queue_task_order_test(){
-
-    let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
-    let mut queue = PendingQueue::new();
-
-    let message4 = QueueMessage::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 4)), 8080),
-        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
-        .unwrap()),
-        None
-    );
-
-    let message3 = QueueMessage::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 3)), 8080),
-        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
-        .unwrap()),
-        Some(TxVN::default())
-    );
-
-    let message2 = QueueMessage::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 8080),
-        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
-        .unwrap()),
-        Some(TxVN::default())
-    );
-
-    let message1 = QueueMessage::new(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-        Msql::Query(MsqlQuery::new("select * from tbltest",TableOps::from("READ table0 table1"))
-        .unwrap()),
-        None
-    );
-
-    queue.push(message1);
-    queue.push(message2);
-    queue.push(message3);
-    queue.push(message4);
-
-    let ready_tasks = queue.get_all_version_ready_task(&mut dbversion).await;
-
-    ready_tasks
-    .iter()
-    .for_each(|task| {
-        println!("{}",task.identifier);
-    });
-
-    queue.queue
-    .iter()
-    .for_each(|task| {
-        println!("{}",task.identifier);
-    });
-
-    println!("Number of tasks is: {}",ready_tasks.len());
-    assert!(ready_tasks.len() == 2);
+        println!("Number of tasks is: {}", ready_tasks.len());
+        assert!(ready_tasks.len() == 2);
+    }
 }
