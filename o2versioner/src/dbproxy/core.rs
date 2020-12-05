@@ -1,4 +1,4 @@
-use crate::comm::MsqlResponse;
+use crate::{core::EarlyReleaseTables, comm::MsqlResponse};
 use crate::core::DbVN;
 use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
@@ -36,12 +36,14 @@ pub struct QueueMessage {
     pub operation_type: Task,
     pub query: String,
     pub versions: Option<TxVN>,
+    pub early_release : Option<EarlyReleaseTables>
 }
 
 impl QueueMessage {
     pub fn new(identifier: RequestMeta, request: Msql, versions: Option<TxVN>) -> Self {
         let operation_type;
         let mut query_string = String::new();
+        let mut early_release = None;
 
         match request {
             Msql::BeginTx(_) => {
@@ -50,6 +52,9 @@ impl QueueMessage {
 
             Msql::Query(op) => {
                 operation_type = Task::READ;
+                if op.has_early_release() {
+                    early_release = Some(op.early_release_tables().clone());
+                }
                 query_string = op.into_msqlfinalstring().into_inner();
             }
 
@@ -63,11 +68,14 @@ impl QueueMessage {
             },
         }
 
+    
+
         QueueMessage {
             identifier: identifier,
             operation_type: operation_type,
             query: query_string,
             versions: versions,
+            early_release: early_release
         }
     }
 
@@ -113,6 +121,7 @@ impl QueueMessage {
             result_type: result_type,
             succeed: succeed,
             contained_newer_versions: contained_newer_versions,
+            contained_early_release_version: self.early_release,
         }
     }
 }
@@ -168,6 +177,11 @@ impl DbVersion {
     pub fn release_on_transaction(&mut self, transaction_version: TxVN) {
         self.db_version
             .release_version(transaction_version.into_dbvn_release_request());
+        self.notify.notify_one();
+    }
+
+    pub fn release_on_early_release(&mut self, early_release_version: EarlyReleaseTables) {
+        self.db_version.release_early_version(early_release_version);
         self.notify.notify_one();
     }
 
@@ -302,6 +316,7 @@ pub struct QueryResult {
     pub succeed: bool,
     pub result_type: QueryResultType,
     pub contained_newer_versions: TxVN,
+    pub contained_early_release_version: Option<EarlyReleaseTables>
 }
 
 impl QueryResult {
@@ -689,4 +704,4 @@ mod tests {
         println!("Number of tasks is: {}", ready_tasks.len());
         assert!(ready_tasks.len() == 2);
     }
-}
+    }
