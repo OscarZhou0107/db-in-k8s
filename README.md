@@ -1,5 +1,5 @@
 # dv-in-rust
-Distributed Versioning in Rust
+o2versioner: Distributed Versioning in Asynchronous Rust
 
 
 [![Build Status][actions-badge]][actions-url]
@@ -15,43 +15,40 @@ Distributed Versioning: Consistent Replication for Scaling Back-end Databases of
 Cristiana Amza, Alan L. Cox and Willy Zwaenepoel  
 
 
-## How to use build and run
+## How to run
 
 
-### To build and run
+### o2versioner
+
+
+#### Build and run
+Using dev build
 ```sh
-cargo run --bin dbproxy_exe
-cargo run --bin scheduler_exe
-cargo run --bin sequencer_exe
-```
-
-
-### To build and test
-```sh
+# build
+cargo build
+# build and run
+cargo run -- --help
+# build and test
 cargo test
-# To show stdout at the end
+# build and test - show stdout output at end
 cargo test -- --show-output
-# To pipe into stdout
+# build and test - show stdout alive
 cargo test -- --nocapture
 ```
 
 
-### To build the entire library
-```sh
-cargo build
-```
+#### For available configurations of o2versioner
+Refer to: [config.rs](o2versioner/src/util/config.rs)
 
 
-### To check the entire library
-```sh
-cargo check
-```
-
-
-### To check number of lines for Rust
+#### To check number of lines for Rust
 ```sh
 find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 ```
+
+
+### Load generator
+Refer to: [README](load_generator/README.md)
 
 
 ## Progress
@@ -78,6 +75,9 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 - [x] Early release
 
 
+## Architecture
+
+
 ### Project layout
 ```
 o2versioner
@@ -92,9 +92,6 @@ o2versioner
 │  └── main.rs    # main executable
 └── tests         # system level testing
 ```
-
-
-## Architecture
 
 
 ### Sequencer

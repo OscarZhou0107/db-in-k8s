@@ -10,7 +10,7 @@ version = "0.1.0"
 async-trait = "0.1"
 bb8 = "0.6"
 bb8-postgres = "0.6"
-chrono = "0.4"
+chrono = {version = "0.4", features = ["serde"]}
 clap = "2.33"
 config = "0.10"
 csv = "1.1"

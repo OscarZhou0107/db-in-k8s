@@ -174,22 +174,19 @@ impl State {
                         Msql::Query(query) if query.has_early_release() && txvn_cloned.is_some() => {
                             let mut txvn = txvn_cloned.unwrap();
                             let (_, _, ertables) = query.unwrap();
-                            self.release_version(
-                                &dbproxy_addr,
-                                txvn.early_release_request(ertables)
-                                    .expect("Early release requesting tables not in TxVN"),
-                            )
-                            .await;
+                            let er_token = txvn
+                                .early_release_request(ertables)
+                                .expect("Early release requesting tables not in TxVN");
+                            debug!("Early releasing {:?}", er_token);
+                            self.release_version(&dbproxy_addr, er_token).await;
                             Some(txvn)
                         }
                         Msql::EndTx(_) => {
-                            self.release_version(
-                                &dbproxy_addr,
-                                txvn_cloned
-                                    .expect("EndTx must include Some(TxVN)")
-                                    .into_dbvn_release_request(),
-                            )
-                            .await;
+                            let re_token = txvn_cloned
+                                .expect("EndTx must include Some(TxVN)")
+                                .into_dbvn_release_request();
+                            debug!("Releasing {:?}", re_token);
+                            self.release_version(&dbproxy_addr, re_token).await;
                             None
                         }
                         _ => txvn_cloned,
@@ -271,8 +268,6 @@ impl State {
 
     /// This should be called whenever dbproxy sent a response back for a `Msql::EndTx`
     async fn release_version(&self, dbproxy_addr: &SocketAddr, release_request: DbVNReleaseRequest) {
-        debug!("release_version: {:?}", release_request);
-
         self.dbvn_manager
             .write()
             .await

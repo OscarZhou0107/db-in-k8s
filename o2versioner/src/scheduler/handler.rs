@@ -9,11 +9,14 @@ use crate::core::*;
 use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
+use chrono::Utc;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
@@ -85,13 +88,16 @@ pub async fn main(conf: Config) {
     };
 
     // Launch main handler as a new task
+    let conf_clone = conf.scheduler.clone();
     let sequencer_socket_pool_clone = sequencer_socket_pool.clone();
+    let state_clone = state.clone();
     let handler_handle = tokio::spawn(
         tcp::start_tcplistener(
             conf.scheduler.to_addr(),
             move |tcp_stream| {
                 let sequencer_socket_pool = sequencer_socket_pool_clone.clone();
-                let state_cloned = state.clone();
+                let state_cloned = state_clone.clone();
+                let conf = conf_clone.clone();
                 // Connection/session specific storage
                 // Note: this closure contains one copy of dispatcher_addr
                 // Then, for each connection, a new dispatcher_addr is cloned
@@ -100,7 +106,7 @@ pub async fn main(conf: Config) {
                     let client_addr = tcp_stream.peer_addr().unwrap();
                     let conn_state =
                         ConnectionState::new(client_addr.clone(), state_cloned.share_client_record(client_addr).await);
-                    process_connection(tcp_stream, conn_state, sequencer_socket_pool, dispatcher_addr).await;
+                    process_connection(conf, tcp_stream, conn_state, sequencer_socket_pool, dispatcher_addr).await;
                 }
             },
             conf.scheduler.max_connection,
@@ -128,6 +134,27 @@ pub async fn main(conf: Config) {
         };
     } else {
         main_handle.await.unwrap();
+    }
+
+    // Dump logging files
+    if let Some(log_dir) = conf.scheduler.performance_logging {
+        info!("Preparing {} for performance logging", log_dir);
+        fs::create_dir_all(log_dir.clone()).await.unwrap();
+        let performance_records: Vec<_> = stream::iter(state.share_client_records().lock().await.iter())
+            .then(|(_, client_record)| async move {
+                let client_record = client_record.read().await;
+                client_record.get_performance_records()
+            })
+            .collect()
+            .await;
+        let performance_records: Vec<_> = performance_records.into_iter().flatten().collect();
+
+        let mut path = PathBuf::from(log_dir);
+        path.push(format!("{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
+        let path = path.as_path();
+        let mut wrt = csv::Writer::from_path(path).unwrap();
+        performance_records.iter().for_each(|r| wrt.serialize(r).unwrap());
+        info!("Dumped performance logging to {:?}", path);
     }
 
     info!("DIES");
@@ -192,8 +219,9 @@ async fn admin(
 ///
 /// Will process all messages sent via this `tcp_stream` on this tcp connection.
 /// Once this tcp connection is closed, this function will return
-#[instrument(name="conn", skip(socket, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
+#[instrument(name="conn", skip(conf, socket, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
 async fn process_connection(
+    conf: SchedulerConfig,
     mut socket: TcpStream,
     conn_state: ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
@@ -223,6 +251,7 @@ async fn process_connection(
     // Process a stream of incoming messages from a single tcp connection
     serded_read
         .and_then(move |msg| {
+            let conf_cloned = conf.clone();
             let conn_state_cloned = conn_state_cloned.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr.clone();
@@ -230,6 +259,7 @@ async fn process_connection(
 
             async move {
                 Ok(process_request(
+                    conf_cloned,
                     msg,
                     conn_state_cloned,
                     sequencer_socket_pool_cloned,
@@ -257,8 +287,9 @@ async fn process_connection(
     }
 }
 
-#[instrument(name="request", skip(msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, id=field::Empty, txid=field::Empty, cmd=field::Empty))]
+#[instrument(name="request", skip(conf, msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, id=field::Empty, txid=field::Empty, cmd=field::Empty))]
 async fn process_request(
+    conf: SchedulerConfig,
     msg: scheduler_api::Message,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
@@ -270,11 +301,27 @@ async fn process_request(
 
     let response = match msg {
         scheduler_api::Message::RequestMsql(msql) => {
-            process_msql(msql, &mut conn_state_guard, sequencer_socket_pool, dispatcher_addr).await
+            process_msql(
+                conf,
+                msql,
+                &mut conn_state_guard,
+                sequencer_socket_pool,
+                dispatcher_addr,
+            )
+            .await
         }
         scheduler_api::Message::RequestMsqlText(msqltext) => match Msql::try_from(msqltext) {
             // Try to convert MsqlText to Msql first
-            Ok(msql) => process_msql(msql, &mut conn_state_guard, sequencer_socket_pool, dispatcher_addr).await,
+            Ok(msql) => {
+                process_msql(
+                    conf,
+                    msql,
+                    &mut conn_state_guard,
+                    sequencer_socket_pool,
+                    dispatcher_addr,
+                )
+                .await
+            }
             Err(e) => scheduler_api::Message::InvalidMsqlText(e.to_owned()),
         },
         scheduler_api::Message::RequestCrash(reason) => {
@@ -291,7 +338,8 @@ async fn process_request(
 }
 
 async fn process_msql(
-    msql: Msql,
+    conf: SchedulerConfig,
+    mut msql: Msql,
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
@@ -305,6 +353,10 @@ async fn process_msql(
     let msqlresponse = match msql {
         Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
         Msql::Query(_) => {
+            if conf.disable_early_release {
+                msql.try_get_mut_query().unwrap().drop_early_release();
+            }
+
             if conn_state.current_txvn().is_none() {
                 warn!("Single R/W query");
                 // Construct a new MsqlBeginTx

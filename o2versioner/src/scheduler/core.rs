@@ -37,6 +37,10 @@ impl State {
             .or_insert_with(|| Arc::new(RwLock::new(ClientRecord::new(client))))
             .clone()
     }
+
+    pub fn share_client_records(&self) -> Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>> {
+        self.client_records.clone()
+    }
 }
 
 #[derive(Debug)]

@@ -63,6 +63,22 @@ impl MsqlResponse {
             _ => false,
         }
     }
+
+    pub fn is_ok(&self) -> bool {
+        match self {
+            Self::BeginTx(r) => r.is_ok(),
+            Self::Query(r) => r.is_ok(),
+            Self::EndTx(r) => r.is_ok(),
+        }
+    }
+
+    pub fn is_err(&self) -> bool {
+        match self {
+            Self::BeginTx(r) => r.is_err(),
+            Self::Query(r) => r.is_err(),
+            Self::EndTx(r) => r.is_err(),
+        }
+    }
 }
 
 /// Unit test for `MsqlResponse`

@@ -2,6 +2,7 @@
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 pub struct RequestRecordStart {
@@ -36,7 +37,7 @@ impl RequestRecordStart {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RequestRecord {
     req: Msql,
     req_timestamp: DateTime<Utc>,
@@ -120,5 +121,64 @@ impl ClientRecord {
     /// Append a new `RequestRecord` to the end of the list
     pub fn push(&mut self, req_record: RequestRecord) {
         self.records.push(req_record)
+    }
+
+    /// Returns a `Vec<PerformanceRequestRecord>` that is converted from
+    /// all `RequestRecord` of the current `client_addr`
+    pub fn get_performance_records(&self) -> Vec<PerformanceRequestRecord> {
+        self.records
+            .iter()
+            .cloned()
+            .map(|reqrecord| {
+                PerformanceRequestRecord::from(reqrecord).set_client_addr(Some(self.client_addr().clone()))
+            })
+            .collect()
+    }
+}
+
+/// For performance benchmarking, converted from `RequestRecord`
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PerformanceRequestRecord {
+    client_addr: Option<SocketAddr>,
+    request_type: String,
+    request_result: String,
+    initial_timestamp: DateTime<Utc>,
+    final_timestamp: DateTime<Utc>,
+}
+
+impl From<RequestRecord> for PerformanceRequestRecord {
+    fn from(r: RequestRecord) -> Self {
+        let request_type = match &r.req {
+            Msql::BeginTx(_) => "BeginTx".to_owned(),
+            Msql::Query(query) => {
+                if r.initial_txvn.is_some() {
+                    if !query.has_early_release() {
+                        query.tableops().access_pattern().as_ref().to_owned()
+                    } else {
+                        format!("{}EarlyRelease", query.tableops().access_pattern().as_ref())
+                    }
+                } else {
+                    format!("Single{}", query.tableops().access_pattern().as_ref())
+                }
+            }
+            Msql::EndTx(endtx) => endtx.mode().as_ref().to_owned(),
+        };
+
+        let request_result = if r.res.is_ok() { "Ok" } else { "Err" };
+
+        Self {
+            client_addr: None,
+            request_type,
+            request_result: request_result.into(),
+            initial_timestamp: r.req_timestamp,
+            final_timestamp: r.res_timestamp,
+        }
+    }
+}
+
+impl PerformanceRequestRecord {
+    pub fn set_client_addr(mut self, client_addr: Option<SocketAddr>) -> Self {
+        self.client_addr = client_addr;
+        self
     }
 }

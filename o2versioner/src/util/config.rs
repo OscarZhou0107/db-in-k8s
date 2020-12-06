@@ -31,6 +31,10 @@ pub struct SchedulerConfig {
     pub sequencer_pool_size: u32,
     pub dispatcher_queue_size: usize,
     pub transceiver_queue_size: usize,
+    #[serde(default)]
+    pub performance_logging: Option<String>,
+    #[serde(default)]
+    pub disable_early_release: bool,
 }
 
 impl SchedulerConfig {
@@ -86,7 +90,9 @@ mod tests_config {
                     max_connection: Some(50),
                     sequencer_pool_size: 20,
                     dispatcher_queue_size: 500,
-                    transceiver_queue_size: 500
+                    transceiver_queue_size: 500,
+                    performance_logging: None,
+                    disable_early_release: false
                 },
                 sequencer: SequencerConfig {
                     addr: String::from("127.0.0.1:9876"),
