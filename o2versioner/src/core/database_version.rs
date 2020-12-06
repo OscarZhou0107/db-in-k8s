@@ -67,14 +67,13 @@ impl DbVN {
     ///
     /// let dbvn = DbVN::default();
     ///
-    /// let txvn = TxVN {
-    ///     tx: None,
-    ///     txtablevns: vec![
+    /// let txvn = TxVN::new().set_txtablevns(
+    ///     vec![
     ///         TxTableVN::new("t0", 0, RWOperation::W),
     ///         TxTableVN::new("t1", 0, RWOperation::W),
     ///         TxTableVN::new("t2", 6, RWOperation::R),
-    ///     ],
-    /// };
+    ///     ]
+    /// );
     ///
     /// let can_execute_list = txvn
     ///     .get_from_tableops(&TableOps::from_iter(vec![
@@ -115,14 +114,13 @@ impl DbVN {
     /// ```
     /// use o2versioner::core::*;
     /// let mut dbvn = DbVN::default();
-    /// let txvn = TxVN {
-    ///     tx: None,
-    ///     txtablevns: vec![
+    /// let txvn = TxVN::new().set_txtablevns(
+    ///     vec![
     ///         TxTableVN::new("t0", 5, RWOperation::W),
     ///         TxTableVN::new("t1", 6, RWOperation::W),
     ///         TxTableVN::new("t2", 6, RWOperation::R),
-    ///     ],
-    /// };
+    ///     ]
+    /// );
     /// dbvn.release_version(txvn.into_dbvn_release_request());
     /// ```
     pub fn release_version(&mut self, release_request: DbVNReleaseRequest) {
@@ -241,34 +239,22 @@ mod tests_dbvn {
         let tableops2 = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::W)]);
         let tableops3 = TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R)]);
 
-        let txvn0 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 5, RWOperation::W),
-                TxTableVN::new("t1", 5, RWOperation::R),
-            ],
-        };
-        let txvn1 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 6, RWOperation::W),
-                TxTableVN::new("t1", 7, RWOperation::W),
-            ],
-        };
-        let txvn2 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 5, RWOperation::W),
-                TxTableVN::new("t1", 6, RWOperation::W),
-            ],
-        };
-        let txvn3 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 3, RWOperation::R),
-                TxTableVN::new("t1", 2, RWOperation::R),
-            ],
-        };
+        let txvn0 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 5, RWOperation::W),
+            TxTableVN::new("t1", 5, RWOperation::R),
+        ]);
+        let txvn1 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 6, RWOperation::W),
+            TxTableVN::new("t1", 7, RWOperation::W),
+        ]);
+        let txvn2 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 5, RWOperation::W),
+            TxTableVN::new("t1", 6, RWOperation::W),
+        ]);
+        let txvn3 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 3, RWOperation::R),
+            TxTableVN::new("t1", 2, RWOperation::R),
+        ]);
 
         let dbvn = DbVN::default();
         assert!(!dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops0).unwrap()));
@@ -304,22 +290,16 @@ mod tests_dbvn {
                 .collect(),
         );
 
-        let txvn0 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 5, RWOperation::W),
-                TxTableVN::new("t1", 6, RWOperation::W),
-                TxTableVN::new("t2", 6, RWOperation::R),
-            ],
-        };
+        let txvn0 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 5, RWOperation::W),
+            TxTableVN::new("t1", 6, RWOperation::W),
+            TxTableVN::new("t2", 6, RWOperation::R),
+        ]);
 
-        let txvn1 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 6, RWOperation::W),
-                TxTableVN::new("t1", 7, RWOperation::R),
-            ],
-        };
+        let txvn1 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 6, RWOperation::W),
+            TxTableVN::new("t1", 7, RWOperation::R),
+        ]);
 
         let tableops = TableOps::from_iter(vec![
             TableOp::new("t0", RWOperation::R),

@@ -35,10 +35,8 @@ async fn test_sequencer() {
                 ))
                 .set_name(Some("tx1")),
             ),
-            Message::ReplyTxVN(Some(TxVN {
-                tx: Some(String::from("tx2")),
-                // A single vec storing all W and R `TxTableVN` for now
-                txtablevns: vec![
+            Message::ReplyTxVN(Some(TxVN::new().set_tx(Some(String::from("tx2"))).set_txtablevns(
+                vec![
                     TxTableVN {
                         table: String::from("table0"),
                         vn: 0,
@@ -50,7 +48,7 @@ async fn test_sequencer() {
                         op: RWOperation::R,
                     },
                 ],
-            })),
+            ))),
             Message::Invalid,
         ];
 
@@ -74,10 +72,8 @@ async fn test_sequencer() {
                 ))
                 .set_name(Some("tx1")),
             ),
-            Message::ReplyTxVN(Some(TxVN {
-                tx: Some(String::from("tx2")),
-                // A single vec storing all W and R `TxTableVN` for now
-                txtablevns: vec![
+            Message::ReplyTxVN(Some(TxVN::new().set_tx(Some(String::from("tx2"))).set_txtablevns(
+                vec![
                     TxTableVN {
                         table: String::from("table0"),
                         vn: 0,
@@ -89,7 +85,7 @@ async fn test_sequencer() {
                         op: RWOperation::R,
                     },
                 ],
-            })),
+            ))),
             Message::Invalid,
         ];
 

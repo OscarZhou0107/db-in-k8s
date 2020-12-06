@@ -57,21 +57,21 @@ impl State {
         if self.is_vn_record_blocked() {
             None
         } else {
-            Some(TxVN {
-                tx,
-                txtablevns: tableops
-                    .into_iter()
-                    .map(|tableop| TxTableVN {
-                        table: tableop.table().to_string(),
-                        vn: self
-                            .vn_record
-                            .entry(tableop.table().to_string())
-                            .or_default()
-                            .assign(&tableop.op()),
-                        op: tableop.op(),
-                    })
-                    .collect(),
-            })
+            Some(
+                TxVN::new()
+                    .set_tx(tx)
+                    .set_txtablevns(tableops.into_iter().map(|tableop| {
+                        TxTableVN {
+                            table: tableop.table().to_string(),
+                            vn: self
+                                .vn_record
+                                .entry(tableop.table().to_string())
+                                .or_default()
+                                .assign(&tableop.op()),
+                            op: tableop.op(),
+                        }
+                    })),
+            )
         }
     }
 
@@ -235,112 +235,112 @@ mod tests_state {
         // next_for_read     0     0     0
         // next_for_write    0     0     0
         assert_eq!(
-            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("a", RWOperation::W),
-                TableOp::new("b", RWOperation::W),
-                TableOp::new("c", RWOperation::R)
-            ]))),
-            Some(TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN {
-                        table: String::from("a"),
-                        vn: 0,
-                        op: RWOperation::W,
-                    },
-                    TxTableVN {
-                        table: String::from("b"),
-                        vn: 0,
-                        op: RWOperation::W,
-                    },
-                    TxTableVN {
-                        table: String::from("c"),
-                        vn: 0,
-                        op: RWOperation::R,
-                    }
-                ]
-            })
+            state
+                .assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                    TableOp::new("a", RWOperation::W),
+                    TableOp::new("b", RWOperation::W),
+                    TableOp::new("c", RWOperation::R)
+                ])))
+                .map(|txvn| txvn.erase_uuid()),
+            Some(TxVN::new().set_txtablevns(vec![
+                TxTableVN {
+                    table: String::from("a"),
+                    vn: 0,
+                    op: RWOperation::W,
+                },
+                TxTableVN {
+                    table: String::from("b"),
+                    vn: 0,
+                    op: RWOperation::W,
+                },
+                TxTableVN {
+                    table: String::from("c"),
+                    vn: 0,
+                    op: RWOperation::R,
+                }
+            ]))
+            .map(|txvn| txvn.erase_uuid()),
         );
 
         //                   a     b     c
         // next_for_read     1     1     0
         // next_for_write    1     1     1
         assert_eq!(
-            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("b", RWOperation::W),
-                TableOp::new("c", RWOperation::R)
-            ]))),
-            Some(TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN {
-                        table: String::from("b"),
-                        vn: 1,
-                        op: RWOperation::W,
-                    },
-                    TxTableVN {
-                        table: String::from("c"),
-                        vn: 0,
-                        op: RWOperation::R,
-                    }
-                ]
-            })
+            state
+                .assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                    TableOp::new("b", RWOperation::W),
+                    TableOp::new("c", RWOperation::R)
+                ])))
+                .map(|txvn| txvn.erase_uuid()),
+            Some(TxVN::new().set_txtablevns(vec![
+                TxTableVN {
+                    table: String::from("b"),
+                    vn: 1,
+                    op: RWOperation::W,
+                },
+                TxTableVN {
+                    table: String::from("c"),
+                    vn: 0,
+                    op: RWOperation::R,
+                }
+            ]))
+            .map(|txvn| txvn.erase_uuid())
         );
 
         //                   a     b     c
         // next_for_read     1     2     0
         // next_for_write    1     2     2
         assert_eq!(
-            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("b", RWOperation::R),
-                TableOp::new("c", RWOperation::W)
-            ]))),
-            Some(TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN {
-                        table: String::from("b"),
-                        vn: 2,
-                        op: RWOperation::R,
-                    },
-                    TxTableVN {
-                        table: String::from("c"),
-                        vn: 2,
-                        op: RWOperation::W,
-                    }
-                ]
-            })
+            state
+                .assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                    TableOp::new("b", RWOperation::R),
+                    TableOp::new("c", RWOperation::W)
+                ])))
+                .map(|txvn| txvn.erase_uuid()),
+            Some(TxVN::new().set_txtablevns(vec![
+                TxTableVN {
+                    table: String::from("b"),
+                    vn: 2,
+                    op: RWOperation::R,
+                },
+                TxTableVN {
+                    table: String::from("c"),
+                    vn: 2,
+                    op: RWOperation::W,
+                }
+            ]))
+            .map(|txvn| txvn.erase_uuid()),
         );
 
         //                   a     b     c
         // next_for_read     1     2     3
         // next_for_write    1     3     3
         assert_eq!(
-            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("a", RWOperation::R),
-                TableOp::new("b", RWOperation::R),
-                TableOp::new("c", RWOperation::W)
-            ],))),
-            Some(TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN {
-                        table: String::from("a"),
-                        vn: 1,
-                        op: RWOperation::R,
-                    },
-                    TxTableVN {
-                        table: String::from("b"),
-                        vn: 2,
-                        op: RWOperation::R,
-                    },
-                    TxTableVN {
-                        table: String::from("c"),
-                        vn: 3,
-                        op: RWOperation::W,
-                    }
-                ]
-            })
+            state
+                .assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                    TableOp::new("a", RWOperation::R),
+                    TableOp::new("b", RWOperation::R),
+                    TableOp::new("c", RWOperation::W)
+                ])))
+                .map(|txvn| txvn.erase_uuid()),
+            Some(TxVN::new().set_txtablevns(vec![
+                TxTableVN {
+                    table: String::from("a"),
+                    vn: 1,
+                    op: RWOperation::R,
+                },
+                TxTableVN {
+                    table: String::from("b"),
+                    vn: 2,
+                    op: RWOperation::R,
+                },
+                TxTableVN {
+                    table: String::from("c"),
+                    vn: 3,
+                    op: RWOperation::W,
+                }
+            ]))
+            .map(|txvn| txvn.erase_uuid())
         );
 
         //                   a     b     c
@@ -356,31 +356,31 @@ mod tests_state {
         // next_for_read     0     0     0
         // next_for_write    0     0     0
         assert_eq!(
-            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("a", RWOperation::W),
-                TableOp::new("b", RWOperation::W),
-                TableOp::new("c", RWOperation::R)
-            ]))),
-            Some(TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN {
-                        table: String::from("a"),
-                        vn: 0,
-                        op: RWOperation::W,
-                    },
-                    TxTableVN {
-                        table: String::from("b"),
-                        vn: 0,
-                        op: RWOperation::W,
-                    },
-                    TxTableVN {
-                        table: String::from("c"),
-                        vn: 0,
-                        op: RWOperation::R,
-                    }
-                ]
-            })
+            state
+                .assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                    TableOp::new("a", RWOperation::W),
+                    TableOp::new("b", RWOperation::W),
+                    TableOp::new("c", RWOperation::R)
+                ])))
+                .map(|txvn| txvn.erase_uuid()),
+            Some(TxVN::new().set_txtablevns(vec![
+                TxTableVN {
+                    table: String::from("a"),
+                    vn: 0,
+                    op: RWOperation::W,
+                },
+                TxTableVN {
+                    table: String::from("b"),
+                    vn: 0,
+                    op: RWOperation::W,
+                },
+                TxTableVN {
+                    table: String::from("c"),
+                    vn: 0,
+                    op: RWOperation::R,
+                }
+            ]))
+            .map(|txvn| txvn.erase_uuid())
         );
 
         let prev = state.set_vn_record_blocked(true);
@@ -396,25 +396,25 @@ mod tests_state {
         let prev = state.set_vn_record_blocked(false);
         assert_eq!(prev, true);
         assert_eq!(
-            state.assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
-                TableOp::new("b", RWOperation::W),
-                TableOp::new("c", RWOperation::R)
-            ]))),
-            Some(TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN {
-                        table: String::from("b"),
-                        vn: 1,
-                        op: RWOperation::W,
-                    },
-                    TxTableVN {
-                        table: String::from("c"),
-                        vn: 0,
-                        op: RWOperation::R,
-                    }
-                ]
-            })
+            state
+                .assign_vn(MsqlBeginTx::from(TableOps::from_iter(vec![
+                    TableOp::new("b", RWOperation::W),
+                    TableOp::new("c", RWOperation::R)
+                ])))
+                .map(|txvn| txvn.erase_uuid()),
+            Some(TxVN::new().set_txtablevns(vec![
+                TxTableVN {
+                    table: String::from("b"),
+                    vn: 1,
+                    op: RWOperation::W,
+                },
+                TxTableVN {
+                    table: String::from("c"),
+                    vn: 0,
+                    op: RWOperation::R,
+                }
+            ]))
+            .map(|txvn| txvn.erase_uuid())
         );
     }
 }

@@ -1,7 +1,7 @@
 use super::core::{PendingQueue, QueueMessage};
 use crate::comm::scheduler_dbproxy::Message;
 use futures::prelude::*;
-use std::{sync::Arc, thread::JoinHandle};
+use std::sync::Arc;
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
@@ -141,7 +141,7 @@ mod tests_receiver {
             let (tcp_stream, _) = listener.accept().await.unwrap();
             let (tcp_read, _) = tcp_stream.into_split();
 
-            Receiver::run(pending_queue, tcp_read);
+            Receiver::run(pending_queue, tcp_read).await;
         });
     }
 

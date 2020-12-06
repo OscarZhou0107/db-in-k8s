@@ -21,7 +21,6 @@ impl Dispatcher {
         transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
-
             println!("Dispathcer Started");
 
             let mut task_notify = pending_queue.lock().await.get_notify();
@@ -43,7 +42,7 @@ impl Dispatcher {
                     .get_all_version_ready_task(&mut version)
                     .await;
 
-                println!("Operation batch size is {}",operations.len());
+                println!("Operation batch size is {}", operations.len());
 
                 {
                     let mut lock = transactions.lock().await;
@@ -107,7 +106,7 @@ impl Dispatcher {
     ) {
         tokio::spawn(async move {
             {
-                let mut finish = false;
+                let finish = false;
                 let conn = pool.get().await.unwrap();
                 while let Some(operation) = rec.recv().await {
                     let raw;
@@ -200,7 +199,7 @@ mod tests_dispatcher {
             operation_type: Task::ABORT,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
-            early_release : None,
+            early_release: None,
         });
         mock_ops.push(QueueMessage {
             identifier: RequestMeta {
@@ -211,7 +210,7 @@ mod tests_dispatcher {
             operation_type: Task::READ,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
-            early_release : None,
+            early_release: None,
         });
         mock_ops.push(QueueMessage {
             identifier: RequestMeta {
@@ -222,7 +221,7 @@ mod tests_dispatcher {
             operation_type: Task::READ,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
-            early_release : None,
+            early_release: None,
         });
         mock_ops.push(QueueMessage {
             identifier: RequestMeta {
@@ -233,7 +232,7 @@ mod tests_dispatcher {
             operation_type: Task::BEGIN,
             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
             versions: None,
-            early_release : None,
+            early_release: None,
         });
 
         helper_spawn_dispatcher(pending_queue, responder_sender, version, transactions);

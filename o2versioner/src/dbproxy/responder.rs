@@ -32,10 +32,7 @@ impl Responder {
                     }
                     _ => match result.flush_early_release() {
                         Ok(request) => {
-                            version
-                                .lock()
-                                .await
-                                .release_on_request(request);
+                            version.lock().await.release_on_request(request);
                         }
                         Err(_) => {}
                     },
@@ -58,6 +55,7 @@ impl Responder {
 mod tests_test {
     use super::Responder;
     use crate::comm::MsqlResponse;
+    use crate::core::*;
     use crate::dbproxy::core::{DbVersion, QueryResult, QueryResultType};
     use crate::{comm::scheduler_dbproxy::Message, core::RequestMeta};
     use futures::prelude::*;
@@ -92,7 +90,7 @@ mod tests_test {
             result: "r".to_string(),
             succeed: true,
             result_type: QueryResultType::BEGIN,
-            contained_newer_versions: Default::default(),
+            contained_newer_versions: TxVN::new(),
             contained_early_release_version: None,
         };
 

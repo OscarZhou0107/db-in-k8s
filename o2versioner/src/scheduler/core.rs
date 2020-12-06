@@ -201,9 +201,16 @@ mod tests_connection_state {
             Arc::new(RwLock::new(ClientRecord::new(client_addr))),
         );
         assert_eq!(*conn_state.current_txvn(), None);
-        assert_eq!(conn_state.replace_txvn(Some(TxVN::default())), None);
-        assert_eq!(*conn_state.current_txvn(), Some(TxVN::default()));
-        assert_eq!(conn_state.replace_txvn(None), Some(TxVN::default()));
+
+        assert_eq!(conn_state.replace_txvn(Some(TxVN::new().erase_uuid())), None);
+        assert_eq!(
+            *conn_state.current_txvn(),
+            Some(TxVN::new()).map(|txvn| txvn.erase_uuid())
+        );
+        assert_eq!(
+            conn_state.replace_txvn(None),
+            Some(TxVN::new()).map(|txvn| txvn.erase_uuid())
+        );
         assert_eq!(*conn_state.current_txvn(), None);
     }
 }
@@ -240,13 +247,10 @@ mod tests_dbvnmanager {
                     TableOp::new("t0", RWOperation::R),
                     TableOp::new("t1", RWOperation::R)
                 ]),
-                &TxVN {
-                    tx: None,
-                    txtablevns: vec![
-                        TxTableVN::new("t0", 0, RWOperation::R),
-                        TxTableVN::new("t1", 0, RWOperation::R),
-                    ],
-                }
+                &TxVN::new().set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 0, RWOperation::R),
+                ])
             ),
             vec![
                 (
@@ -266,13 +270,10 @@ mod tests_dbvnmanager {
                     TableOp::new("t0", RWOperation::R),
                     TableOp::new("t1", RWOperation::R)
                 ]),
-                &TxVN {
-                    tx: None,
-                    txtablevns: vec![
-                        TxTableVN::new("t0", 0, RWOperation::R),
-                        TxTableVN::new("t1", 1, RWOperation::R),
-                    ],
-                }
+                &TxVN::new().set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 1, RWOperation::R),
+                ])
             ),
             vec![]
         );
@@ -280,13 +281,10 @@ mod tests_dbvnmanager {
         assert_eq!(
             dbvnmanager.get_all_that_can_execute_read_query(
                 &TableOps::from_iter(vec![TableOp::new("t0", RWOperation::R)]),
-                &TxVN {
-                    tx: None,
-                    txtablevns: vec![
-                        TxTableVN::new("t0", 0, RWOperation::R),
-                        TxTableVN::new("t1", 1, RWOperation::R),
-                    ],
-                }
+                &TxVN::new().set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 1, RWOperation::R),
+                ])
             ),
             vec![
                 ("127.0.0.1:10000".parse().unwrap(), vec![DbTableVN::new("t0", 0)]),
@@ -297,13 +295,10 @@ mod tests_dbvnmanager {
         assert_eq!(
             dbvnmanager.get_all_that_can_execute_read_query(
                 &TableOps::from_iter(vec![TableOp::new("t1", RWOperation::R)]),
-                &TxVN {
-                    tx: None,
-                    txtablevns: vec![
-                        TxTableVN::new("t0", 0, RWOperation::R),
-                        TxTableVN::new("t1", 1, RWOperation::R),
-                    ],
-                }
+                &TxVN::new().set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 1, RWOperation::R),
+                ])
             ),
             vec![]
         );
@@ -319,13 +314,10 @@ mod tests_dbvnmanager {
 
         dbvnmanager.get_all_that_can_execute_read_query(
             &TableOps::from_iter(vec![TableOp::new("t0", RWOperation::W)]),
-            &TxVN {
-                tx: None,
-                txtablevns: vec![
-                    TxTableVN::new("t0", 0, RWOperation::W),
-                    TxTableVN::new("t1", 0, RWOperation::W),
-                ],
-            },
+            &TxVN::new().set_txtablevns(vec![
+                TxTableVN::new("t0", 0, RWOperation::W),
+                TxTableVN::new("t1", 0, RWOperation::W),
+            ]),
         );
     }
 
@@ -336,13 +328,10 @@ mod tests_dbvnmanager {
             "127.0.0.1:10001".parse().unwrap(),
         ]);
 
-        let txvn0 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 0, RWOperation::R),
-            ],
-        };
+        let txvn0 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 0, RWOperation::R),
+        ]);
         assert_eq!(
             dbvnmanager.get_all_that_can_execute_read_query(
                 &TableOps::from_iter(vec![
@@ -363,13 +352,10 @@ mod tests_dbvnmanager {
             ]
         );
 
-        let txvn1 = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 1, RWOperation::R),
-            ],
-        };
+        let txvn1 = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 1, RWOperation::R),
+        ]);
         assert_eq!(
             dbvnmanager.get_all_that_can_execute_read_query(
                 &TableOps::from_iter(vec![

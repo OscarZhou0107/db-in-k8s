@@ -1,5 +1,6 @@
 use crate::core::operation::*;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// Version number
 pub type VN = u64;
@@ -39,18 +40,34 @@ pub struct TxVN {
     pub tx: Option<String>,
     /// A single vec storing all W and R `TxTableVN` for now
     pub txtablevns: Vec<TxTableVN>,
-}
-
-impl Default for TxVN {
-    fn default() -> Self {
-        Self {
-            tx: None,
-            txtablevns: Vec::new(),
-        }
-    }
+    pub uuid: Uuid,
 }
 
 impl TxVN {
+    pub fn new() -> Self {
+        Self {
+            tx: None,
+            txtablevns: Vec::new(),
+            uuid: Uuid::new_v4(),
+        }
+    }
+
+    /// Set `uuid` to nil, for testing
+    pub fn erase_uuid(mut self) -> Self {
+        self.uuid = Uuid::nil();
+        self
+    }
+
+    pub fn set_tx<S: Into<String>>(mut self, tx: Option<S>) -> Self {
+        self.tx = tx.map(|tx| tx.into());
+        self
+    }
+
+    pub fn set_txtablevns<I: IntoIterator<Item = TxTableVN>>(mut self, txtablevns: I) -> Self {
+        self.txtablevns = txtablevns.into_iter().collect();
+        self
+    }
+
     /// Find the `TxTableVN` that matches with the argument `TableOp` from the `TxVN`
     ///
     /// If `TableOp` is of `RWOperation::R`, then only need to match the name with `TxTableVN`;
@@ -147,13 +164,10 @@ mod tests_txvn {
 
     #[test]
     fn test_get_from_tableop() {
-        let txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 2, RWOperation::W),
-            ],
-        };
+        let txvn = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 2, RWOperation::W),
+        ]);
 
         assert_eq!(
             txvn.get_from_tableop(&TableOp::new("t0", RWOperation::R)),
@@ -172,13 +186,10 @@ mod tests_txvn {
 
     #[test]
     fn test_get_from_tableops() {
-        let txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 2, RWOperation::W),
-            ],
-        };
+        let txvn = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 2, RWOperation::W),
+        ]);
 
         assert_eq!(
             txvn.get_from_tableops(&TableOps::from_iter(vec![
@@ -262,13 +273,10 @@ mod tests_txvn {
 
     #[test]
     fn test_get_from_ertables() {
-        let txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 2, RWOperation::W),
-            ],
-        };
+        let txvn = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 2, RWOperation::W),
+        ]);
 
         assert_eq!(
             txvn.get_from_ertables(&EarlyReleaseTables::from_iter(vec!["t0", "t1"])),
@@ -307,13 +315,10 @@ mod tests_txvn {
 
     #[test]
     fn test_into_dbvn_release_request() {
-        let txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 2, RWOperation::W),
-            ],
-        };
+        let txvn = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 2, RWOperation::W),
+        ]);
 
         assert_eq!(
             txvn.into_dbvn_release_request(),
@@ -323,14 +328,11 @@ mod tests_txvn {
 
     #[test]
     fn test_early_release_request() {
-        let mut txvn = TxVN {
-            tx: None,
-            txtablevns: vec![
-                TxTableVN::new("t0", 0, RWOperation::R),
-                TxTableVN::new("t1", 2, RWOperation::W),
-                TxTableVN::new("t2", 5, RWOperation::R),
-            ],
-        };
+        let mut txvn = TxVN::new().set_txtablevns(vec![
+            TxTableVN::new("t0", 0, RWOperation::R),
+            TxTableVN::new("t1", 2, RWOperation::W),
+            TxTableVN::new("t2", 5, RWOperation::R),
+        ]);
 
         assert!(txvn.early_release_request(EarlyReleaseTables::from("t0 t3")).is_err());
 

@@ -95,7 +95,7 @@ impl QueueMessage {
         }
 
         let result_type;
-        let mut contained_newer_versions: TxVN = Default::default();
+        let mut contained_newer_versions: TxVN = TxVN::new();
 
         match self.operation_type {
             Task::BEGIN => {
@@ -564,7 +564,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            Some(TxVN::default()),
+            Some(TxVN::new()),
         );
 
         let message2 = QueueMessage::new(
@@ -581,7 +581,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            Some(TxVN::default()),
+            Some(TxVN::new()),
         );
 
         let message1 = QueueMessage::new(

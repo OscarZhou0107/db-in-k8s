@@ -28,3 +28,4 @@ tracing = "0.1"
 tracing-futures = "0.2"
 tracing-subscriber = "0.2"
 unicase = "2.6"
+uuid = {version = "0.8", features = ["serde", "v4"]}
