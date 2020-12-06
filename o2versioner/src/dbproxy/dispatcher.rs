@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::NoTls;
+use uuid::Uuid;
 
 pub struct Dispatcher {}
 
@@ -18,7 +19,7 @@ impl Dispatcher {
         sender: mpsc::Sender<QueryResult>,
         config: tokio_postgres::Config,
         mut version: Arc<Mutex<DbVersion>>,
-        transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
+        transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
             println!("Dispathcer Started");
@@ -54,9 +55,9 @@ impl Dispatcher {
 
                         match op_cloned.operation_type {
                             Task::BEGIN | Task::READ | Task::WRITE => {
-                                if !lock.contains_key(&op_cloned.identifier.client_addr) {
+                                if !lock.contains_key(op_cloned.versions.clone().unwrap().uuid()) {
                                     let (ts, tr) = mpsc::channel(100);
-                                    lock.insert(op_cloned.identifier.client_addr.clone(), ts);
+                                    lock.insert(op_cloned.versions.clone().unwrap().uuid().clone(), ts);
                                     Self::spawn_transaction(pool_cloned, tr, sender_cloned);
                                 };
                             }
@@ -64,17 +65,17 @@ impl Dispatcher {
                         };
                     });
                 }
-                let senders: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> =
+                let senders: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>> =
                     Arc::new(Mutex::new(HashMap::new()));
                 {
                     let lock = transactions.lock().await;
                     let mut lock_2 = senders.lock().await;
 
                     operations.iter().for_each(|op| {
-                        if !lock_2.contains_key(&op.identifier.client_addr) {
+                        if !lock_2.contains_key(op.versions.clone().unwrap().uuid()) {
                             lock_2.insert(
-                                op.identifier.client_addr.clone(),
-                                lock.get(&op.identifier.client_addr).unwrap().clone(),
+                                op.versions.clone().unwrap().uuid().clone(),
+                                lock.get(op.versions.clone().unwrap().uuid()).unwrap().clone(),
                             );
                         }
                     });
@@ -86,7 +87,7 @@ impl Dispatcher {
                         .for_each(|op| async {
                             println!("Sending a new operation");
                             let op = op;
-                            lock.get(&op.clone().identifier.client_addr)
+                            lock.get(op.versions.clone().unwrap().uuid())
                                 .unwrap()
                                 .send(op.clone())
                                 .await
@@ -108,12 +109,10 @@ impl Dispatcher {
             {
                 let finish = false;
                 let conn = pool.get().await.unwrap();
+                conn.simple_query("START TRANSACTION;").await;
                 while let Some(operation) = rec.recv().await {
                     let raw;
                     match operation.operation_type {
-                        Task::BEGIN => {
-                            raw = conn.simple_query("START TRANSACTION;").await;
-                        }
                         Task::READ => {
                             raw = conn.simple_query(&operation.query).await;
                         }
@@ -127,6 +126,9 @@ impl Dispatcher {
                         Task::ABORT => {
                             raw = conn.simple_query("ROLLBACK;").await;
                             //finish = true;
+                        }
+                        _ => {
+                            panic!("Unexpected operation type");
                         }
                     }
 
@@ -150,126 +152,127 @@ impl Dispatcher {
     }
 }
 
-#[cfg(test)]
-mod tests_dispatcher {
-    use super::Dispatcher;
-    use crate::core::RWOperation;
-    use crate::core::*;
-    use crate::dbproxy::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
-    use std::{collections::HashMap, net::IpAddr, net::Ipv4Addr, net::SocketAddr, sync::Arc};
-    use tokio::sync::mpsc;
-    use tokio::sync::Mutex;
+// #[cfg(test)]
+// #[ignore]
+// mod tests_dispatcher {
+//     use super::Dispatcher;
+//     use crate::core::RWOperation;
+//     use crate::core::*;
+//     use crate::dbproxy::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
+//     use std::{collections::HashMap, net::IpAddr, net::Ipv4Addr, net::SocketAddr, sync::Arc};
+//     use tokio::sync::mpsc;
+//     use tokio::sync::Mutex;
 
-    #[tokio::test]
-    #[ignore]
-    async fn test_receive_response_from_new_transactions() {
-        //Prepare - Network
-        let transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let transactions_2 = Arc::clone(&transactions);
+//     #[tokio::test]
+//     #[ignore]
+//     async fn test_receive_response_from_new_transactions() {
+//         //Prepare - Network
+//         let transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>> =
+//             Arc::new(Mutex::new(HashMap::new()));
+//         let transactions_2 = Arc::clone(&transactions);
 
-        //Global version//
-        let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
+//         //Global version//
+//         let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
 
-        //PendingQueue
-        let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-        let pending_queue_2 = Arc::clone(&pending_queue);
-        //Responder sender and receiver
-        let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
-            mpsc::channel(100);
-        let mut mock_vs = Vec::new();
-        mock_vs.push(TxTableVN {
-            table: "table2".to_string(),
-            vn: 0,
-            op: RWOperation::R,
-        });
-        mock_vs.push(TxTableVN {
-            table: "table1".to_string(),
-            vn: 0,
-            op: RWOperation::R,
-        });
+//         //PendingQueue
+//         let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
+//         let pending_queue_2 = Arc::clone(&pending_queue);
+//         //Responder sender and receiver
+//         let (responder_sender, mut responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
+//             mpsc::channel(100);
+//         let mut mock_vs = Vec::new();
+//         mock_vs.push(TxTableVN {
+//             table: "table2".to_string(),
+//             vn: 0,
+//             op: RWOperation::R,
+//         });
+//         mock_vs.push(TxTableVN {
+//             table: "table1".to_string(),
+//             vn: 0,
+//             op: RWOperation::R,
+//         });
 
-        let mut mock_ops = Vec::new();
-        mock_ops.push(QueueMessage {
-            identifier: RequestMeta {
-                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid: 0,
-                request_id: 0,
-            },
-            operation_type: Task::ABORT,
-            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
-            versions: None,
-            early_release: None,
-        });
-        mock_ops.push(QueueMessage {
-            identifier: RequestMeta {
-                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid: 0,
-                request_id: 0,
-            },
-            operation_type: Task::READ,
-            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
-            versions: None,
-            early_release: None,
-        });
-        mock_ops.push(QueueMessage {
-            identifier: RequestMeta {
-                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid: 0,
-                request_id: 0,
-            },
-            operation_type: Task::READ,
-            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
-            versions: None,
-            early_release: None,
-        });
-        mock_ops.push(QueueMessage {
-            identifier: RequestMeta {
-                client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                cur_txid: 0,
-                request_id: 0,
-            },
-            operation_type: Task::BEGIN,
-            query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
-            versions: None,
-            early_release: None,
-        });
+//         let mut mock_ops = Vec::new();
+//         mock_ops.push(QueueMessage {
+//             identifier: RequestMeta {
+//                 client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+//                 cur_txid: 0,
+//                 request_id: 0,
+//             },
+//             operation_type: Task::ABORT,
+//             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
+//             versions: None,
+//             early_release: None,
+//         });
+//         mock_ops.push(QueueMessage {
+//             identifier: RequestMeta {
+//                 client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+//                 cur_txid: 0,
+//                 request_id: 0,
+//             },
+//             operation_type: Task::READ,
+//             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
+//             versions: None,
+//             early_release: None,
+//         });
+//         mock_ops.push(QueueMessage {
+//             identifier: RequestMeta {
+//                 client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+//                 cur_txid: 0,
+//                 request_id: 0,
+//             },
+//             operation_type: Task::READ,
+//             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
+//             versions: None,
+//             early_release: None,
+//         });
+//         mock_ops.push(QueueMessage {
+//             identifier: RequestMeta {
+//                 client_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+//                 cur_txid: 0,
+//                 request_id: 0,
+//             },
+//             operation_type: Task::BEGIN,
+//             query: "SELECT name, age, designation, salary FROM public.tbltest;".to_string(),
+//             versions: None,
+//             early_release: None,
+//         });
 
-        helper_spawn_dispatcher(pending_queue, responder_sender, version, transactions);
-        helper_mock_client(pending_queue_2, mock_ops).await;
+//         helper_spawn_dispatcher(pending_queue, responder_sender, version, transactions);
+//         helper_mock_client(pending_queue_2, mock_ops).await;
 
-        let mut task_num: u64 = 0;
-        while let Some(_) = responder_receiver.recv().await {
-            task_num += 1;
-            //println!("{}", q.result);
-            if task_num == 4 {
-                break;
-            }
-        }
+//         let mut task_num: u64 = 0;
+//         while let Some(_) = responder_receiver.recv().await {
+//             task_num += 1;
+//             //println!("{}", q.result);
+//             if task_num == 4 {
+//                 break;
+//             }
+//         }
 
-        //Only one unique transaction
-        assert!(transactions_2.lock().await.len() == 1);
-    }
+//         //Only one unique transaction
+//         assert!(transactions_2.lock().await.len() == 1);
+//     }
 
-    fn helper_spawn_dispatcher(
-        pending_queue: Arc<Mutex<PendingQueue>>,
-        sender: mpsc::Sender<QueryResult>,
-        version: Arc<Mutex<DbVersion>>,
-        transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
-    ) {
-        let mut config = tokio_postgres::Config::new();
-        config.user("postgres");
-        config.password("Abc@123");
-        config.host("localhost");
-        config.port(5432);
-        config.dbname("Test");
+//     fn helper_spawn_dispatcher(
+//         pending_queue: Arc<Mutex<PendingQueue>>,
+//         sender: mpsc::Sender<QueryResult>,
+//         version: Arc<Mutex<DbVersion>>,
+//         transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
+//     ) {
+//         let mut config = tokio_postgres::Config::new();
+//         config.user("postgres");
+//         config.password("Abc@123");
+//         config.host("localhost");
+//         config.port(5432);
+//         config.dbname("Test");
 
-        Dispatcher::run(pending_queue, sender, config, version, transactions)
-    }
+//         Dispatcher::run(pending_queue, sender, config, version, transactions)
+//     }
 
-    async fn helper_mock_client(pending_queue: Arc<Mutex<PendingQueue>>, mut messages: Vec<QueueMessage>) {
-        while !messages.is_empty() {
-            pending_queue.lock().await.push(messages.pop().unwrap());
-        }
-    }
-}
+//     async fn helper_mock_client(pending_queue: Arc<Mutex<PendingQueue>>, mut messages: Vec<QueueMessage>) {
+//         while !messages.is_empty() {
+//             pending_queue.lock().await.push(messages.pop().unwrap());
+//         }
+//     }
+// }
