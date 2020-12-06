@@ -185,7 +185,7 @@ impl DbVersion {
 
     pub fn violate_version(&self, transaction_version: Option<TxVN>) -> bool {
         if let Some(tx_version) = transaction_version {
-            return !self.db_version.can_execute_query(&tx_version.txtablevns);
+            return !self.db_version.can_execute_query(tx_version.txtablevns());
         }
         false
     }

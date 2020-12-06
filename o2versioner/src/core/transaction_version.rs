@@ -37,10 +37,10 @@ impl TxTableVN {
 /// Version numbers of tables declared by a transaction
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TxVN {
-    pub tx: Option<String>,
+    tx: Option<String>,
     /// A single vec storing all W and R `TxTableVN` for now
-    pub txtablevns: Vec<TxTableVN>,
-    pub uuid: Uuid,
+    txtablevns: Vec<TxTableVN>,
+    uuid: Uuid,
 }
 
 impl TxVN {
@@ -66,6 +66,18 @@ impl TxVN {
     pub fn set_txtablevns<I: IntoIterator<Item = TxTableVN>>(mut self, txtablevns: I) -> Self {
         self.txtablevns = txtablevns.into_iter().collect();
         self
+    }
+
+    pub fn tx(&self) -> &Option<String> {
+        &self.tx
+    }
+
+    pub fn txtablevns(&self) -> &[TxTableVN] {
+        &self.txtablevns
+    }
+
+    pub fn uuid(&self) -> &Uuid {
+        &self.uuid
     }
 
     /// Find the `TxTableVN` that matches with the argument `TableOp` from the `TxVN`
