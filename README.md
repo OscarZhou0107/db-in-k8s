@@ -36,6 +36,20 @@ cargo test -- --show-output
 cargo test -- --nocapture
 ```
 
+Using release build
+```sh
+# build
+cargo build --release
+# build and run
+cargo run --release -- --help
+# build and test
+cargo test --release
+# build and test - show stdout output at end
+cargo test --release -- --show-output
+# build and test - show stdout alive
+cargo test --release -- --nocapture
+```
+
 
 #### For available configurations of o2versioner
 Refer to: [config.rs](o2versioner/src/util/config.rs)
