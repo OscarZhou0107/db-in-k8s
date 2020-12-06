@@ -15,12 +15,14 @@ pub struct Responder {}
 impl Responder {
     pub fn run(mut receiver: mpsc::Receiver<QueryResult>, version: Arc<Mutex<DbVersion>>, tcp_write: OwnedWriteHalf) {
         tokio::spawn(async move {
+            println!("Responder started");
             let mut serializer = SymmetricallyFramed::new(
                 FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
                 SymmetricalJson::<Message>::default(),
             );
 
             while let Some(mut result) = receiver.recv().await {
+                println!("Responder got a result to return");
                 match result.result_type {
                     QueryResultType::END => {
                         version
@@ -47,6 +49,7 @@ impl Responder {
                     .await
                     .unwrap();
             }
+            println!("Responder finishes its job");
         });
     }
 }

@@ -88,8 +88,8 @@ impl QueueMessage {
                 result = writer.to_csv(message);
                 succeed = true;
             }
-            Err(_) => {
-                result = "There was an error".to_string();
+            Err(err) => {
+                result = err.to_string();
                 succeed = false;
             }
         }
@@ -185,7 +185,7 @@ impl DbVersion {
 
     pub fn violate_version(&self, transaction_version: Option<TxVN>) -> bool {
         if let Some(tx_version) = transaction_version {
-            return self.db_version.can_execute_query(&tx_version.txtablevns);
+            return !self.db_version.can_execute_query(&tx_version.txtablevns);
         }
         false
     }
@@ -487,25 +487,24 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn postgres_read_test() {
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         rt.block_on(async move {
             let mut config = tokio_postgres::Config::new();
             config.user("postgres");
-            config.password("Rayh8768");
-            config.host("localhost");
+            config.password("Abc@123");
+            config.host("34.70.165.61");
             config.port(5432);
-            config.dbname("Test");
+            config.dbname("tpcw");
 
-            let size: u32 = 50;
+               let size: u32 = 50;
             let manager = PostgresConnectionManager::new(config, NoTls);
             let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
 
             let conn = pool.get().await.unwrap();
             let result = conn
-                .simple_query("SELECT name, age, designation, salary FROM public.tbltest;")
+                .simple_query("SELECT * FROM address LIMIT 10;")
                 .await
                 .unwrap();
 

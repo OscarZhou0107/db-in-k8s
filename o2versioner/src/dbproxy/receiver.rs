@@ -1,7 +1,7 @@
 use super::core::{PendingQueue, QueueMessage};
 use crate::comm::scheduler_dbproxy::Message;
 use futures::prelude::*;
-use std::sync::Arc;
+use std::{sync::Arc, thread::JoinHandle};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
@@ -11,14 +11,17 @@ use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 pub struct Receiver {}
 
 impl Receiver {
-    pub fn run(pending_queue: Arc<Mutex<PendingQueue>>, tcp_read: OwnedReadHalf) {
+    pub async fn run(pending_queue: Arc<Mutex<PendingQueue>>, tcp_read: OwnedReadHalf) {
         let mut deserializer = SymmetricallyFramed::new(
             FramedRead::new(tcp_read, LengthDelimitedCodec::new()),
             SymmetricalJson::<Message>::default(),
         );
 
-        tokio::spawn(async move {
+        let handler = tokio::spawn(async move {
+            println!("Receiver started");
+
             while let Some(msg) = deserializer.try_next().await.unwrap() {
+                println!("Receiver a new request");
                 match msg {
                     Message::MsqlRequest(meta, request, versions) => {
                         pending_queue
@@ -29,7 +32,10 @@ impl Receiver {
                     _ => println!("nope"),
                 }
             }
+            println!("Receiver finished its jobs");
         });
+
+        handler.await;
     }
 }
 
