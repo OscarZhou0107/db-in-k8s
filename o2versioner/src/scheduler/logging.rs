@@ -94,7 +94,7 @@ impl RequestRecord {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClientRecord {
     client_addr: SocketAddr,
     records: Vec<RequestRecord>,
