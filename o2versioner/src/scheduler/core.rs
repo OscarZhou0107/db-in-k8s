@@ -1,6 +1,7 @@
 use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
+use futures::prelude::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -38,8 +39,18 @@ impl State {
             .clone()
     }
 
-    pub fn share_client_records(&self) -> Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>> {
-        self.client_records.clone()
+    // pub fn share_client_records(&self) -> Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>> {
+    //     self.client_records.clone()
+    // }
+
+    pub async fn collect_client_records(&self) -> HashMap<SocketAddr, ClientRecord> {
+        stream::iter(self.client_records.lock().await.iter())
+            .then(|(client_addr, client_record)| async move {
+                let client_record = client_record.read().await;
+                (client_addr.clone(), client_record.clone())
+            })
+            .collect()
+            .await
     }
 }
 

@@ -140,20 +140,19 @@ pub async fn main(conf: Config) {
     if let Some(log_dir) = conf.scheduler.performance_logging {
         info!("Preparing {} for performance logging", log_dir);
         fs::create_dir_all(log_dir.clone()).await.unwrap();
-        let performance_records: Vec<_> = stream::iter(state.share_client_records().lock().await.iter())
-            .then(|(_, client_record)| async move {
-                let client_record = client_record.read().await;
-                client_record.get_performance_records()
-            })
-            .collect()
-            .await;
-        let performance_records: Vec<_> = performance_records.into_iter().flatten().collect();
 
         let mut path = PathBuf::from(log_dir);
-        path.push(format!("{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
+        path.push(format!("perf_{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
         let path = path.as_path();
         let mut wrt = csv::Writer::from_path(path).unwrap();
-        performance_records.iter().for_each(|r| wrt.serialize(r).unwrap());
+
+        state
+            .collect_client_records()
+            .await
+            .into_iter()
+            .map(|(_, reqrecord)| reqrecord.get_performance_records())
+            .flatten()
+            .for_each(|r| wrt.serialize(r).unwrap());
         info!("Dumped performance logging to {:?}", path);
     }
 
