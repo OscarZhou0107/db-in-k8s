@@ -177,6 +177,11 @@ impl MsqlQuery {
         !self.ertables.is_empty()
     }
 
+    /// Drops the `ertables`
+    pub fn drop_early_release(&mut self) {
+        self.ertables = EarlyReleaseTables::default();
+    }
+
     /// Unwrap into (query: String, tableops: TableOps, ertables: EarlyReleaseTables)
     pub fn unwrap(self) -> (String, TableOps, EarlyReleaseTables) {
         (self.query, self.tableops, self.ertables)
@@ -293,7 +298,14 @@ impl Msql {
     }
 
     pub fn try_get_begintx(&self) -> Result<&MsqlBeginTx, ()> {
-        match &self {
+        match self {
+            Self::BeginTx(x) => Ok(x),
+            _ => Err(()),
+        }
+    }
+
+    pub fn try_get_mut_begintx(&mut self) -> Result<&mut MsqlBeginTx, ()> {
+        match self {
             Self::BeginTx(x) => Ok(x),
             _ => Err(()),
         }
@@ -307,7 +319,14 @@ impl Msql {
     }
 
     pub fn try_get_query(&self) -> Result<&MsqlQuery, ()> {
-        match &self {
+        match self {
+            Self::Query(x) => Ok(x),
+            _ => Err(()),
+        }
+    }
+
+    pub fn try_get_mut_query(&mut self) -> Result<&mut MsqlQuery, ()> {
+        match self {
             Self::Query(x) => Ok(x),
             _ => Err(()),
         }
@@ -321,7 +340,14 @@ impl Msql {
     }
 
     pub fn try_get_endtx(&self) -> Result<&MsqlEndTx, ()> {
-        match &self {
+        match self {
+            Self::EndTx(x) => Ok(x),
+            _ => Err(()),
+        }
+    }
+
+    pub fn try_get_mut_endtx(&mut self) -> Result<&mut MsqlEndTx, ()> {
+        match self {
             Self::EndTx(x) => Ok(x),
             _ => Err(()),
         }
@@ -412,7 +438,7 @@ impl TryFrom<MsqlText> for Msql {
 ///     }
 /// );
 /// ```
-/// 
+///
 /// `MsqlText::BeginTx`
 /// ```
 /// use o2versioner::core::{MsqlEndTxMode, MsqlText};
