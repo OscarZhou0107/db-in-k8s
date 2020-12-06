@@ -216,6 +216,7 @@ class Client:
         response = self.getBook(i_id)
         # DispOnly
         if self.isErr(response):
+            self.logger.error("Response to getBook has error")
             return False
         
         # adminUpdate (sequence)
@@ -228,6 +229,7 @@ class Client:
         response = self.send_query_and_receive_response(query, "adminUpdate")
         # UpdateOnly
         if self.isErr(response):
+            self.logger.error("Response to adminUpdate has error")
             return False
 
         #   b. adminUpdateRelated
@@ -235,9 +237,11 @@ class Client:
         response = self.send_query_and_receive_response(query, "adminUpdateRelated")
         # ReadResponse - SELECT ol_i_id FROM orders, order_line
         if self.isErr(response):
+            self.logger.error("Response to adminUpdateRelated has error")
             return False
         # add exactly 5 items into related
         if self.isEmpty(response):
+            self.logger.warning("Response to adminUpdateRelated is empty")
             return True # bypass the rest
 
         num = len(response)
@@ -257,6 +261,7 @@ class Client:
         response = self.send_query_and_receive_response(query, "adminUpdateRelated1")
         # UpdateOnly
         if self.isErr(response):
+            self.logger.error("Response to adminUpdateRelated1 has error")
             return False
 
         return True
@@ -266,6 +271,7 @@ class Client:
         response = self.getBook(-1)
         # DispOnly
         if self.isErr(response):
+            self.logger.error("Response to getBook has error")
             return False
         return True
 
@@ -273,6 +279,7 @@ class Client:
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
+            self.logger.error("Response to getRelated has error")
             return False
         
         # getBestSellers
@@ -281,6 +288,7 @@ class Client:
         response = self.send_query_and_receive_response(query, "getBestSellers")
         # DispOnly
         if self.isErr(response):
+            self.logger.error("Response to getBestSellers has error")
             return False
         
         return True
@@ -291,8 +299,10 @@ class Client:
         response = self.send_query_and_receive_response(query, "getCDiscount")
         # ReadResponse - SELECT c_discount
         if self.isErr(response):
+            self.logger.error("Response to getCDiscount has error")
             return False
         if self.isEmpty(response):
+            self.logger.warning("Response to getCDiscount is empty")
             return True # bypass the rest
 
         discount = int(response[0][0])
@@ -301,6 +311,7 @@ class Client:
         if self.shopping_id:
             response = self.getCart()
             if self.isErr(response):
+                self.logger.error("Response to getCart has error")
                 return False
             processed = self.processCart(response, discount) # handle all index and return a dictionary
 
@@ -317,8 +328,10 @@ class Client:
                 response = self.enterAddress(street1, street2, city, state, zzip, country)
                 # ReadResponse - addr_id (self constructed in EnterAddress)
                 if self.isErr(response):
+                    self.logger.error("Response to enterAddress has error")
                     return False
                 if self.isEmpty(response):
+                    self.logger.warning("Response to enterAddress is empty")
                     return False
                 ship_addr_id = response[0][0]
             else:
@@ -327,8 +340,10 @@ class Client:
                 response = self.send_query_and_receive_response(query, "getCAddr")
                 # ReadResponse - SELECT c_addr_id
                 if self.isErr(response):
+                    self.logger.error("Response to getCAddr has error")
                     return False
                 if self.isEmpty(response):
+                    self.logger.warning("Response to getCAddr is empty")
                     return True # bypass the rest
 
                 ship_addr_id = response[0][0]
@@ -339,8 +354,10 @@ class Client:
             response = self.send_query_and_receive_response(query, "getCAddrId")
             # ReadResponse - SELECT c_addr_id
             if self.isErr(response):
+                self.logger.error("Response to getAddrId has error")
                 return False
             if self.isEmpty(response):
+                self.logger.warning("Response to getAddrId is empty")
                 return True # bypass the rest
 
             c_addr_id = response[0][0]
@@ -350,8 +367,10 @@ class Client:
             response = self.send_query_and_receive_response(query, "enterOrderMaxId")
             # ReadResponse - SELECT count(o_id)
             if self.isErr(response):
+                self.logger.error("Response to enterOrderMaxId has error")
                 return False
             if self.isEmpty(response):
+                self.logger.warning("Response to enterOrderMaxId is empty")
                 return False # count has to have a number
             
             o_id = response[0][0] + 1
@@ -367,6 +386,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "enterOrderInsert")
             # UpdateOnly
             if self.isErr(response):
+                self.logger.error("Response to enterOrderInsert has error")
                 return False
             # loop
             for i in range(len(processed["lines"])):
@@ -378,6 +398,7 @@ class Client:
                 response = self.send_query_and_receive_response(query, "addOrderLine")
                 # UpdateOnly
                 if self.isErr(response):
+                    self.logger.error("Response to addOrderLine has error")
                     return False
 
                 # getStock
@@ -385,8 +406,10 @@ class Client:
                 response = self.send_query_and_receive_response(query, "getStock")
                 # ReadResponse - SELECT i_stock
                 if self.isErr(response):
+                    self.logger.error("Response to getStock has error")
                     return False
                 if self.isEmpty(response):
+                    self.logger.warning("Response to getStock is empty")
                     return True # bypass the rest
 
                 stock = response[0][0]
@@ -400,6 +423,7 @@ class Client:
                 response = self.send_query_and_receive_response(query, "setStock")
                 # UpdateOnly
                 if self.isErr(response):
+                    self.logger.error("Response to setStock has error")
                     return False
 
             # enterCCXact
@@ -413,6 +437,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "enterCCXact")
             # UpdateOnly
             if self.isErr(response):
+                self.logger.error("Response to enterCCXact has error")
                 return False
 
             # clearCart
@@ -420,6 +445,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "clearCart")
             # UpdateOnly
             if self.isErr(response):
+                self.logger.error("Response to clearCart has error")
                 return False
 
         return True
@@ -433,6 +459,7 @@ class Client:
                 response = self.send_query_and_receive_response(query, "getCustomer")
                 # DispOnly
                 if self.isErr(response):
+                    self.logger.error("Response to getCustomer has error")
                     return False
 
                 # refreshSession 
@@ -440,6 +467,7 @@ class Client:
                 response = self.send_query_and_receive_response(query, "refreshSession")
                 # UpdateOnly
                 if self.isErr(response):
+                    self.logger.error("Response to refreshSession has error")
                     return False
 
                 # use random number to simulate if input password is incorrect
@@ -458,8 +486,10 @@ class Client:
             response = self.enterAddress(street1, street2, city, state, zzip, country)
             # ReadResponse - addr_id (self constructed in EnterAddress)
             if self.isErr(response):
+                self.logger.error("Response to enterAddress has error")
                 return False
             if self.isEmpty(response):
+                self.logger.warning("Response to enterAddress is empty")
                 return False
             addr_id = response[0][0]
            
@@ -468,8 +498,10 @@ class Client:
             response = self.send_query_and_receive_response(query, "createNewCustomerMaxId")
             # ReadResponse - SELECT max(c_id)
             if self.isErr(response):
+                self.logger.error("Response to createNewCustomerMaxId has error")
                 return False
             if self.isEmpty(response):
+                self.logger.warning("Response to createNewCustomerMaxId is empty")
                 return False # max has to have a number
             max_id = response[0][0] + 1
 
@@ -502,12 +534,14 @@ class Client:
             response = self.send_query_and_receive_response(query, "refreshSession")
             # UpdateOnly
             if self.isErr(response):
+                self.logger.error("Response to refreshSession has error")
                 return False
 
         # getCart
         if self.shopping_id:
             response = self.getCart()
             if self.isErr(response):
+                self.logger.error("Response to getCart has error")
                 return False
 
         return True
@@ -518,8 +552,10 @@ class Client:
         response = self.send_query_and_receive_response(query, "getUserName")
         # ReadResponse - SELECT c_uname
         if self.isErr(response):
+            self.logger.error("Response to getUserName has error")
             return False
         if self.isEmpty(response):
+            self.logger.warning("Response to getUserName is empty")
             return True # bypass the rest
         self.c_uname = response[0][0]
 
@@ -532,13 +568,17 @@ class Client:
             response = self.send_query_and_receive_response(query, "getName")
             # ReadResponse - if not empty, existing customer, load data
             if self.isErr(response):
+                self.logger.error("Response to getName has error")
                 return False
             if not self.isEmpty(response):
                 self.load = True
+            else:
+                self.logger.warning("Response to getName is empty")
 
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
+            self.logger.error("Response to getRelated has error")
             return False
         
         return True
@@ -547,6 +587,7 @@ class Client:
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
+            self.logger.error("Response to getRelated has error")
             return False
 
         # getNewProducts
@@ -555,6 +596,7 @@ class Client:
         response = self.send_query_and_receive_response(query, "getNewProducts")
         # DispOnly
         if self.isErr(response):
+            self.logger.error("Response to getNewProducts has error")
             return False
 
         return True
@@ -566,34 +608,42 @@ class Client:
             response = self.send_query_and_receive_response(query, "getPassword")
             # DispOnly
             if self.isErr(response):
+                self.logger.error("Response to getPassword has error")
                 return False
             
             # use random number to simulate if input password is correct
             if randint(1, WRONG_PASSWD_FRENQUENCY)> 1: 
-                # 2. GetMostRecentOrder (sequence) - only execute if input password is correct
+                # 2. getMostRecentOrder (sequence) - only execute if input password is correct
                 #       a. getMostRecentOrderId
                 #       b. getMostRecentOrderOrder - only execute if a. is not empty; need o_id from a.
                 #       c. getMostRecentOrderLines - only execyte if b. is not empty; need o_id from a.
-                    # GetMostRecentOrderId
-                query = sql.replaceVars(sql.sqlNameToCommand["GetMostRecentOrderId"], 1, [self.c_uname])
-                response = self.send_query_and_receive_response(query, "GetMostRecentOrderId")
+                    # getMostRecentOrderId
+                query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderId"], 1, [self.c_uname])
+                response = self.send_query_and_receive_response(query, "getMostRecentOrderId")
                 # ReadResponse - SELECT o_id
                 if self.isErr(response):
+                    self.logger.error("Response to getMostRecentOrderId has error")
                     return False
                 if not self.isEmpty(response):
                     o_id = response[0][0]
                     # getMostRecentOrderOrder
-                    query = sql.replaceVars(sql.sqlNameToCommand["GetMostRecentOrderOrder"], 1, [o_id])
-                    response = self.send_query_and_receive_response(query, "GetMostRecentOrderOrder")
+                    query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderOrder"], 1, [o_id])
+                    response = self.send_query_and_receive_response(query, "getMostRecentOrderOrder")
                     # ReadResponse - SELECT orders.*, customer.*; but only care if it is empty
                     if self.isErr(response):
+                        self.logger.error("Response to getMostRecentOrderOrder has error")
                         return False
                     if not self.isEmpty(response):
-                        query = sql.replaceVars(sql.sqlNameToCommand["GetMostRecentOrderLines"], 1, [o_id])
-                        response = self.send_query_and_receive_response(query, "GetMostRecentOrderLines")
+                        query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderLines"], 1, [o_id])
+                        response = self.send_query_and_receive_response(query, "getMostRecentOrderLines")
                         # DispOnly
                         if self.isErr(response):
+                            self.logger.error("Response to getMostRecentOrderLine has error")
                             return False
+                    else:
+                        self.logger.warning("Response to getMostRecentOrderOrder is empty")
+                else:
+                    self.logger.warning("Response to getMostRecentOrderId is empty")
 
 
         return True
@@ -605,6 +655,7 @@ class Client:
         response = self.getBook(-1)
         # DispOnly
         if self.isErr(response):
+            self.logger.error("Response to getBook has error")
             return False
         return True
 
@@ -612,6 +663,7 @@ class Client:
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
+            self.logger.error("Response to getRelated has error")
             return False
         return True
 
@@ -619,6 +671,7 @@ class Client:
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
+            self.logger.error("Response to getRelated has error")
             return False
         
         # choose one of three searches to do -> use a random number to decide
@@ -633,6 +686,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "doAuthorSearch")
             # DispOnly
             if self.isErr(response):
+                self.logger.error("Response to doAuthorSearch has error")
                 return False
         elif searchType == 2:
             # title
@@ -641,6 +695,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "doTitleSearch")
             # DispOnly
             if self.isErr(response):
+                self.logger.error("Response to doTitleSearch has error")
                 return False
         else: # searchType == 3
             # subject
@@ -649,6 +704,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "doSubjectSearch")
             # DispOnly
             if self.isErr(response):
+                self.logger.error("Response to doSubjectSearch has error")
                 return False
 
         return True
@@ -661,8 +717,10 @@ class Client:
             response = self.send_query_and_receive_response(query, "createEmptyCart")
             # ReadResponse - read COUNT
             if self.isErr(response):
+                self.logger.error("Response to createEmptyCart has error")
                 return False
             if self.isEmpty(response):
+                self.logger.warning("Response to createEmptyCart is empty")
                 return False # count has to have a number
             self.shopping_id = int(response[0][0])
 
@@ -671,6 +729,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "createEmptyCartInsertV2")
             # UpdateOnly:
             if self.isErr(response):
+                self.logger.error("Response to createEmptyCartInsertV2 has error")
                 return False
 
         # doCart (sequence)
@@ -680,6 +739,7 @@ class Client:
         if flag:
             response = addItem(-1)
             if self.isErr(response):
+                self.logger.error("Response to addItem has error")
                 return False
 
         # 2. refreshCart (sequnce)
@@ -697,12 +757,14 @@ class Client:
                     response = self.send_query_and_receive_response(query, "refreshCartRemove")
                     # UpdateOnly
                     if self.isErr(response):
+                        self.logger.error("Response to refreshCartRemove has error")
                         return False
                 else:
                     query = sql.replaceVars(sql.sqlNameToCommand["refreshCartUpdate"], 3, [qty, self.shopping_id, iid])
                     response = self.send_query_and_receive_response(query, "refreshCartUpdate")
                     # UpdateOnly
                     if self.isErr(response):
+                        self.logger.error("Response to refreshCartUpdate has error")
                         return False
 
         # 3. addRandomItemToCartIfNecessary (sequence)
@@ -713,8 +775,10 @@ class Client:
         response = self.send_query_and_receive_response(query, "addRandomItemToCartIfNecessary")
         # ReadResponse - read COUNT
         if self.isErr(response):
+            self.logger.error("Response to addRandomItemToCartIfNecessary has error")
             return False
         if self.isEmpty(response):
+            self.logger.warning("Response to addRandomItemToCartIfNecessary is empty")
             return False # count has to have a number
         count = int(response[0][0])
 
@@ -723,28 +787,37 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["getRelated1"], 1, [i_id])
             response = self.send_query_and_receive_response(query, "getRelated1")
             # ReadResponse - read SELECT i_related1
-            r_id = int(response[0][0])
-
+            if self.isErr(response):
+                self.logger.error("Response to getRelated1 has error")
+                return False
             if not self.isEmpty(response):
+                r_id = int(response[0][0])
                 response = addItem(r_id)
+                # UpdateOnly
                 if self.isErr(response):
+                    self.logger.error("Response to addItem has error")
                     return False
+            else:
+                self.logger.warning("Response to getRelated1 is empty")
             
         # 4. resetCartTime
         query = sql.replaceVars(sql.sqlNameToCommand["resetCartTime"], 1, [self.shopping_id])
         response = self.send_query_and_receive_response(query, "resetCartTime")
         # UpdateOnly:
         if self.isErr(response):
+            self.logger.error("Response to resetCartTime has error")
             return False
 
         # 5. getCart
         response = self.getCart()
         if self.isErr(response):
+            self.logger.error("Response to getCart has error")
             return False
 
         # # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
+            self.logger.error("Response to getRelated has error")
             return False
 
         return True
@@ -860,13 +933,16 @@ class Client:
         response = self.send_query_and_receive_response(query, "addItem")
         # ReadResponse - read SELECT scl_qty
         if self.isErr(response):
+            self.logger.error("Response to addItem has error")
             return response
         if self.isEmpty(response):
+            self.logger.warning("Response to addItem is empty")
             # addItemPut
             query = sql.replaceVars(sql.sqlNameToCommand["addItemPut"], 3, [self.shopping_id, 1, i_id])
             response = self.send_query_and_receive_response(query, "addItemPut")
             # UpdateOnly
             if self.isErr(response):
+                self.logger.error("Response to addItemPut has error")
                 return response
         else:
             # addItemUpdate
@@ -875,6 +951,7 @@ class Client:
             response = self.send_query_and_receive_response(query, "addItemUpdate")
             # UpdateOnly
             if self.isErr(response):
+                self.logger.error("Response to addItemUpdate has error")
                 return response
         
         return response
@@ -904,6 +981,7 @@ class Client:
         response = self.send_query_and_receive_response(query, "enterAddressId")
         # ReadResponse - SELECT co_id
         if self.isErr(response):
+            self.logger.error("Response to enterAddressId has error")
             return response
         if not self.isEmpty(response):
             co_id = response[0][0]
@@ -912,15 +990,19 @@ class Client:
             response = self.send_query_and_receive_response(query, "enterAddressMatch")
             # ReadResponse - SELECT addr_id
             if self.isErr(response):
+                self.logger.error("Response to enterAddressMatch has error")
                 return response
             if self.isEmpty(response):
+                self.logger.warning("Response to enterAddressMatch is empty")
                 #   c. enterAddressMaxId
                 query = sql.sqlNameToCommand["enterAddressMaxId"]
                 response = self.send_query_and_receive_response(query, "enterAddressMaxId")
                 # ReadResponse - SELECT max(addr_id)
                 if self.isErr(response):
+                    self.logger.error("Response to enterAddressMaxId has error")
                     return response
                 if self.isEmpty(response):
+                    self.logger.warning("Response to enterAddressMaxId is empty")
                     return False # max has to have a number
                 addr_id = response[0][0] + 1
 
@@ -929,10 +1011,13 @@ class Client:
                 response = self.send_query_and_receive_response(query, "enterAddressInsert")
                 # UpdateOnly
                 if self.isErr(response):
+                    self.logger.error("Response to enterAddressInsert has error")
                     return response
 
             else:
                 addr_id = response[0][0]
+        else:
+            self.logger.warning("Response to enterAddressId is empty")
 
         return [[addr_id]]
 
