@@ -21,6 +21,9 @@ impl Dispatcher {
         transactions: Arc<Mutex<HashMap<SocketAddr, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
+
+            println!("Dispathcer Started");
+
             let mut task_notify = pending_queue.lock().await.get_notify();
             let mut version_notify = version.lock().await.get_notify();
 
@@ -30,11 +33,17 @@ impl Dispatcher {
             loop {
                 Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
+                println!("Dispathcer get a notification");
+
+                println!("Pending queue size is {}", pending_queue.lock().await.queue.len());
+
                 let operations = pending_queue
                     .lock()
                     .await
                     .get_all_version_ready_task(&mut version)
                     .await;
+
+                println!("Operation batch size is {}",operations.len());
 
                 {
                     let mut lock = transactions.lock().await;
@@ -45,7 +54,7 @@ impl Dispatcher {
                         let sender_cloned = sender.clone();
 
                         match op_cloned.operation_type {
-                            Task::BEGIN => {
+                            Task::BEGIN | Task::READ | Task::WRITE => {
                                 if !lock.contains_key(&op_cloned.identifier.client_addr) {
                                     let (ts, tr) = mpsc::channel(100);
                                     lock.insert(op_cloned.identifier.client_addr.clone(), ts);
@@ -76,6 +85,7 @@ impl Dispatcher {
                     let lock = senders.lock().await;
                     stream::iter(operations)
                         .for_each(|op| async {
+                            println!("Sending a new operation");
                             let op = op;
                             lock.get(&op.clone().identifier.client_addr)
                                 .unwrap()
@@ -113,11 +123,11 @@ impl Dispatcher {
                         }
                         Task::COMMIT => {
                             raw = conn.simple_query("COMMIT;").await;
-                            finish = true;
+                            //finish = true;
                         }
                         Task::ABORT => {
                             raw = conn.simple_query("ROLLBACK;").await;
-                            finish = true;
+                            //finish = true;
                         }
                     }
 
