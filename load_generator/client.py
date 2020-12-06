@@ -17,7 +17,7 @@ import sql
 
 
 HOST = '127.0.0.1'
-TT = 3 # think time
+TT = 0.5 # think time
 MAX_TIME = 600
 MAX_PROB = 9999
 seed(1)
@@ -756,7 +756,7 @@ class Client:
         #       - happens only when user set a flag, in which case only one i_id is given -> use random number
         flag = randint(0, 1)
         if flag:
-            response = addItem(-1)
+            response = self.addItem(-1)
             if self.isErr(response):
                 self.logger.error("Response to addItem has error")
                 return False
@@ -811,7 +811,7 @@ class Client:
                 return False
             if not self.isEmpty(response):
                 r_id = int(response[0][0])
-                response = addItem(r_id)
+                response = self.addItem(r_id)
                 # UpdateOnly
                 if self.isErr(response):
                     self.logger.error("Response to addItem has error")
@@ -851,6 +851,8 @@ class Client:
     '''
 
     def send_query_and_receive_response(self, query, name, ertables=[]):
+        if DEBUG and "shopping_cart" in query:
+            return ["0"] * 20 
         # take raw query, return result in list -> result[row][col]
         pairs = sql.sqlNameToOP[name]
         ops = {"READ":set(), "WRITE":set()}
@@ -899,7 +901,11 @@ class Client:
 
         # TODO: will get result in .csv, parse to list -> result[row][col]
         result = csv
-        # only sql result, no rust layers
+        
+
+        if DEBUG:
+            return ["0"] * 20 
+        
         return result
     
     def isErr(self, response):
@@ -969,7 +975,7 @@ class Client:
                 return response
         else:
             # addItemUpdate
-            newQty = response[0]["scl_qty"] + 1
+            newQty = int(response[0][0]) + 1
             query = sql.replaceVars(sql.sqlNameToCommand["addItemUpdate"], 3, [newQty, self.shopping_id, i_id])
             response = self.send_query_and_receive_response(query, "addItemUpdate")
             # UpdateOnly
@@ -1021,7 +1027,7 @@ class Client:
         if not self.isEmpty(response):
             co_id = response[0][0]
             #   b. enterAddressMatch
-            query = sql.replaceVars(sql.sqlNameToCommand["enterAddressMatch"], 6, [street1. street2, city, state, zzip, co_id])
+            query = sql.replaceVars(sql.sqlNameToCommand["enterAddressMatch"], 6, [street1, street2, city, state, zzip, co_id])
             response = self.send_query_and_receive_response(query, "enterAddressMatch")
             # ReadResponse - SELECT addr_id
             if self.isErr(response):
