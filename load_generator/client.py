@@ -17,10 +17,10 @@ import sql
 
 
 HOST = '127.0.0.1'
-TT = 0.5 # think time
+TT = 0
+#TT = 0.5 # think time
 MAX_TIME = 600
 MAX_PROB = 9999
-seed(1)
 OK = "Ok"
 NUM_ITEM = 1000
 NUM_QTY = 10
@@ -44,9 +44,9 @@ def generateRandomString():
                 'w','x','y','z','A','B','C','D','E','F','G',
                 'H','I','J','K','L','M','N','O','P','Q','R',
                 'S','T','U','V','W','X','Y','Z','!','@','#',
-                '$','%','^','&','*','(',')','_','-','=','+',
+                '$','%','&','*','(',')','_','-','=','+',
                 '{','}','[',']','|',':',';',',','.','?','/',
-                '~',' ' ]
+                '~',' ' ] # removed '^'
     for i in range(randint(1, MAX_STRING_LEN)):
         index = randint(0,len(allChar)-1)
         res.append(allChar[index])
@@ -103,6 +103,7 @@ class Client:
         logname = "./logs/client_" + str(c_id) + "_process_" + str(os.getpid()) + ".log"
         logging.basicConfig(
             level=logging.DEBUG,
+            #level=logging.CRITICAL,
             format='%(asctime)s,%(msecs)d %(name)s [%(levelname)s] %(message)s',
             # write to both stdout and log file
             handlers=[
@@ -112,6 +113,10 @@ class Client:
         )
         # set name for this logger
         self.logger = logging.getLogger("client_" + str(c_id) + "_process_" + str(os.getpid()))
+        
+        
+        # set up random seed
+        seed(c_id)
 
     def run(self):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -121,7 +126,7 @@ class Client:
         while datetime.datetime.now() < self.max_time:
             curr_index = con_data.states.index(self.curr)
             self.logger.debug("=======================================")
-            self.logger.info("Entering webpage {}".format(self.curr))
+            self.logger.critical("Entering webpage {}".format(self.curr))
 
             # send BEGIN to start the transaction
             begin = web_to_sql.getBegin(self.curr)
@@ -485,7 +490,7 @@ class Client:
 
                 # use random number to simulate if input password is incorrect
                 if randint(1, WRONG_PASSWD_FRENQUENCY) == 1:
-                    return False
+                    return True
         # only if flag is N == 0
         else:
             # createNewCustomer (sequence)
@@ -518,7 +523,7 @@ class Client:
             if self.isEmpty(response):
                 self.logger.warning("Response to createNewCustomerMaxId is empty")
                 return False # max has to have a number
-            max_id = response[0][0] + 1
+            max_id = int(response[0][0]) + 1
 
             #   3. createNewCustomer
             #       - fields:
@@ -537,19 +542,19 @@ class Client:
             c_since = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             c_login = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             c_expiration = (datetime.datetime.now() + datetime.timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
-            c_discount = ranint(0, 50) * 1.0
-            c_birthday = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            c_discount = randint(0, 50) * 1.0
+            c_birthdate = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             c_data = generateRandomString()
             cust_info = [   max_id, c_uname, c_passwd, c_fname, c_lname, 
                             addr_id, c_phone, c_email, c_since, c_last_login,
                             c_login, c_expiration, c_discount, 0.0, 0.0, 
                             c_birthdate, c_data
                         ]
-            query = sql.replaceVars(sql.sqlNameToCommand["refreshSession"], 17, cust_info)
-            response = self.send_query_and_receive_response(query, "refreshSession")
+            query = sql.replaceVars(sql.sqlNameToCommand["createNewCustomer"], 17, cust_info)
+            response = self.send_query_and_receive_response(query, "createNewCustomer")
             # UpdateOnly
             if self.isErr(response):
-                self.logger.error("Response to refreshSession has error")
+                self.logger.error("Response to createNewCustomer has error")
                 return False
 
         # getCart
@@ -663,7 +668,6 @@ class Client:
                         self.logger.warning("Response to getMostRecentOrderOrder is empty")
                 else:
                     self.logger.warning("Response to getMostRecentOrderId is empty")
-
 
         return True
 

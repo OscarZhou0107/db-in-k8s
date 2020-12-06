@@ -159,7 +159,7 @@ def getBegin(url):
         readString = "READ " + " ".join(revResult["READ"])
     if len(revResult["WRITE"]):
         writeString = "WRITE " + " ".join(revResult["WRITE"])
-    resultString = readString + " " + writeString + "'" 
+    resultString = readString + " " + writeString + "" 
 
     # serialize begin
     serialized = json.dumps({
