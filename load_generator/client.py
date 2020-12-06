@@ -50,7 +50,7 @@ def generateRandomString():
     for i in range(randint(1, MAX_STRING_LEN)):
         index = randint(0,len(allChar)-1)
         res.append(allChar[index])
-    return '"' + "".join(res) + '"'
+    return "'" + "".join(res) + "'"
 
 def generateRandomNum():
     res = []
