@@ -1,5 +1,5 @@
 # dv-in-rust
-Distributed Versioning in Rust
+o2versioner: Distributed Versioning in Asynchronous Rust
 
 
 [![Build Status][actions-badge]][actions-url]
@@ -7,10 +7,6 @@ Distributed Versioning in Rust
 
 [actions-badge]: https://github.com/lichen-liu/dv-in-rust/workflows/o2versioner-build/badge.svg
 [actions-url]: https://github.com/lichen-liu/dv-in-rust/actions?query=workflow%3Ao2versioner-build
-
-
-## o2versioner
-An implementation of the paper (in the next section) using asynchronous Rust.
 
 
 ## Paper of reference
