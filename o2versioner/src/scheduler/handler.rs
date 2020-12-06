@@ -9,11 +9,14 @@ use crate::core::*;
 use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
+use chrono::Utc;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
@@ -87,12 +90,13 @@ pub async fn main(conf: Config) {
     // Launch main handler as a new task
     let conf_clone = conf.scheduler.clone();
     let sequencer_socket_pool_clone = sequencer_socket_pool.clone();
+    let state_clone = state.clone();
     let handler_handle = tokio::spawn(
         tcp::start_tcplistener(
             conf.scheduler.to_addr(),
             move |tcp_stream| {
                 let sequencer_socket_pool = sequencer_socket_pool_clone.clone();
-                let state_cloned = state.clone();
+                let state_cloned = state_clone.clone();
                 let conf = conf_clone.clone();
                 // Connection/session specific storage
                 // Note: this closure contains one copy of dispatcher_addr
@@ -130,6 +134,27 @@ pub async fn main(conf: Config) {
         };
     } else {
         main_handle.await.unwrap();
+    }
+
+    // Dump logging files
+    if let Some(log_dir) = conf.scheduler.performance_logging {
+        info!("Preparing {} for performance logging", log_dir);
+        fs::create_dir_all(log_dir.clone()).await.unwrap();
+        let performance_records: Vec<_> = stream::iter(state.share_client_records().lock().await.iter())
+            .then(|(_, client_record)| async move {
+                let client_record = client_record.read().await;
+                client_record.get_performance_records()
+            })
+            .collect()
+            .await;
+        let performance_records: Vec<_> = performance_records.into_iter().flatten().collect();
+
+        let mut path = PathBuf::from(log_dir);
+        path.push(format!("{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
+        let path = path.as_path();
+        let mut wrt = csv::Writer::from_path(path).unwrap();
+        performance_records.iter().for_each(|r| wrt.serialize(r).unwrap());
+        info!("Dumped performance logging to {:?}", path);
     }
 
     info!("DIES");

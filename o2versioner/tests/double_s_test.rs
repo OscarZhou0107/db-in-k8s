@@ -114,7 +114,7 @@ async fn run_double_s() {
             sequencer_pool_size: 10,
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
-            performance_logging: None,
+            performance_logging: Some("./logging".to_owned()),
             disable_early_release: false,
         },
         sequencer: SequencerConfig {

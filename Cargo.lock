@@ -164,6 +164,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits 0.2.14",
+ "serde 1.0.118",
  "time",
  "winapi",
 ]

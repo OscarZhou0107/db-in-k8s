@@ -2,6 +2,7 @@
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 pub struct RequestRecordStart {
@@ -125,13 +126,20 @@ impl ClientRecord {
     /// Returns a `Vec<PerformanceRequestRecord>` that is converted from
     /// all `RequestRecord` of the current `client_addr`
     pub fn get_performance_records(&self) -> Vec<PerformanceRequestRecord> {
-        self.records.iter().cloned().map(|reqrecord| reqrecord.into()).collect()
+        self.records
+            .iter()
+            .cloned()
+            .map(|reqrecord| {
+                PerformanceRequestRecord::from(reqrecord).set_client_addr(Some(self.client_addr().clone()))
+            })
+            .collect()
     }
 }
 
 /// For performance benchmarking, converted from `RequestRecord`
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PerformanceRequestRecord {
+    client_addr: Option<SocketAddr>,
     request_type: String,
     request_result: String,
     initial_timestamp: DateTime<Utc>,
@@ -159,10 +167,18 @@ impl From<RequestRecord> for PerformanceRequestRecord {
         let request_result = if r.res.is_ok() { "Ok" } else { "Err" };
 
         Self {
+            client_addr: None,
             request_type,
             request_result: request_result.into(),
             initial_timestamp: r.req_timestamp,
             final_timestamp: r.res_timestamp,
         }
+    }
+}
+
+impl PerformanceRequestRecord {
+    pub fn set_client_addr(mut self, client_addr: Option<SocketAddr>) -> Self {
+        self.client_addr = client_addr;
+        self
     }
 }
