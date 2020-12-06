@@ -142,7 +142,7 @@ pub async fn main(conf: Config) {
         fs::create_dir_all(log_dir.clone()).await.unwrap();
 
         let mut path = PathBuf::from(log_dir);
-        path.push(format!("{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
+        path.push(format!("perf_{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
         let path = path.as_path();
         let mut wrt = csv::Writer::from_path(path).unwrap();
 
