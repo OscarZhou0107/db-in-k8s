@@ -44,6 +44,7 @@ pub struct TxVN {
 }
 
 impl TxVN {
+    /// Create a new `TxVN` with a unique id assigned to the transaction
     pub fn new() -> Self {
         Self {
             tx: None,
@@ -52,30 +53,36 @@ impl TxVN {
         }
     }
 
-    /// Set `uuid` to nil, for testing
+    /// Set `uuid` to nil, for testing, so that `TxVN` can be properly
+    /// compared for equality
     pub fn erase_uuid(mut self) -> Self {
         self.uuid = Uuid::nil();
         self
     }
 
+    /// Builder style setting transaction name
     pub fn set_tx<S: Into<String>>(mut self, tx: Option<S>) -> Self {
         self.tx = tx.map(|tx| tx.into());
         self
     }
 
+    /// Builder style setting the `txtablevns`
     pub fn set_txtablevns<I: IntoIterator<Item = TxTableVN>>(mut self, txtablevns: I) -> Self {
         self.txtablevns = txtablevns.into_iter().collect();
         self
     }
 
+    /// A `ref` to transaction name `tx`
     pub fn tx(&self) -> &Option<String> {
         &self.tx
     }
 
+    /// A `ref` to the `txtablevns`
     pub fn txtablevns(&self) -> &[TxTableVN] {
         &self.txtablevns
     }
 
+    /// A `ref` to the `uuid`
     pub fn uuid(&self) -> &Uuid {
         &self.uuid
     }
