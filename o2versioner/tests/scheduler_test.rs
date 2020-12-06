@@ -22,6 +22,7 @@ async fn test_scheduler() {
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
             performance_logging: None,
+            disable_early_release: false,
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
@@ -92,6 +93,7 @@ async fn test_scheduler_with_admin() {
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
             performance_logging: None,
+            disable_early_release: false,
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
@@ -187,6 +189,7 @@ async fn test_scheduler_with_request_crash() {
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
             performance_logging: None,
+            disable_early_release: false,
         },
         sequencer: SequencerConfig {
             addr: String::from(sequencer_addr),
