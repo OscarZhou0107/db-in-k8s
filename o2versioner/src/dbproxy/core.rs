@@ -268,12 +268,13 @@ impl PostgreToCsvWriter {
         message.iter().for_each(|q_message| match q_message {
             tokio_postgres::SimpleQueryMessage::Row(query_row) => {
                 let len = query_row.len();
-                let mut row: Vec<&str> = Vec::new();
+                let mut row: Vec<String> = Vec::new();
                 row.reserve(len);
 
                 for index in 0..len {
-                    row.push(query_row.get(index).unwrap());
+                    row.push(format!("\"{}\"",query_row.get(index).unwrap()));
                 }
+
                 self.wrt.write_record(&row).unwrap();
             }
             _ => {}
