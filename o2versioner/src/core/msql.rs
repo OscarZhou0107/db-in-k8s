@@ -184,7 +184,7 @@ impl MsqlQuery {
 }
 
 /// Enum representing the end transaction mode, can be either `Rollback` or `Commit`
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, strum::AsRefStr)]
 #[serde(rename_all = "snake_case")]
 pub enum MsqlEndTxMode {
     Commit,

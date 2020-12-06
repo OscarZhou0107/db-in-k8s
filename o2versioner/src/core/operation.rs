@@ -12,7 +12,7 @@ pub enum RWOperation {
 }
 
 /// Enum representing the access pattern of a `TableOps`
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, strum::AsRefStr)]
 pub enum AccessPattern {
     WriteOnly,
     ReadOnly,

@@ -30,6 +30,7 @@ async fn test_double_s() {
             sequencer_pool_size: sequencer_max_connection,
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
+            performance_logging: None,
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:6379"),
@@ -112,6 +113,7 @@ async fn run_double_s() {
             sequencer_pool_size: 10,
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
+            performance_logging: None,
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:24212"),
