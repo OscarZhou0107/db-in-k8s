@@ -79,6 +79,9 @@ Refer to: [README](load_generator/README.md)
 - [x] Early release
 
 
+## Architecture
+
+
 ### Project layout
 ```
 o2versioner
@@ -93,9 +96,6 @@ o2versioner
 │  └── main.rs    # main executable
 └── tests         # system level testing
 ```
-
-
-## Architecture
 
 
 ### Sequencer
