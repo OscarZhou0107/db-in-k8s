@@ -148,53 +148,53 @@ async fn run_double_s() {
 
     let tx0 = vec![
         Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
         Message::RequestMsqlText(MsqlText::query(
             "update w1 set name=\"ray\" where id = 20;",
             "write w1",
-            Some(""),
+            Some("w1"),
         )),
         Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
         Message::RequestMsqlText(MsqlText::query(
             "update w2 set name=\"ray\" where id = 22;",
             "write w2",
-            Some(""),
+            Some("w2"),
         )),
         Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
     ];
 
     let tx1 = vec![
         Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 r1 WRITE w2 w3")),
-        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
         Message::RequestMsqlText(MsqlText::query(
             "update w2 set name=\"ray\" where id = 20;",
             "write w2",
             Some(""),
         )),
-        Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some(""))),
-        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
+        Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some("r1"))),
+        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
         Message::RequestMsqlText(MsqlText::query(
             "update w3 set name=\"ray\" where id = 22;",
             "write w3",
-            Some(""),
+            Some("w3"),
         )),
         Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
     ];
 
     let tx2 = vec![
         Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ w1 w2 WRITE r0 r1")),
-        Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1", Some(""))),
+        Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1", Some("w1"))),
         Message::RequestMsqlText(MsqlText::query(
             "update r0 set name=\"ray\" where id = 20;",
             "write r0",
-            Some(""),
+            Some("r0"),
         )),
         Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some(""))),
-        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
+        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
         Message::RequestMsqlText(MsqlText::query(
             "update r1 set name=\"ray\" where id = 22;",
             "write r1",
-            Some(""),
+            Some("r1"),
         )),
         Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
     ];

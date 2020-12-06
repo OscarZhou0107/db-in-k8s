@@ -691,5 +691,7 @@ mod tests_early_release_tables {
         assert!(!EarlyReleaseTables::default().add_table("Table_1 bbb").is_empty());
         assert!(EarlyReleaseTables::default().is_empty());
         assert!(EarlyReleaseTables::default().add_table("").is_empty());
+        assert!(EarlyReleaseTables::from("").is_empty());
+        assert!(EarlyReleaseTables::from_iter(vec!["", " "]).is_empty());
     }
 }
