@@ -44,9 +44,9 @@ def generateRandomString():
                 'w','x','y','z','A','B','C','D','E','F','G',
                 'H','I','J','K','L','M','N','O','P','Q','R',
                 'S','T','U','V','W','X','Y','Z','!','@','#',
-                '$','%','&','*','(',')','_','-','=','+',
+                '$','%','&','*','_','-','=','+',
                 '{','}','[',']','|',':',';',',','.','?','/',
-                '~',' ' ] # removed '^'
+                '~',' ' ] # removed '^', '(',')'
     for i in range(randint(1, MAX_STRING_LEN)):
         index = randint(0,len(allChar)-1)
         res.append(allChar[index])
