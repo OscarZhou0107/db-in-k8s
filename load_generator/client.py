@@ -234,16 +234,18 @@ class Client:
 
         #   b. adminUpdateRelated
         query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated"], 2, i_id, i_id)
-        response = self.send_query_and_receive_response(query, "adminUpdateRelated")
+        # EarlyRelease - orders, order_line
+        ertables = ["orders", "order_line"]
+        response = self.send_query_and_receive_response(query, "adminUpdateRelated", ertables)
         # ReadResponse - SELECT ol_i_id FROM orders, order_line
         if self.isErr(response):
             self.logger.error("Response to adminUpdateRelated has error")
             return False
-        # add exactly 5 items into related
         if self.isEmpty(response):
             self.logger.warning("Response to adminUpdateRelated is empty")
             return True # bypass the rest
-
+        
+        # add exactly 5 items into related
         num = len(response)
         related = []
         if num >= 5:
@@ -351,7 +353,9 @@ class Client:
             # enterOrder (sequence)
             #   a. getCAddrId - same as getCAddr
             query = sql.replaceVars(sql.sqlNameToCommand["getCAddrId"], 1, [self.c_id])
-            response = self.send_query_and_receive_response(query, "getCAddrId")
+            # EarlyRelease - customer
+            ertables = ["customer"]
+            response = self.send_query_and_receive_response(query, "getCAddrId", ertables)
             # ReadResponse - SELECT c_addr_id
             if self.isErr(response):
                 self.logger.error("Response to getAddrId has error")
@@ -383,11 +387,14 @@ class Client:
             interval = randint(1, 7)
             order_info = [o_id, self.c_id, o_sub_total, o_total, o_ship_type, interval, c_addr_id, ship_addr_id]
             query = sql.replaceVars(sql.sqlNameToCommand["enterOrderInsert"], 8, order_info)
-            response = self.send_query_and_receive_response(query, "enterOrderInsert")
+            # EarlyRelease - orders
+            ertables = ["orders"]
+            response = self.send_query_and_receive_response(query, "enterOrderInsert", ertables)
             # UpdateOnly
             if self.isErr(response):
                 self.logger.error("Response to enterOrderInsert has error")
                 return False
+
             # loop
             for i in range(len(processed["lines"])):
                 # addOrderLine
@@ -395,7 +402,9 @@ class Client:
                                   processed["lines"][i]["scl_qty"], discount, 
                                   generateRandomString()]
                 query = sql.replaceVars(sql.sqlNameToCommand["addOrderLine"], 6, orderline_info)
-                response = self.send_query_and_receive_response(query, "addOrderLine")
+                # EarlyRelease - order_line
+                ertables = ["order_line"]
+                response = self.send_query_and_receive_response(query, "addOrderLine", ertables)
                 # UpdateOnly
                 if self.isErr(response):
                     self.logger.error("Response to addOrderLine has error")
@@ -420,7 +429,9 @@ class Client:
                 else:
                     stock = stock - processed["lines"][i]["scl_qty"]
                 query = sql.replaceVars(sql.sqlNameToCommand["setStock"], 2, [stock, processed["lines"][i]["scl_i_id"]])
-                response = self.send_query_and_receive_response(query, "setStock")
+                # EarlyRelease - item
+                ertables = ["item"]
+                response = self.send_query_and_receive_response(query, "setStock", ertables)
                 # UpdateOnly
                 if self.isErr(response):
                     self.logger.error("Response to setStock has error")
@@ -434,7 +445,9 @@ class Client:
             cc_expiry = (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
             cc_info = [o_id, cc_type, cc_num, cc_name, cc_expiry, o_total, ship_addr_id]
             query = sql.replaceVars(sql.sqlNameToCommand["enterCCXact"], 7, cc_info)
-            response = self.send_query_and_receive_response(query, "enterCCXact")
+            # EarlyRelease - country, cc_xacts, address
+            ertables = ["country", "cc_xacts", "address"]
+            response = self.send_query_and_receive_response(query, "enterCCXact", ertables)
             # UpdateOnly
             if self.isErr(response):
                 self.logger.error("Response to enterCCXact has error")
@@ -495,7 +508,9 @@ class Client:
            
             #   2. createNewCustomerMaxId
             query = sql.sqlNameToCommand["createNewCustomerMaxId"]
-            response = self.send_query_and_receive_response(query, "createNewCustomerMaxId")
+            # EarlyRelease - customer
+            ertables = ["customer"]
+            response = self.send_query_and_receive_response(query, "createNewCustomerMaxId", ertables)
             # ReadResponse - SELECT max(c_id)
             if self.isErr(response):
                 self.logger.error("Response to createNewCustomerMaxId has error")
@@ -565,7 +580,9 @@ class Client:
         # say hello - getName - c_id, shopping_id
         if not self.load: # only getName if it is a new connection or if the customer is not in the db
             query = sql.replaceVars(sql.sqlNameToCommand["getName"], 1, [self.c_id])
-            response = self.send_query_and_receive_response(query, "getName")
+            # EarlyRelease - customer
+            ertables = ["customer"]
+            response = self.send_query_and_receive_response(query, "getName", ertables)
             # ReadResponse - if not empty, existing customer, load data
             if self.isErr(response):
                 self.logger.error("Response to getName has error")
@@ -628,7 +645,9 @@ class Client:
                     o_id = response[0][0]
                     # getMostRecentOrderOrder
                     query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderOrder"], 1, [o_id])
-                    response = self.send_query_and_receive_response(query, "getMostRecentOrderOrder")
+                    # EarlyRelease - customer, country, cc_xacts, orders, address
+                    ertables = ["customer", "country", "cc_xacts", "orders", "address"]
+                    response = self.send_query_and_receive_response(query, "getMostRecentOrderOrder", ertables)
                     # ReadResponse - SELECT orders.*, customer.*; but only care if it is empty
                     if self.isErr(response):
                         self.logger.error("Response to getMostRecentOrderOrder has error")
@@ -802,7 +821,9 @@ class Client:
             
         # 4. resetCartTime
         query = sql.replaceVars(sql.sqlNameToCommand["resetCartTime"], 1, [self.shopping_id])
-        response = self.send_query_and_receive_response(query, "resetCartTime")
+        # EarlyRelease - shopping_cart
+        ertables = ["shopping_cart"]
+        response = self.send_query_and_receive_response(query, "resetCartTime", ertables)
         # UpdateOnly:
         if self.isErr(response):
             self.logger.error("Response to resetCartTime has error")
@@ -813,6 +834,7 @@ class Client:
         if self.isErr(response):
             self.logger.error("Response to getCart has error")
             return False
+        
 
         # # promo - getRelated
         response = self.getRelated()
@@ -828,7 +850,7 @@ class Client:
     ==================================================================================================================
     '''
 
-    def send_query_and_receive_response(self, query, name):
+    def send_query_and_receive_response(self, query, name, ertables=[]):
         # take raw query, return result in list -> result[row][col]
         pairs = sql.sqlNameToOP[name]
         ops = {"READ":set(), "WRITE":set()}
@@ -851,7 +873,8 @@ class Client:
             "request_msql_text":{
                 "op":"query",
                 "query":query,
-                "tableops":opsString
+                "tableops":opsString,
+                "ertables":" ".join(ertables)
             }
         })
         
@@ -959,7 +982,11 @@ class Client:
     def getCart(self):
         # getCart
         query = sql.replaceVars(sql.sqlNameToCommand["getCart"], 1, [self.shopping_id])
-        response = self.send_query_and_receive_response(query, "getCart")
+        # EarlyRelease - shopping_cart_line; if self.curr == shopCart
+        ertables = []
+        if self.curr == "shopCart":
+            ertables = ["shopping_cart_line"]
+        response = self.send_query_and_receive_response(query, "getCart", ertables)
         # DispOnly
         return response
 
@@ -969,7 +996,11 @@ class Client:
             # If invalid i_id, generate a random one
             i_id = randint(1, NUM_ITEM)
         query = sql.replaceVars(sql.sqlNameToCommand["getBook"], 1, [i_id])
-        response = self.send_query_and_receive_response(query, "getBook")
+        # EarlyRelease - author; if self.curr == adminConf
+        ertables = []
+        if self.curr == "adminConf":
+            ertables = ["author"]
+        response = self.send_query_and_receive_response(query, "getBook", ertables)
         # DispOnly
         return response
 
@@ -978,7 +1009,11 @@ class Client:
         # enterAddress (sequence)
         #   a. enterAddressId
         query = sql.replaceVars(sql.sqlNameToCommand["enterAddressId"], 1, [country])
-        response = self.send_query_and_receive_response(query, "enterAddressId")
+        # EarlyRelease - country; if self.curr == buyReq
+        ertables = []
+        if self.curr == "buyReq":
+            ertables = ["country"]
+        response = self.send_query_and_receive_response(query, "enterAddressId", ertables)
         # ReadResponse - SELECT co_id
         if self.isErr(response):
             self.logger.error("Response to enterAddressId has error")
@@ -996,7 +1031,11 @@ class Client:
                 self.logger.warning("Response to enterAddressMatch is empty")
                 #   c. enterAddressMaxId
                 query = sql.sqlNameToCommand["enterAddressMaxId"]
-                response = self.send_query_and_receive_response(query, "enterAddressMaxId")
+                # EarlyRelease - address; if self.curr == buyReq
+                ertables = []
+                if self.curr == "buyReq":
+                    ertables = ["address"]
+                response = self.send_query_and_receive_response(query, "enterAddressMaxId", ertables)
                 # ReadResponse - SELECT max(addr_id)
                 if self.isErr(response):
                     self.logger.error("Response to enterAddressMaxId has error")
