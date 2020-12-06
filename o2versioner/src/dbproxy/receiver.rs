@@ -35,7 +35,7 @@ impl Receiver {
             println!("Receiver finished its jobs");
         });
 
-        handler.await;
+        handler.await.unwrap();
     }
 }
 
@@ -54,6 +54,7 @@ mod tests_receiver {
     use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
     #[tokio::test]
+    #[ignore]
     async fn test_send_single_item_to_receiver() {
         let details = "127.0.0.1:2345";
         let addr: SocketAddr = details.parse().expect("Unable to parse socket address");
@@ -94,6 +95,7 @@ mod tests_receiver {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_send_ten_items_to_receiver() {
         let details = "127.0.0.1:2344";
         let addr: SocketAddr = details.parse().expect("Unable to parse socket address");

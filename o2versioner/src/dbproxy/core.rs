@@ -89,7 +89,7 @@ impl QueueMessage {
                 succeed = true;
             }
             Err(err) => {
-                result = err.to_string();
+                result = err.to_string();   
                 succeed = false;
             }
         }
@@ -653,7 +653,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            Some(TxVN::default()),
+            None,
         );
 
         let message2 = QueueMessage::new(
@@ -670,7 +670,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            Some(TxVN::default()),
+            None,
         );
 
         let message1 = QueueMessage::new(
@@ -706,6 +706,6 @@ mod tests {
         });
 
         println!("Number of tasks is: {}", ready_tasks.len());
-        assert!(ready_tasks.len() == 2);
+        assert!(ready_tasks.len() == 4);
     }
     }
