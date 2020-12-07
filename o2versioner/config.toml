@@ -1,16 +1,14 @@
 [scheduler]
-addr = "127.0.0.1:1077"
+addr = "127.0.0.1:2077"
 admin_addr = "127.0.0.1:9999"
-performance_loggin = "./logging"
-dispatcher_queue_size = 500
-max_connection = 50
-sequencer_pool_size = 20
-transceiver_queue_size = 20
 disable_early_release = true
+dispatcher_queue_size = 500
+performance_loggin = "./logging"
+sequencer_pool_size = 10
+transceiver_queue_size = 10
 
 [sequencer]
 addr = "127.0.0.1:9876"
-max_connection = 50
 
 # This is for UG
 [[dbproxy]]
@@ -29,7 +27,3 @@ host = "34.69.18.204"
 password = "Abc@123"
 port = "5432"
 user = "postgres"
-
-
-
-
