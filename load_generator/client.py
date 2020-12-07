@@ -30,6 +30,8 @@ DEBUG = 0
 WRONG_PASSWD_FRENQUENCY = 1 # out of 10
 MAX_STRING_LEN = 10
 MAX_NUM_LEN = 12
+UPDATE_NO_ERR_CHECK = 1
+ALLOW_ABORT = 1
 
 def determineNext(curr_index, prob):
     row = prob[curr_index]
@@ -327,7 +329,7 @@ class Client:
         query = sql.replaceVars(sql.sqlNameToCommand["adminUpdate"], 4, item_info)
         response = self.send_query_and_receive_response(query, "adminUpdate")
         # UpdateOnly
-        if self.isErr(response):
+        if not UPDATE_NO_ERR_CHECK and self.isErr(response):
             self.logger.error("Response to adminUpdate has error")
             return False
 
@@ -337,6 +339,9 @@ class Client:
         ertables = ["orders", "order_line"]
         response = self.send_query_and_receive_response(query, "adminUpdateRelated", ertables)
         # ReadResponse - SELECT ol_i_id FROM orders, order_line
+        if self.isAbort(response):
+            self.logger.warning("Response to adminUpdateRelated is abort")
+            return True
         if self.isErr(response):
             self.logger.error("Response to adminUpdateRelated has error")
             return False
@@ -361,7 +366,7 @@ class Client:
         query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated1"], 6, related)
         response = self.send_query_and_receive_response(query, "adminUpdateRelated1")
         # UpdateOnly
-        if self.isErr(response):
+        if not UPDATE_NO_ERR_CHECK and self.isErr(response):
             self.logger.error("Response to adminUpdateRelated1 has error")
             return False
 
@@ -399,6 +404,9 @@ class Client:
         query = sql.replaceVars(sql.sqlNameToCommand["getCDiscount"], 1, [self.c_id])
         response = self.send_query_and_receive_response(query, "getCDiscount")
         # ReadResponse - SELECT c_discount
+        if self.isAbort(response):
+            self.logger.warning("Response to getCDiscount is abort")
+            return True
         if self.isErr(response):
             self.logger.error("Response to getCDiscount has error")
             return False
@@ -412,6 +420,9 @@ class Client:
         if self.shopping_id:
             response = self.getCart()
             # ReadResponse - cart
+            if self.isAbort(response):
+                self.logger.warning("Response to getCart is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to getCart has error")
                 return False
@@ -431,6 +442,9 @@ class Client:
                 country = generateRandomCountry()
                 response = self.enterAddress(street1, street2, city, state, zzip, country)
                 # ReadResponse - addr_id (self constructed in EnterAddress)
+                if self.isAbort(response):
+                    self.logger.warning("Response to enterAddress is abort")
+                    return True
                 if self.isErr(response):
                     self.logger.error("Response to enterAddress has error")
                     return False
@@ -443,6 +457,9 @@ class Client:
                 query = sql.replaceVars(sql.sqlNameToCommand["getCAddr"], 1, [self.c_id])
                 response = self.send_query_and_receive_response(query, "getCAddr")
                 # ReadResponse - SELECT c_addr_id
+                if self.isAbort(response):
+                    self.logger.warning("Response to getCAddr is abort")
+                    return True
                 if self.isErr(response):
                     self.logger.error("Response to getCAddr has error")
                     return False
@@ -459,6 +476,9 @@ class Client:
             ertables = ["customer"]
             response = self.send_query_and_receive_response(query, "getCAddrId", ertables)
             # ReadResponse - SELECT c_addr_id
+            if self.isAbort(response):
+                self.logger.warning("Response to getCAddrId is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to getAddrId has error")
                 return False
@@ -472,6 +492,9 @@ class Client:
             query = sql.sqlNameToCommand["enterOrderMaxId"]
             response = self.send_query_and_receive_response(query, "enterOrderMaxId")
             # ReadResponse - SELECT count(o_id)
+            if self.isAbort(response):
+                self.logger.warning("Response to enterOrderMaxId is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to enterOrderMaxId has error")
                 return False
@@ -493,7 +516,7 @@ class Client:
             ertables = ["orders"]
             response = self.send_query_and_receive_response(query, "enterOrderInsert", ertables)
             # UpdateOnly
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to enterOrderInsert has error")
                 return False
 
@@ -505,10 +528,12 @@ class Client:
                                   generateRandomString()]
                 query = sql.replaceVars(sql.sqlNameToCommand["addOrderLine"], 6, orderline_info)
                 # EarlyRelease - order_line
-                ertables = ["order_line"]
+                ertables = []
+                if i == len(processed["lines"]) - 1:
+                    ertables = ["order_line"]
                 response = self.send_query_and_receive_response(query, "addOrderLine", ertables)
                 # UpdateOnly
-                if self.isErr(response):
+                if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                     self.logger.error("Response to addOrderLine has error")
                     return False
 
@@ -516,6 +541,9 @@ class Client:
                 query = sql.replaceVars(sql.sqlNameToCommand["getStock"], 1, [processed["lines"][i]["scl_i_id"]])
                 response = self.send_query_and_receive_response(query, "getStock")
                 # ReadResponse - SELECT i_stock
+                if self.isAbort(response):
+                    self.logger.warning("Response to getStock is abort")
+                    return True
                 if self.isErr(response):
                     self.logger.error("Response to getStock has error")
                     return False
@@ -532,10 +560,12 @@ class Client:
                     stock = stock - processed["lines"][i]["scl_qty"]
                 query = sql.replaceVars(sql.sqlNameToCommand["setStock"], 2, [stock, processed["lines"][i]["scl_i_id"]])
                 # EarlyRelease - item
-                ertables = ["item"]
+                ertables = []
+                if i == len(processed["lines"]) - 1:
+                    ertables = ["item"]
                 response = self.send_query_and_receive_response(query, "setStock", ertables)
                 # UpdateOnly
-                if self.isErr(response):
+                if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                     self.logger.error("Response to setStock has error")
                     return False
 
@@ -551,7 +581,7 @@ class Client:
             ertables = ["country", "cc_xacts", "address"]
             response = self.send_query_and_receive_response(query, "enterCCXact", ertables)
             # UpdateOnly
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to enterCCXact has error")
                 return False
 
@@ -559,7 +589,7 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["clearCart"], 1, [self.shopping_id])
             response = self.send_query_and_receive_response(query, "clearCart")
             # UpdateOnly
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to clearCart has error")
                 return False
 
@@ -581,7 +611,7 @@ class Client:
                 query = sql.replaceVars(sql.sqlNameToCommand["refreshSession"], 1, [self.c_id])
                 response = self.send_query_and_receive_response(query, "refreshSession")
                 # UpdateOnly
-                if self.isErr(response):
+                if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                     self.logger.error("Response to refreshSession has error")
                     return False
 
@@ -600,6 +630,9 @@ class Client:
             country = generateRandomCountry()
             response = self.enterAddress(street1, street2, city, state, zzip, country)
             # ReadResponse - addr_id (self constructed in EnterAddress)
+            if self.isAbort(response):
+                self.logger.warning("Response to enterAddress is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to enterAddress has error")
                 return False
@@ -612,6 +645,9 @@ class Client:
             query = sql.sqlNameToCommand["createNewCustomerMaxId"]
             response = self.send_query_and_receive_response(query, "createNewCustomerMaxId")
             # ReadResponse - SELECT max(c_id)
+            if self.isAbort(response):
+                self.logger.warning("Response to createNewCustomerMaxId is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to createNewCustomerMaxId has error")
                 return False
@@ -650,7 +686,7 @@ class Client:
             ertables = ["customer"]
             response = self.send_query_and_receive_response(query, "createNewCustomer", ertables)
             # UpdateOnly
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to createNewCustomer has error")
                 return False
 
@@ -668,6 +704,9 @@ class Client:
         query = sql.replaceVars(sql.sqlNameToCommand["getUserName"], 1, [self.c_id])
         response = self.send_query_and_receive_response(query, "getUserName")
         # ReadResponse - SELECT c_uname
+        if self.isAbort(response):
+            self.logger.warning("Response to getUserName is abort")
+            return True
         if self.isErr(response):
             self.logger.error("Response to getUserName has error")
             return False
@@ -686,6 +725,9 @@ class Client:
             ertables = ["customer"]
             response = self.send_query_and_receive_response(query, "getName", ertables)
             # ReadResponse - if not empty, existing customer, load data
+            if self.isAbort(response):
+                self.logger.warning("Response to getName is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to getName has error")
                 return False
@@ -740,6 +782,9 @@ class Client:
                 query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderId"], 1, ["'" + self.c_uname.strip("'") + "'"])
                 response = self.send_query_and_receive_response(query, "getMostRecentOrderId")
                 # ReadResponse - SELECT o_id
+                if self.isAbort(response):
+                    self.logger.warning("Response to getMostRecentOrderId is abort")
+                    return True
                 if self.isErr(response):
                     self.logger.error("Response to getMostRecentOrderId has error")
                     return False
@@ -751,6 +796,9 @@ class Client:
                     ertables = ["customer", "country", "cc_xacts", "orders", "address"]
                     response = self.send_query_and_receive_response(query, "getMostRecentOrderOrder", ertables)
                     # ReadResponse - SELECT orders.*, customer.*; but only care if it is empty
+                    if self.isAbort(response):
+                        self.logger.warning("Response to getMostRecentOrderOrder is abort")
+                        return True
                     if self.isErr(response):
                         self.logger.error("Response to getMostRecentOrderOrder has error")
                         return False
@@ -836,6 +884,9 @@ class Client:
             query = sql.sqlNameToCommand["createEmptyCart"]
             response = self.send_query_and_receive_response(query, "createEmptyCart")
             # ReadResponse - read COUNT
+            if self.isAbort(response):
+                self.logger.warning("Response to createEmptyCart is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to createEmptyCart has error")
                 return False
@@ -848,7 +899,7 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["createEmptyCartInsertV2"], 1, [self.shopping_id])
             response = self.send_query_and_receive_response(query, "createEmptyCartInsertV2")
             # UpdateOnly:
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to createEmptyCartInsertV2 has error")
                 return False
 
@@ -876,14 +927,14 @@ class Client:
                     query = sql.replaceVars(sql.sqlNameToCommand["refreshCartRemove"], 2, [self.shopping_id, iid])
                     response = self.send_query_and_receive_response(query, "refreshCartRemove")
                     # UpdateOnly
-                    if self.isErr(response):
+                    if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                         self.logger.error("Response to refreshCartRemove has error")
                         return False
                 else:
                     query = sql.replaceVars(sql.sqlNameToCommand["refreshCartUpdate"], 3, [qty, self.shopping_id, iid])
                     response = self.send_query_and_receive_response(query, "refreshCartUpdate")
                     # UpdateOnly
-                    if self.isErr(response):
+                    if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                         self.logger.error("Response to refreshCartUpdate has error")
                         return False
 
@@ -894,6 +945,9 @@ class Client:
         query = sql.replaceVars(sql.sqlNameToCommand["addRandomItemToCartIfNecessary"], 1, [self.shopping_id])
         response = self.send_query_and_receive_response(query, "addRandomItemToCartIfNecessary")
         # ReadResponse - read COUNT
+        if self.isAbort(response):
+            self.logger.warning("Response to addRandomItemToCartIfNecessary is abort")
+            return True
         if self.isErr(response):
             self.logger.error("Response to addRandomItemToCartIfNecessary has error")
             return False
@@ -907,6 +961,9 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["getRelated1"], 1, [i_id])
             response = self.send_query_and_receive_response(query, "getRelated1")
             # ReadResponse - read SELECT i_related1
+            if self.isAbort(response):
+                self.logger.warning("Response to getRelated1 is abort")
+                return True
             if self.isErr(response):
                 self.logger.error("Response to getRelated1 has error")
                 return False
@@ -914,7 +971,7 @@ class Client:
                 r_id = int(response[0][0])
                 response = self.addItem(r_id)
                 # UpdateOnly
-                if self.isErr(response):
+                if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                     self.logger.error("Response to addItem has error")
                     return False
             else:
@@ -926,7 +983,7 @@ class Client:
         ertables = ["shopping_cart"]
         response = self.send_query_and_receive_response(query, "resetCartTime", ertables)
         # UpdateOnly:
-        if self.isErr(response):
+        if not UPDATE_NO_ERR_CHECK and self.isErr(response):
             self.logger.error("Response to resetCartTime has error")
             return False
 
@@ -990,6 +1047,10 @@ class Client:
         self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
+        if ALLOW_ABORT and OK not in response["reply"]["Query"]:
+            if "aborted" in response["reply"]["Query"]["Err"]:
+                return "Abort"
+
         if OK not in response["reply"]["Query"]:
             self.logger.error("Response to {} contains error".format(name))
             return "Err"
@@ -1017,6 +1078,9 @@ class Client:
     
     def isEmpty(self, response):
         return response == "Empty"
+
+    def isAbort(self, response):
+        return response == "Abort"
 
     def processCart(self, response, discount):
         cart = {"lines":[], "sc_sub_total":0, "sc_total":0, "total_items":0}
@@ -1066,6 +1130,9 @@ class Client:
         query = sql.replaceVars(sql.sqlNameToCommand["addItem"], 2, [self.shopping_id, i_id])
         response = self.send_query_and_receive_response(query, "addItem")
         # ReadResponse - read SELECT scl_qty
+        if self.isAbort(response):
+            self.logger.warning("Response to addItem is abort")
+            return response
         if self.isErr(response):
             self.logger.error("Response to addItem has error")
             return response
@@ -1075,7 +1142,7 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["addItemPut"], 3, [self.shopping_id, 1, i_id])
             response = self.send_query_and_receive_response(query, "addItemPut")
             # UpdateOnly
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to addItemPut has error")
                 return response
         else:
@@ -1084,7 +1151,7 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["addItemUpdate"], 3, [newQty, self.shopping_id, i_id])
             response = self.send_query_and_receive_response(query, "addItemUpdate")
             # UpdateOnly
-            if self.isErr(response):
+            if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                 self.logger.error("Response to addItemUpdate has error")
                 return response
         
@@ -1126,6 +1193,9 @@ class Client:
             ertables = ["country"]
         response = self.send_query_and_receive_response(query, "enterAddressId", ertables)
         # ReadResponse - SELECT co_id
+        if self.isAbort(response):
+            self.logger.warning("Response to enterAddressId is abort")
+            return response
         if self.isErr(response):
             self.logger.error("Response to enterAddressId has error")
             return response
@@ -1135,6 +1205,9 @@ class Client:
             query = sql.replaceVars(sql.sqlNameToCommand["enterAddressMatch"], 6, [street1, street2, city, state, zzip, co_id])
             response = self.send_query_and_receive_response(query, "enterAddressMatch")
             # ReadResponse - SELECT addr_id
+            if self.isAbort(response):
+                self.logger.warning("Response to enterAddressMatch is abort")
+                return response
             if self.isErr(response):
                 self.logger.error("Response to enterAddressMatch has error")
                 return response
@@ -1144,6 +1217,9 @@ class Client:
                 query = sql.sqlNameToCommand["enterAddressMaxId"]
                 response = self.send_query_and_receive_response(query, "enterAddressMaxId")
                 # ReadResponse - SELECT max(addr_id)
+                if self.isAbort(response):
+                    self.logger.warning("Response to enterAddressMaxId is abort")
+                    return response
                 if self.isErr(response):
                     self.logger.error("Response to enterAddressMaxId has error")
                     return response
@@ -1160,7 +1236,7 @@ class Client:
                     ertables = ["address"]
                 response = self.send_query_and_receive_response(query, "enterAddressInsert", ertables)
                 # UpdateOnly
-                if self.isErr(response):
+                if not UPDATE_NO_ERR_CHECK and self.isErr(response):
                     self.logger.error("Response to enterAddressInsert has error")
                     return response
 
