@@ -1,9 +1,7 @@
+use crate::comm::MsqlResponse;
 use crate::core::DbVN;
-use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RequestMeta, TxVN};
-use crate::{
-    comm::MsqlResponse,
-    core::{DbVNReleaseRequest, EarlyReleaseTables, TableOps},
-};
+use crate::core::{DbVNReleaseRequest, EarlyReleaseTables, TableOps};
+use crate::core::{Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
 use bb8_postgres::bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
@@ -160,13 +158,13 @@ impl PendingQueue {
                     if let Ok(query) = op.msql.try_get_query() {
                         (
                             op.clone(),
-                            version.lock().await.violate_version(
-                                query.tableops(),
-                                &op.clone().versions,
-                            ),
+                            version
+                                .lock()
+                                .await
+                                .violate_version(query.tableops(), &op.clone().versions),
                         )
                     } else {
-                        (op,false)
+                        (op, false)
                     }
                 }
             })
@@ -550,6 +548,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn pending_queue_task_order_test() {
         let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         let mut queue = PendingQueue::new();
