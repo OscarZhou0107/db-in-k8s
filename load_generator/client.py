@@ -332,7 +332,7 @@ class Client:
             return False
 
         #   b. adminUpdateRelated
-        query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated"], 2, i_id, i_id)
+        query = sql.replaceVars(sql.sqlNameToCommand["adminUpdateRelated"], 2, [i_id, i_id])
         # EarlyRelease - orders, order_line
         ertables = ["orders", "order_line"]
         response = self.send_query_and_receive_response(query, "adminUpdateRelated", ertables)
@@ -406,14 +406,17 @@ class Client:
             self.logger.warning("Response to getCDiscount is empty")
             return True # bypass the rest
 
-        discount = int(response[0][0])
+        discount = float(response[0][0])
 
         # getCart
         if self.shopping_id:
             response = self.getCart()
+            # ReadResponse - cart
             if self.isErr(response):
                 self.logger.error("Response to getCart has error")
                 return False
+            if self.isEmpty(response):
+                return True
             processed = self.processCart(response, discount) # handle all index and return a dictionary
 
             ship_addr_id = 0
@@ -476,12 +479,12 @@ class Client:
                 self.logger.warning("Response to enterOrderMaxId is empty")
                 return False # count has to have a number
             
-            o_id = response[0][0] + 1
+            o_id = int(response[0][0]) + 1
 
             #   c. enterOrderInsert
             o_sub_total = processed["sc_sub_total"]
             o_total = processed["sc_total"]
-            ship_type = ['FEDEX', 'SHIP', 'AIR', 'COURIER', 'UPS', 'MAIL']
+            ship_type = ["""'FEDEX'""", """'SHIP'""", """'AIR'""", """'COURIER'""", """'UPS'""", """'MAIL'"""]
             o_ship_type = randint(0, len(ship_type)-1)
             interval = randint(1, 7)
             order_info = [o_id, self.c_id, o_sub_total, o_total, o_ship_type, interval, c_addr_id, ship_addr_id]
@@ -520,7 +523,7 @@ class Client:
                     self.logger.warning("Response to getStock is empty")
                     return True # bypass the rest
 
-                stock = response[0][0]
+                stock = int(response[0][0])
 
                 # setStock
                 if stock - processed["lines"][i]["scl_qty"] < 10:
@@ -537,11 +540,11 @@ class Client:
                     return False
 
             # enterCCXact
-            allType = ['DISCOVER', 'DINERS', 'VISA', 'AMEX', 'MASTERCARD']
-            cc_type = allType(randint(0, len(allType)-1))
+            allType = ["""'DISCOVER'""", """'DINERS'""", """'VISA'""", """'AMEX'""", """'MASTERCARD'"""]
+            cc_type = allType[randint(0, len(allType)-1)]
             cc_num = generateRandomNum()
             cc_name = generateRandomString()
-            cc_expiry = (datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')
+            cc_expiry = "'" + str((datetime.datetime.now() + datetime.timedelta(days=365)).strftime('%Y-%m-%d %H:%M:%S')) + "'"
             cc_info = [o_id, cc_type, cc_num, cc_name, cc_expiry, o_total, ship_addr_id]
             query = sql.replaceVars(sql.sqlNameToCommand["enterCCXact"], 7, cc_info)
             # EarlyRelease - country, cc_xacts, address
@@ -567,7 +570,7 @@ class Client:
         if (flag == 1): # only if flag is Y == 1
             if self.load: # only if both c_uname and c_passwd are given (implied by load)
                 # getCustomer
-                query = sql.replaceVars(sql.sqlNameToCommand["getCustomer"], 1, ["'" + self.c_uname + "'"])
+                query = sql.replaceVars(sql.sqlNameToCommand["getCustomer"], 1, ["'" + self.c_uname.strip("'") + "'"])
                 response = self.send_query_and_receive_response(query, "getCustomer")
                 # DispOnly
                 if self.isErr(response):
@@ -720,7 +723,7 @@ class Client:
     def doOrderDisp(self): # state 8
         # 1. getPassword 
         if self.load: # only if both c_uname and c_passwd are given (implied by load)
-            query = sql.replaceVars(sql.sqlNameToCommand["getPassword"], 1, [self.c_uname])
+            query = sql.replaceVars(sql.sqlNameToCommand["getPassword"], 1, ["'" + self.c_uname.strip("'") + "'"])
             response = self.send_query_and_receive_response(query, "getPassword")
             # DispOnly
             if self.isErr(response):
@@ -734,7 +737,7 @@ class Client:
                 #       b. getMostRecentOrderOrder - only execute if a. is not empty; need o_id from a.
                 #       c. getMostRecentOrderLines - only execyte if b. is not empty; need o_id from a.
                     # getMostRecentOrderId
-                query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderId"], 1, [self.c_uname])
+                query = sql.replaceVars(sql.sqlNameToCommand["getMostRecentOrderId"], 1, ["'" + self.c_uname.strip("'") + "'"])
                 response = self.send_query_and_receive_response(query, "getMostRecentOrderId")
                 # ReadResponse - SELECT o_id
                 if self.isErr(response):
@@ -1019,10 +1022,11 @@ class Client:
         cart = {"lines":[], "sc_sub_total":0, "sc_total":0, "total_items":0}
         # process each cart line
         for i in range(len(response)):
+            row = response[i]
             cart["lines"].append({})
             cart["lines"][i]["scl_i_id"] = row[2] 
             cart["lines"][i]["scl_qty"] = int(row[1])
-            cart["lines"][i]["i_cost"] = float(row[19])
+            cart["lines"][i]["i_cost"] = float(row[18])
             cart["total_items"] = cart["total_items"] + cart["lines"][i]["scl_qty"]
             cart["sc_sub_total"] = cart["sc_sub_total"] + cart["lines"][i]["scl_qty"] * cart["lines"][i]["i_cost"]
 
