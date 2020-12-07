@@ -14,7 +14,7 @@ max_connection = 50
 
 # This is for UG
 [[dbproxy]]
-addr = "127.0.0.1:8876"
+addr = "127.0.0.1:8875"
 dbname = "tpcw"
 host = "34.70.104.125"
 password = "Abc@123"
