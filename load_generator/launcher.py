@@ -15,7 +15,7 @@ def launch_client(cids, mix, pid, python):
         script = "test.py"
 
     procs = {}
-    port = 1077
+    port = 2077
 
     print("Popen child processes...")
 
