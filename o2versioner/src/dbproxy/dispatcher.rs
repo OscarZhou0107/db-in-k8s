@@ -39,14 +39,12 @@ impl Dispatcher {
                 println!("Pending queue size is {}", pending_queue.lock().await.queue.len());
 
                 println!("version is: {:?}", version.lock().await.db_version);
-                
                 let operations = pending_queue
                     .lock()
                     .await
                     .get_all_version_ready_task(&mut version)
                     .await;
 
-                
                 println!("Operation batch size is {}", operations.len());
 
                 {
@@ -57,15 +55,10 @@ impl Dispatcher {
                         let pool_cloned = pool.clone();
                         let sender_cloned = sender.clone();
 
-                        match op_cloned.operation_type {
-                            Task::BEGIN | Task::READ | Task::WRITE => {
-                                if !lock.contains_key(op_cloned.versions.clone().unwrap().uuid()) {
-                                    let (ts, tr) = mpsc::channel(100);
-                                    lock.insert(op_cloned.versions.clone().unwrap().uuid().clone(), ts);
-                                    Self::spawn_transaction(pool_cloned, tr, sender_cloned);
-                                };
-                            }
-                            _ => {}
+                        if !lock.contains_key(op_cloned.versions.clone().unwrap().uuid()) {
+                            let (ts, tr) = mpsc::channel(100);
+                            lock.insert(op_cloned.versions.clone().unwrap().uuid().clone(), ts);
+                            Self::spawn_transaction(pool_cloned, tr, sender_cloned);
                         };
                     });
                 }
@@ -111,25 +104,29 @@ impl Dispatcher {
     ) {
         tokio::spawn(async move {
             {
-                let finish = false;
+                let mut finish = false;
                 let conn = pool.get().await.unwrap();
                 conn.simple_query("START TRANSACTION;").await.unwrap();
                 while let Some(operation) = rec.recv().await {
                     let raw;
                     match operation.operation_type {
                         Task::READ => {
-                            raw = conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner()).await;
+                            raw = conn
+                                .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                                .await;
                         }
                         Task::WRITE => {
-                            raw = conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner()).await;
+                            raw = conn
+                                .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                                .await;
                         }
                         Task::COMMIT => {
                             raw = conn.simple_query("COMMIT;").await;
-                            //finish = true;
+                            finish = true;
                         }
                         Task::ABORT => {
                             raw = conn.simple_query("ROLLBACK;").await;
-                            //finish = true;
+                            finish = true;
                         }
                         _ => {
                             panic!("Unexpected operation type");
