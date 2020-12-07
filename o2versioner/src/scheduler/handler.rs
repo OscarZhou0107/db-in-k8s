@@ -10,6 +10,7 @@ use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
@@ -162,8 +163,18 @@ async fn admin(
         let state = state.clone();
         let conf = conf.clone();
         async move {
+            let cmd_registry: HashMap<_, Vec<_>> = vec![
+                ("block_unblock", vec!["block", "unblock"]),
+                ("kill", vec!["kill", "exit", "quit"]),
+                ("dump_perf", vec!["dump_perf"]),
+            ]
+            .into_iter()
+            .map(|(k, vs)| (k, vs.into_iter().map(|v| UniCase::new(String::from(v))).collect()))
+            .collect();
+
             let command = UniCase::new(msg);
-            if command == UniCase::new("block") || command == UniCase::new("unblock") {
+
+            if cmd_registry.get("block_unblock").unwrap().contains(&command) {
                 let m = if command == UniCase::new("block") {
                     scheduler_sequencer::Message::RequestBlock
                 } else {
@@ -178,7 +189,7 @@ async fn admin(
                     .map_ok_or_else(|e| e, |m| m)
                     .await;
                 (reply, true)
-            } else if Vec::from_iter(vec!["kill", "exit", "quit"].into_iter().map(|s| s.into())).contains(&command) {
+            } else if cmd_registry.get("kill").unwrap().contains(&command) {
                 let reply = format!(
                     "Scheduler is going to Stop. {}",
                     tcp::send_and_receive_single_as_json(
@@ -196,7 +207,7 @@ async fn admin(
                     .await
                 );
                 (reply, false)
-            } else if command == UniCase::new("dump_perf") {
+            } else if cmd_registry.get("dump_perf").unwrap().contains(&command) {
                 state
                     .dump_perf_log(
                         conf.scheduler.performance_logging.unwrap_or(String::from("debug")),
@@ -205,7 +216,10 @@ async fn admin(
                     .await;
                 (format!("Perf logging dumped. Check scheduler terminal"), true)
             } else {
-                (format!("Unknown command: {}", command), true)
+                (
+                    format!("Unknown command: {}. Available commands: {:?}", command, cmd_registry),
+                    true,
+                )
             }
         }
     })
