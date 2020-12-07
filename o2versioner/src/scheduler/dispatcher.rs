@@ -240,12 +240,15 @@ impl State {
             }
 
             // For now, pick the first dbproxy from all available
-            let dbproxy_addr = avail_dbproxy[0].0;
+            let selected_dbproxy = &avail_dbproxy[0];
             debug!(
                 "Found dbproxy {} for executing the ReadOnly query: {:?}",
-                dbproxy_addr, avail_dbproxy[0].1
+                selected_dbproxy.0, selected_dbproxy.1
             );
-            (dbproxy_addr.clone(), self.dbproxy_manager.get(&dbproxy_addr))
+            (
+                selected_dbproxy.0.clone(),
+                self.dbproxy_manager.get(&selected_dbproxy.0),
+            )
         } else {
             // Single read operation that does not have a TxVN
             // Since a single-read transaction executes only at one replica,
