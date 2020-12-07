@@ -1,5 +1,6 @@
 use crate::core::operation::*;
 use serde::{Deserialize, Serialize};
+use std::iter::FromIterator;
 use uuid::Uuid;
 
 /// Version number
@@ -80,6 +81,15 @@ impl TxVN {
     /// A `ref` to the `txtablevns`
     pub fn txtablevns(&self) -> &[TxTableVN] {
         &self.txtablevns
+    }
+
+    /// Translate the current `TxVN` as `TableOps`
+    pub fn get_tableops(&self) -> TableOps {
+        TableOps::from_iter(
+            self.txtablevns
+                .iter()
+                .map(|txtablevn| TableOp::new(txtablevn.table.clone(), txtablevn.op.clone())),
+        )
     }
 
     /// A `ref` to the `uuid`
