@@ -217,7 +217,12 @@ impl State {
             "Expecting ReadOnly access pattern for the query"
         );
 
-        debug!("entering wait_on_version {:?} {:?}", msqlquery, txvn);
+        debug!(
+            "entering wait_on_version {:?} {:?} {:?}",
+            msqlquery,
+            txvn,
+            self.dbvn_manager.read().await.inner()
+        );
 
         if let Some(txvn) = txvn {
             // The scheduler blocks read queries until at least one database has, for all tables in the query,
