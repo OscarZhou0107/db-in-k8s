@@ -9,7 +9,6 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio_postgres::Config;
-use uuid::Uuid;
 
 pub async fn main(conf: DbProxyConfig) {
     println!("Starting dbproxy...");

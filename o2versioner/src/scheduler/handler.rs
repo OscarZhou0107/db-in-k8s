@@ -138,25 +138,32 @@ pub async fn main(conf: Config) {
 
     // Dump logging files
     if let Some(log_dir) = conf.scheduler.performance_logging {
-        info!("Preparing {} for performance logging", log_dir);
-        fs::create_dir_all(log_dir.clone()).await.unwrap();
-
-        let mut path = PathBuf::from(log_dir);
-        path.push(format!("perf_{}.csv", Utc::now().format("%y%m%d_%H%M%S")));
-        let path = path.as_path();
-        let mut wrt = csv::Writer::from_path(path).unwrap();
-
-        state
-            .collect_client_records()
-            .await
-            .into_iter()
-            .map(|(_, reqrecord)| reqrecord.get_performance_records())
-            .flatten()
-            .for_each(|r| wrt.serialize(r).unwrap());
-        info!("Dumped performance logging to {:?}", path);
+        logging(log_dir, state).await
     }
 
     info!("DIES");
+}
+
+async fn logging(log_dir: String, state: State) {
+    let mut path_builder = PathBuf::from(log_dir);
+    path_builder.push(Utc::now().format("%y%m%d_%H%M%S").to_string());
+    let cur_log_dir = path_builder.as_path();
+    info!("Preparing {} for performance logging", cur_log_dir.display());
+    fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
+
+    let mut csv_path_builder = PathBuf::from(cur_log_dir);
+    csv_path_builder.push("perf.csv");
+    let csv_path = csv_path_builder.as_path();
+
+    let mut wrt = csv::Writer::from_path(csv_path).unwrap();
+    state
+        .collect_client_records()
+        .await
+        .into_iter()
+        .map(|(_, reqrecord)| reqrecord.get_performance_records())
+        .flatten()
+        .for_each(|r| wrt.serialize(r).unwrap());
+    info!("Dumped performance logging to {}", csv_path.display());
 }
 
 #[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool))]

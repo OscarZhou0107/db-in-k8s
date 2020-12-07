@@ -1,7 +1,9 @@
-import csv
-from datetime import datetime, timedelta
 import argparse
+import csv
 import itertools
+import os
+from datetime import datetime, timedelta
+
 try:
     from dateutil import parser as dateutil_parser
 except:
@@ -86,12 +88,13 @@ def get_throughput(grouped_by_time_interval_since_beginning):
 
 
 def init(parser):
-    parser.add_argument('--log_file', type=str, required=True, help='log file')
+    parser.add_argument('--log_dir', type=str, required=True, help='log file')
 
 
 def main(args):
-    print('Info:', 'Analyzing', args.log_file)
-    db = parse_csv(args.log_file)
+    perf_csv = os.path.join(args.log_dir, 'perf.csv')
+    print('Info:', 'Analyzing', perf_csv)
+    db = parse_csv(perf_csv)
     prepare_db(db)
 
     # [(len_after_first_group, rows)]
@@ -111,6 +114,9 @@ def main(args):
     for item in throughput:
         print('Info:', item)
 
+    # Find the peak throughput
+    print('Info:')
+    print('Info:', 'Peak throughput is', max(throughput, key=lambda kv: kv[1]))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

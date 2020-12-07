@@ -225,11 +225,9 @@ impl State {
             let mut avail_dbproxy;
             // Need to wait on version
             loop {
-                avail_dbproxy = self
-                    .dbvn_manager
-                    .read()
-                    .await
-                    .get_all_that_can_execute_read_query(msqlquery.tableops(), txvn);
+                let dbvn_manager = self.dbvn_manager.read().await;
+
+                avail_dbproxy = dbvn_manager.get_all_that_can_execute_read_query(msqlquery.tableops(), txvn);
 
                 // Found a dbproxy that can execute the read query
                 if avail_dbproxy.len() > 0 {
@@ -243,7 +241,10 @@ impl State {
 
             // For now, pick the first dbproxy from all available
             let dbproxy_addr = avail_dbproxy[0].0;
-            debug!("Found dbproxy {} for executing the ReadOnly query", dbproxy_addr);
+            debug!(
+                "Found dbproxy {} for executing the ReadOnly query: {:?}",
+                dbproxy_addr, avail_dbproxy[0].1
+            );
             (dbproxy_addr.clone(), self.dbproxy_manager.get(&dbproxy_addr))
         } else {
             // Single read operation that does not have a TxVN
