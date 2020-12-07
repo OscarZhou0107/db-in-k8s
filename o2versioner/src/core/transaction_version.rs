@@ -83,7 +83,7 @@ impl TxVN {
         &self.txtablevns
     }
 
-    /// Translate the current `TxVN` as `TableOps`
+    /// Get a `TableOps` representation of the current `TxVN`
     pub fn get_tableops(&self) -> TableOps {
         TableOps::from_iter(
             self.txtablevns
@@ -298,6 +298,50 @@ mod tests_txvn {
                 TableOp::new("t0", RWOperation::R)
             ]))
             .is_err());
+    }
+
+    #[test]
+    fn test_get_tableops() {
+        assert_eq!(
+            TxVN::new()
+                .set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 2, RWOperation::W),
+                ])
+                .get_tableops(),
+            TableOps::from_iter(vec![
+                TableOp::new("t0", RWOperation::R),
+                TableOp::new("t1", RWOperation::W)
+            ])
+        );
+
+        assert_eq!(
+            TxVN::new()
+                .set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 2, RWOperation::R),
+                ])
+                .get_tableops(),
+            TableOps::from_iter(vec![
+                TableOp::new("t0", RWOperation::R),
+                TableOp::new("t1", RWOperation::R)
+            ])
+        );
+
+        assert_eq!(
+            TxVN::new()
+                .set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::W),
+                    TxTableVN::new("t1", 2, RWOperation::W),
+                ])
+                .get_tableops(),
+            TableOps::from_iter(vec![
+                TableOp::new("t0", RWOperation::W),
+                TableOp::new("t1", RWOperation::W)
+            ])
+        );
+
+        assert_eq!(TxVN::new().get_tableops(), TableOps::default());
     }
 
     #[test]
