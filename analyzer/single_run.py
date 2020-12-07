@@ -156,7 +156,7 @@ def init(parser):
 
 def main(args):
     # Parse perf csv
-    perfdb = PerfDB(os.path.join(args.log_dir, 'perf.csv'))
+    perfdb = PerfDB(perf_csv_path=os.path.join(args.log_dir, 'perf.csv'))
 
     # Parse dbproxy stats csv
     dbproxy_stats_db = DbproxyStatsDB(
