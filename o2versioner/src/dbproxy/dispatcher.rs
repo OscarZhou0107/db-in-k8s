@@ -1,3 +1,5 @@
+use crate::core::MsqlFinalString;
+
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
@@ -116,10 +118,10 @@ impl Dispatcher {
                     let raw;
                     match operation.operation_type {
                         Task::READ => {
-                            raw = conn.simple_query(&operation.query).await;
+                            raw = conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner()).await;
                         }
                         Task::WRITE => {
-                            raw = conn.simple_query(&operation.query).await;
+                            raw = conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner()).await;
                         }
                         Task::COMMIT => {
                             raw = conn.simple_query("COMMIT;").await;

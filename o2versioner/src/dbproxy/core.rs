@@ -1,6 +1,9 @@
-use crate::{comm::MsqlResponse, core::{DbVNReleaseRequest, EarlyReleaseTables}};
 use crate::core::DbVN;
 use crate::core::{IntoMsqlFinalString, Msql, MsqlEndTxMode, RequestMeta, TxVN};
+use crate::{
+    comm::MsqlResponse,
+    core::{DbVNReleaseRequest, EarlyReleaseTables, TableOps},
+};
 use async_trait::async_trait;
 use bb8_postgres::bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
@@ -34,34 +37,36 @@ impl PostgresSqlConnPool {
 pub struct QueueMessage {
     pub identifier: RequestMeta,
     pub operation_type: Task,
-    pub query: String,
+    pub msql: Msql,
     pub versions: Option<TxVN>,
-    pub early_release : Option<EarlyReleaseTables>
+    pub early_release: Option<EarlyReleaseTables>,
 }
 
 impl QueueMessage {
-    pub fn new(identifier: RequestMeta, request: Msql, versions: Option<TxVN>) -> Self {
+    pub fn new(identifier: RequestMeta, msql: Msql, versions: Option<TxVN>) -> Self {
         let operation_type;
-        let mut query_string = String::new();
         let mut early_release = None;
 
-        match request {
+        match &msql {
             Msql::BeginTx(_) => {
                 operation_type = Task::BEGIN;
             }
 
             Msql::Query(op) => {
-                
                 match op.tableops().access_pattern() {
-                    crate::core::AccessPattern::ReadOnly => {operation_type = Task::READ;},
-                    crate::core::AccessPattern::WriteOnly => {operation_type = Task::WRITE;}
-                    _=> {panic!("Illegal access pattern");}
+                    crate::core::AccessPattern::ReadOnly => {
+                        operation_type = Task::READ;
+                    }
+                    crate::core::AccessPattern::WriteOnly => {
+                        operation_type = Task::WRITE;
+                    }
+                    _ => {
+                        panic!("Illegal access pattern");
+                    }
                 }
-                
                 if op.has_early_release() {
                     early_release = Some(op.early_release_tables().clone());
                 }
-                query_string = op.into_msqlfinalstring().into_inner();
             }
 
             Msql::EndTx(op) => match op.mode() {
@@ -74,14 +79,12 @@ impl QueueMessage {
             },
         }
 
-    
-
         QueueMessage {
             identifier: identifier,
             operation_type: operation_type,
-            query: query_string,
+            msql: msql,
             versions: versions,
-            early_release: early_release
+            early_release: early_release,
         }
     }
 
@@ -95,7 +98,7 @@ impl QueueMessage {
                 succeed = true;
             }
             Err(err) => {
-                result = err.to_string();   
+                result = err.to_string();
                 succeed = false;
             }
         }
@@ -151,7 +154,22 @@ impl PendingQueue {
 
     pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
         let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
-            .then(|op| async { (op.clone(), version.lock().await.violate_version(op.versions)) })
+            .then(move |op| {
+                let version = version.clone();
+                async move {
+                    if let Ok(query) = op.msql.try_get_query() {
+                        (
+                            op.clone(),
+                            version.lock().await.violate_version(
+                                query.tableops(),
+                                &op.clone().versions,
+                            ),
+                        )
+                    } else {
+                        (op,false)
+                    }
+                }
+            })
             .collect()
             .await;
         let (unready_ops, ready_ops): (Vec<_>, Vec<_>) =
@@ -184,9 +202,11 @@ impl DbVersion {
         self.notify.notify_one();
     }
 
-    pub fn violate_version(&self, transaction_version: Option<TxVN>) -> bool {
-        if let Some(tx_version) = transaction_version {
-            return !self.db_version.can_execute_query(tx_version.txtablevns());
+    pub fn violate_version(&self, table_ops: &TableOps, txvn: &Option<TxVN>) -> bool {
+        if let Some(txvn) = txvn {
+            return !self
+                .db_version
+                .can_execute_query(&txvn.get_from_tableops(table_ops).unwrap());
         }
         false
     }
@@ -273,7 +293,7 @@ impl PostgreToCsvWriter {
                 row.reserve(len);
 
                 for index in 0..len {
-                    row.push(format!("\"{}\"",query_row.get(index).unwrap()));
+                    row.push(format!("\"{}\"", query_row.get(index).unwrap()));
                 }
 
                 self.wrt.write_record(&row).unwrap();
@@ -316,7 +336,7 @@ pub struct QueryResult {
     pub succeed: bool,
     pub result_type: QueryResultType,
     pub contained_newer_versions: TxVN,
-    pub contained_early_release_version: Option<EarlyReleaseTables>
+    pub contained_early_release_version: Option<EarlyReleaseTables>,
 }
 
 impl QueryResult {
@@ -349,8 +369,10 @@ impl QueryResult {
     }
 
     pub fn flush_early_release(&mut self) -> Result<DbVNReleaseRequest, &'static str> {
-        if let Some(early_release) = & self.contained_early_release_version {
-            return self.contained_newer_versions.early_release_request(early_release.clone())
+        if let Some(early_release) = &self.contained_early_release_version {
+            return self
+                .contained_newer_versions
+                .early_release_request(early_release.clone());
         }
         Err("No available early release")
     }
@@ -500,15 +522,12 @@ mod tests {
             config.port(5432);
             config.dbname("tpcw");
 
-               let size: u32 = 50;
+            let size: u32 = 50;
             let manager = PostgresConnectionManager::new(config, NoTls);
             let pool = Pool::builder().max_size(size).build(manager).await.unwrap();
 
             let conn = pool.get().await.unwrap();
-            let result = conn
-                .simple_query("SELECT * FROM address LIMIT 10;")
-                .await
-                .unwrap();
+            let result = conn.simple_query("SELECT * FROM address LIMIT 10;").await.unwrap();
 
             result.iter().for_each(|q_message| match q_message {
                 tokio_postgres::SimpleQueryMessage::Row(query_row) => {
@@ -710,4 +729,4 @@ mod tests {
         println!("Number of tasks is: {}", ready_tasks.len());
         assert!(ready_tasks.len() == 4);
     }
-    }
+}
