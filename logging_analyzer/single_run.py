@@ -10,11 +10,11 @@ except:
     print('Error:', 'pip install python-dateutil')
 
 
-def parse_csv(log_path):
+def parse_perf_csv(perf_csv_path):
     '''
     [{key:value}]
     '''
-    with open(log_path) as csvfile:
+    with open(perf_csv_path) as csvfile:
         csvreader = csv.DictReader(csvfile)
         return list(csvreader)
 
@@ -94,7 +94,7 @@ def init(parser):
 def main(args):
     perf_csv = os.path.join(args.log_dir, 'perf.csv')
     print('Info:', 'Analyzing', perf_csv)
-    db = parse_csv(perf_csv)
+    db = parse_perf_csv(perf_csv)
     prepare_db(db)
 
     # [(len_after_first_group, rows)]
