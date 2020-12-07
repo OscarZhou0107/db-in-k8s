@@ -7,15 +7,15 @@ import os
 import signal
 import multiprocessing
 
-DEBUG = 1
+DEBUG = 0
 
-def launch_client(cids, pid):
+def launch_client(cids, mix, pid):
     script = "client.py"
     if DEBUG:
         script = "test.py"
 
     procs = {}
-    port = 4000
+    port = 1077
 
     print("Popen child processes...")
 
@@ -24,13 +24,13 @@ def launch_client(cids, pid):
     # -> handle this with finally
     for cid in cids:
         if DEBUG:
-            command = "python3.8 {} --c_id {}".format(script, cid)
-            procs[subprocess.Popen(["python3.8", script, "--c_id", str(cid)])] = command
-            #procs.add(subprocess.Popen(["python3.8", script]))
+            command = "python3 {} --c_id {}".format(script, cid)
+            procs[subprocess.Popen(["python3", script, "--c_id", str(cid)])] = command
+            #procs.add(subprocess.Popen(["python3", script]))
         else:
-            command = "python3.8 {} --port {} --c_id {}".format(script, port, cid)
-            procs[(subprocess.Popen(["python3.8", script, "--port", str(port), "--c_id", str(cid)]))] #, stderr=subprocess.PIPE))
-            port = port + 1
+            command = "python3 {} --port {} --c_id {} --mix {}".format(script, port, cid, mix)
+            print(command)
+            procs[(subprocess.Popen(["python3", script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix)]))] = command #, stderr=subprocess.PIPE))
 
     try:
         # p.poll() only gets return code
@@ -43,13 +43,14 @@ def launch_client(cids, pid):
                 if p.poll() is not None: # not None == finished
                     if p.returncode != 0: # abnoraml exit of a child process -> kill everything
                                         # default return code is 0
-                        print("process {} abnormal exit".format(os.getpid()))
+                        print("Abnormal exit:{}".format(procs[p]))
                         print(procs[p])
                         os.killpg(pid, signal.SIGTERM)
                     # else: correctly exited
                     to_remove.add(p)
             for p in to_remove:
                 procs.pop(p) 
+            time.sleep(2)
                     
     except:
         print("Run into exception, terminate parent process to terminate children")
@@ -62,8 +63,11 @@ if __name__ == "__main__":
     # use ps aux | grep client.py to check how many clients are running
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--mix", type=int, required=True)
     parser.add_argument("--range", nargs='+', required=True)
     args = parser.parse_args()
+
+    mix = args.mix
     cid_range = args.range
     if (len(cid_range) != 2):
         print("This script takes exactly two argument! e.g. python launcher.py --range 0 10")
@@ -72,7 +76,7 @@ if __name__ == "__main__":
     cids = list(range(int(cid_range[0]), int(cid_range[1])))
     pid = os.getpid()
     # put launch_client into a separate process
-    p = multiprocessing.Process(target=launch_client, args=(cids, pid))
+    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid))
     p.start()
 
     start_time = time.time()
