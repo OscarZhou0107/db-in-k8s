@@ -4,6 +4,7 @@ import itertools
 import os
 from datetime import datetime, timedelta
 import statistics
+import math
 
 try:
     from dateutil import parser as dateutil_parser
@@ -107,7 +108,10 @@ class PerfDB(DB):
 
         latency = list(map(lambda row: row['latency'], db))
 
-        return (statistics.mean(latency), statistics.stdev(latency), statistics.geometric_mean(latency), statistics.median(latency))
+        def geomean(data):
+            return math.exp(math.fsum(math.log(x) for x in data) / len(data))
+
+        return (statistics.mean(latency), statistics.stdev(latency), geomean(latency), statistics.median(latency))
 
     def get_filtered(self, filter_func):
         return PerfDB(data=list(filter(filter_func, self)))
@@ -122,6 +126,9 @@ class Throughput(list):
 
     def get_trajectory(self):
         return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), self))
+
+    def get_peak(self):    
+        return max(self.get_trajectory(), key=lambda kv: kv[1])
 
     def print_trajectory(self):
         print('Info:')
