@@ -27,48 +27,63 @@ impl Legality {
         Self::Panic(s.into())
     }
 
+    fn check_tableops_match_txvn(query: &MsqlQuery, txvn: &TxVN) -> Option<Self> {
+        if txvn.get_from_tableops(&query.tableops()).is_err() {
+            let missing_tableops: Vec<_> = query
+                .tableops()
+                .get()
+                .iter()
+                .filter(|tableop| txvn.get_from_tableop(tableop).is_none())
+                .map(|tableop| tableop.table())
+                .collect();
+            Some(Self::critical(format!(
+                "Query is using tables not declared in the BeginTx: {:?}",
+                missing_tableops
+            )))
+        } else {
+            None
+        }
+    }
+
     pub fn final_check(msql: &Msql, txvn_opt: &Option<TxVN>) -> Self {
         match msql {
             Msql::BeginTx(_begintx) => {
                 if txvn_opt.is_some() {
                     Self::critical("Cannot begin new transaction because previous transaction not finished yet.")
                 } else {
-                    Self::Legal
+                    Self::legal()
                 }
             }
             Msql::Query(query) => {
                 if let Some(txvn) = txvn_opt.as_ref() {
-                    if query.tableops().access_pattern() == AccessPattern::Mixed {
-                        Self::critical("Does not support query with mixed R and W")
-                    } else if txvn.get_from_tableops(&query.tableops()).is_err() {
-                        let missing_tableops: Vec<_> = query
-                            .tableops()
-                            .get()
-                            .iter()
-                            .filter(|tableop| txvn.get_from_tableop(tableop).is_none())
-                            .map(|tableop| tableop.table())
-                            .collect();
-                        Self::critical(format!(
-                            "Query is using tables not declared in the BeginTx: {:?}",
-                            missing_tableops
-                        ))
-                    } else if txvn.get_from_ertables(&query.early_release_tables()).is_err() {
-                        Self::critical(
-                            "Tables marked for early release was not declared in the BeginTx or has already been released",
-                        )
-                    } else {
-                        Self::Legal
+                    match &query.tableops().access_pattern() {
+                        AccessPattern::Mixed => Self::critical("Does not support query with mixed R and W"),
+                        AccessPattern::ReadOnly => {
+                            if let Some(err) = Self::check_tableops_match_txvn(query, txvn) {
+                                err
+                            } else if query.has_early_release() {
+                                Self::critical("Does not support early release on R queries")
+                            } else {
+                                Self::legal()
+                            }
+                        }
+                        AccessPattern::WriteOnly => {
+                            if let Some(err) = Self::check_tableops_match_txvn(query, txvn) {
+                                err
+                            } else if txvn.get_from_ertables(&query.early_release_tables()).is_err() {
+                                Self::critical(
+                                        "Tables marked for early release was not declared in the BeginTx or has already been released",
+                                    )
+                            } else {
+                                Self::legal()
+                            }
+                        }
                     }
                 } else {
-                    if query.tableops().access_pattern() == AccessPattern::ReadOnly {
-                        if query.has_early_release() {
-                            // TODO: change it to critical after supporting fast single R query
-                            Self::panic("Does not support early release release for fast single R query")
-                        } else {
-                            Self::panic("Does not support fast single R query yet")
-                        }
-                    } else {
-                        Self::panic("Query does not have a valid BeginTx")
+                    match &query.tableops().access_pattern() {
+                        AccessPattern::Mixed => Self::critical("Does not support query with mixed R and W"),
+                        AccessPattern::ReadOnly => Self::panic("Does not support fast single R query"),
+                        AccessPattern::WriteOnly => Self::panic("Query does not have a valid BeginTx"),
                     }
                 }
             }
@@ -76,7 +91,7 @@ impl Legality {
                 if txvn_opt.is_none() {
                     Self::critical("There is not transaction to end")
                 } else {
-                    Self::Legal
+                    Self::legal()
                 }
             }
         }

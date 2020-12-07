@@ -365,7 +365,7 @@ async fn process_request(
 
 async fn process_msql(
     conf: SchedulerConfig,
-    mut msql: Msql,
+    msql: Msql,
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     dispatcher_addr: Arc<DispatcherAddr>,
@@ -378,24 +378,31 @@ async fn process_msql(
     let reqrecord = RequestRecord::start(&msql, conn_state.current_txvn());
     let msqlresponse = match msql {
         Msql::BeginTx(msqlbegintx) => process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await,
-        Msql::Query(_) => {
-            if conf.disable_early_release {
-                msql.try_get_mut_query().unwrap().drop_early_release();
+        Msql::Query(mut query) => {
+            if query.has_early_release() {
+                if conf.disable_early_release || query.tableops().access_pattern().is_read_only() {
+                    warn!(
+                        "Removing early release annotation due to settings or ReadOnly query. {:?} {:?}",
+                        query.tableops(),
+                        query.early_release_tables()
+                    );
+                    query.drop_early_release();
+                }
             }
 
             if conn_state.current_txvn().is_none() {
-                warn!("Single R/W query");
+                info!("Single R/W query");
                 // Construct a new MsqlBeginTx
-                let msqlbegintx = MsqlBeginTx::from(msql.try_get_query().unwrap().tableops().clone());
+                let msqlbegintx = MsqlBeginTx::from(query.tableops().clone());
                 process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await;
                 // Execute the query
-                let resp = process_query(msql, conn_state, &dispatcher_addr).await;
+                let resp = process_query(Msql::Query(query), conn_state, &dispatcher_addr).await;
                 // Construct a new MsqlEndTx
                 let msqlendtx = Msql::EndTx(MsqlEndTx::commit());
                 process_endtx(msqlendtx, conn_state, &dispatcher_addr).await;
                 resp
             } else {
-                process_query(msql, conn_state, &dispatcher_addr).await
+                process_query(Msql::Query(query), conn_state, &dispatcher_addr).await
             }
         }
         Msql::EndTx(_) => process_endtx(msql, conn_state, &dispatcher_addr).await,
