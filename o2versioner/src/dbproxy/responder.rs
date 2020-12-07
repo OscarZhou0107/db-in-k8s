@@ -25,6 +25,8 @@ impl Responder {
                 println!("Responder got a result to return");
                 match result.result_type {
                     QueryResultType::END => {
+                        println!("Trying to release a version");
+                        println!("{:?}", result.contained_newer_versions.clone());
                         version
                             .lock()
                             .await

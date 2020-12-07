@@ -37,12 +37,15 @@ impl Dispatcher {
 
                 println!("Pending queue size is {}", pending_queue.lock().await.queue.len());
 
+                println!("version is: {:?}", version.lock().await.db_version);
+                
                 let operations = pending_queue
                     .lock()
                     .await
                     .get_all_version_ready_task(&mut version)
                     .await;
 
+                
                 println!("Operation batch size is {}", operations.len());
 
                 {

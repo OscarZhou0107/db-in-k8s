@@ -51,7 +51,13 @@ impl QueueMessage {
             }
 
             Msql::Query(op) => {
-                operation_type = Task::READ;
+                
+                match op.tableops().access_pattern() {
+                    crate::core::AccessPattern::ReadOnly => {operation_type = Task::READ;},
+                    crate::core::AccessPattern::WriteOnly => {operation_type = Task::WRITE;}
+                    _=> {panic!("Illegal access pattern");}
+                }
+                
                 if op.has_early_release() {
                     early_release = Some(op.early_release_tables().clone());
                 }
@@ -98,20 +104,15 @@ impl QueueMessage {
         let mut contained_newer_versions: TxVN = TxVN::new();
 
         match self.operation_type {
-            Task::BEGIN => {
-                result_type = QueryResultType::BEGIN;
-                match self.versions {
-                    Some(versions) => {
-                        contained_newer_versions = versions;
-                    }
-                    None => {}
-                }
-            }
             Task::READ | Task::WRITE => {
                 result_type = QueryResultType::QUERY;
             }
             Task::COMMIT | Task::ABORT => {
+                contained_newer_versions = self.versions.unwrap();
                 result_type = QueryResultType::END;
+            }
+            _ => {
+                panic!("Illegal operation");
             }
         };
 
@@ -162,7 +163,7 @@ impl PendingQueue {
 }
 
 pub struct DbVersion {
-    db_version: DbVN,
+    pub db_version: DbVN,
     notify: Arc<Notify>,
 }
 

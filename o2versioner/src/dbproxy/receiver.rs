@@ -24,6 +24,9 @@ impl Receiver {
                 println!("Receiver a new request");
                 match msg {
                     Message::MsqlRequest(meta, request, versions) => {
+
+                        println!("Responder: {:?}", versions.clone());
+
                         pending_queue
                             .lock()
                             .await
