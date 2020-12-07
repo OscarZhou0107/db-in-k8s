@@ -65,6 +65,12 @@ find o2versioner/ -name '*.rs' | xargs wc -l | sort -nr
 Refer to: [README](load_generator/README.md)
 
 
+#### To check number of lines for Python
+```sh
+find  -name '*.py' | xargs wc -l | sort -nr
+```
+
+
 ## Progress
 
 
