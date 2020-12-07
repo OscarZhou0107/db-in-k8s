@@ -56,16 +56,14 @@ class PerfDB(DB):
     def get_num_clients(self):
         return len(set(map(lambda x: x['client_addr'], self)))
 
-    def group_by_time_interval_since_beginning(self, filter_func=None, interval_length=timedelta(seconds=1)):
+    def get_throughput(self, filter_func=None, interval_length=timedelta(seconds=1)):
         '''
         filter_func(row) returns false to ignore the row if filter_func is not None
 
         A list of groups, each group is defined to be
         having final_timestamp within [k, k+1] integer multiple of interval_length since the earliest initial_timestamp
 
-        return [(len_after_first_group, rows)]
-        sorted by len_after_first_group, and len_after_first_group is unique throughout the list
-        rows are also sorted based on final_timestamp
+        return Throughput
         '''
 
         db = list(self)
@@ -92,25 +90,43 @@ class PerfDB(DB):
                 sorted(rows, key=lambda row: row['final_timestamp']))
             secs.append(sec)
 
-        return list(zip(secs, groups_of_rows))
+        return Throughput(zip(secs, groups_of_rows))
 
 
-def get_throughput(grouped_by_time_interval_since_beginning):
+class Throughput(list):
     '''
-    Input should come from group_by_time_interval_since_beginning()
-
     return [(len_after_first_group, rows)]
     sorted by len_after_first_group, and len_after_first_group is unique throughout the list
     rows are also sorted based on final_timestamp
-
-    return [(len_after_first_group, num_finished_within_the_interval)]
     '''
-    return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), grouped_by_time_interval_since_beginning))
+
+    def get_trajectory(self):
+        return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), self))
+
+    def print_trajectory(self):
+        print('Info:')
+        print('Info:', 'Throughput(#request_finished/sec) Trajectory')
+        trajectory = self.get_trajectory()
+        for item in trajectory:
+            print('Info:', item)
+        print('Info:')
+        print('Info:', 'Peak throughput is', max(
+            trajectory, key=lambda kv: kv[1]))
+
+    def print_detailed_trajectory(self):
+        for (sec, group_of_rows) in self:
+            print('Info:')
+            print('Info:', sec)
+            for row in group_of_rows:
+                DBRow(row).pretty_print_row()
 
 
 class DbproxyStatsDB(DB):
     def __init__(self, dbproxy_stats_csv_path):
         super(DbproxyStatsDB, self).__init__(dbproxy_stats_csv_path)
+
+    def get_num_dbproxy(self):
+        return len(self)
 
 
 def init(parser):
@@ -125,29 +141,24 @@ def main(args):
     dbproxy_stats_db = DbproxyStatsDB(
         os.path.join(args.log_dir, 'dbproxy_stats.csv'))
 
-    # [(len_after_first_group, rows)]
-    groupings = perfdb.group_by_time_interval_since_beginning()
-    print('Info:')
-    print('Info:', 'Requests finished in each second after beginning')
-    for (sec, group_of_rows) in groupings:
-        print('Info:')
-        print('Info:', sec)
-        for row in group_of_rows:
-            DBRow(row).pretty_print_row()
-
     # Find the throughput for all time intervals since the beginning
-    throughput = get_throughput(groupings)
-    print('Info:')
-    print('Info:', 'Throughput(#request_finished/sec) Trajectory')
-    for item in throughput:
-        print('Info:', item)
+    all_throughput = perfdb.get_throughput()
+    print('Info:', 'All Throughput:')
+    # all_throughput.print_detailed_trajectory()
+    all_throughput.print_trajectory()
 
-    # Find the peak throughput
-    print('Info:')
-    print('Info:', 'Peak throughput is', max(throughput, key=lambda kv: kv[1]))
+    successful_throughput = perfdb.get_throughput(
+        filter_func=lambda row: row['request_result'] == 'Ok')
+    print('Info:', 'Successful Request Throughput:')
+    successful_throughput.print_trajectory()
+
+    successful_query_throughput = perfdb.get_throughput(filter_func=lambda row: row['request_result'] in [
+        'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease'])
+    print('Info:', 'Successful Query Request Throughput:')
+    successful_query_throughput.print_trajectory()
 
     num_clients = perfdb.get_num_clients()
-    num_dbproxy_db = len(dbproxy_stats_db)
+    num_dbproxy_db = dbproxy_stats_db.get_num_dbproxy()
     print('Info:', 'num_clients', num_clients)
     print('Info:', 'num_dbproxy_db', num_dbproxy_db)
 
