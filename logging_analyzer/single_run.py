@@ -11,14 +11,6 @@ except:
     print('Error:', 'pip install python-dateutil')
 
 
-def parse_csv(csv_path):
-    '''
-    [{key:value}]
-    '''
-
-# [{key: value}]
-
-
 class DBRow(dict):
     def __init___(self, row):
         super(DBRow, self).__init__(row)
@@ -56,7 +48,8 @@ class PerfDB(DB):
                     row['initial_timestamp'])
                 row['final_timestamp'] = dateutil_parser.isoparse(
                     row['final_timestamp'])
-                row['latency'] = (row['final_timestamp'] - row['initial_timestamp']).total_seconds()
+                row['latency'] = (row['final_timestamp'] -
+                                  row['initial_timestamp']).total_seconds()
         elif data is not None:
             super(PerfDB, self).__init__(data=data)
 
@@ -157,7 +150,8 @@ class DbproxyStatsDB(DB):
 
 
 def init(parser):
-    parser.add_argument('--log_dir', type=str, required=True, help='log file')
+    parser.add_argument('--log_dir', type=str, required=True,
+                        help='log file directory for single run')
 
 
 def main(args):
