@@ -225,9 +225,11 @@ impl State {
             let mut avail_dbproxy;
             // Need to wait on version
             loop {
-                let dbvn_manager = self.dbvn_manager.read().await;
-
-                avail_dbproxy = dbvn_manager.get_all_that_can_execute_read_query(msqlquery.tableops(), txvn);
+                avail_dbproxy = self
+                    .dbvn_manager
+                    .read()
+                    .await
+                    .get_all_that_can_execute_read_query(msqlquery.tableops(), txvn);
 
                 // Found a dbproxy that can execute the read query
                 if avail_dbproxy.len() > 0 {
