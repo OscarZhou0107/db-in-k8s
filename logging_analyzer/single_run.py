@@ -3,6 +3,7 @@ import csv
 import itertools
 import os
 from datetime import datetime, timedelta
+import statistics
 
 try:
     from dateutil import parser as dateutil_parser
@@ -32,11 +33,14 @@ class DBRow(dict):
 
 
 class DB(list):
-    def __init__(self, csv_path):
-        with open(csv_path) as csvfile:
-            print('Info:', 'Parsing', csv_path)
-            csvreader = csv.DictReader(csvfile)
-            super(DB, self).__init__(csvreader)
+    def __init__(self, csv_path=None, data=None):
+        if csv_path is not None:
+            with open(csv_path) as csvfile:
+                print('Info:', 'Parsing', csv_path)
+                csvreader = csv.DictReader(csvfile)
+                super(DB, self).__init__(csvreader)
+        elif data is not None:
+            super(DB, self).__init__(data)
 
     def pretty_print(self):
         for row in self:
@@ -44,14 +48,17 @@ class DB(list):
 
 
 class PerfDB(DB):
-    def __init__(self, perf_csv_path):
-        super(PerfDB, self).__init__(perf_csv_path)
-        for row in self:
-            row['initial_timestamp'] = dateutil_parser.isoparse(
-                row['initial_timestamp'])
-            row['final_timestamp'] = dateutil_parser.isoparse(
-                row['final_timestamp'])
-            row['latency'] = row['final_timestamp'] - row['initial_timestamp']
+    def __init__(self, perf_csv_path=None, data=None):
+        if perf_csv_path is not None:
+            super(PerfDB, self).__init__(csv_path=perf_csv_path, data=data)
+            for row in self:
+                row['initial_timestamp'] = dateutil_parser.isoparse(
+                    row['initial_timestamp'])
+                row['final_timestamp'] = dateutil_parser.isoparse(
+                    row['final_timestamp'])
+                row['latency'] = (row['final_timestamp'] - row['initial_timestamp']).total_seconds()
+        elif data is not None:
+            super(PerfDB, self).__init__(data=data)
 
     def get_num_clients(self):
         return len(set(map(lambda x: x['client_addr'], self)))
@@ -92,6 +99,25 @@ class PerfDB(DB):
 
         return Throughput(zip(secs, groups_of_rows))
 
+    def get_latency_stats(self, filter_func=None):
+        '''
+        in seconds
+        (mean, stddev, geomean, median)
+        '''
+        db = list(self)
+        if filter_func is not None:
+            db = list(filter(filter_func, db))
+
+        if len(db) == 0:
+            return
+
+        latency = list(map(lambda row: row['latency'], db))
+
+        return (statistics.mean(latency), statistics.stdev(latency), statistics.geometric_mean(latency), statistics.median(latency))
+
+    def get_filtered(self, filter_func):
+        return PerfDB(data=list(filter(filter_func, self)))
+
 
 class Throughput(list):
     '''
@@ -112,6 +138,7 @@ class Throughput(list):
         print('Info:')
         print('Info:', 'Peak throughput is', max(
             trajectory, key=lambda kv: kv[1]))
+        print('Info:')
 
     def print_detailed_trajectory(self):
         for (sec, group_of_rows) in self:
@@ -123,7 +150,7 @@ class Throughput(list):
 
 class DbproxyStatsDB(DB):
     def __init__(self, dbproxy_stats_csv_path):
-        super(DbproxyStatsDB, self).__init__(dbproxy_stats_csv_path)
+        super(DbproxyStatsDB, self).__init__(csv_path=dbproxy_stats_csv_path)
 
     def get_num_dbproxy(self):
         return len(self)
@@ -141,26 +168,27 @@ def main(args):
     dbproxy_stats_db = DbproxyStatsDB(
         os.path.join(args.log_dir, 'dbproxy_stats.csv'))
 
-    # Find the throughput for all time intervals since the beginning
-    all_throughput = perfdb.get_throughput()
-    print('Info:', 'All Throughput:')
-    # all_throughput.print_detailed_trajectory()
-    all_throughput.print_trajectory()
+    # Apply filter on perfdb
+    def successful_query_filter(row):
+        return row['request_result'] == 'Ok' and row['request_type'] in [
+            'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease']
+    sq_perfdb = perfdb.get_filtered(successful_query_filter)
 
-    successful_throughput = perfdb.get_throughput(
-        filter_func=lambda row: row['request_result'] == 'Ok')
-    print('Info:', 'Successful Request Throughput:')
-    successful_throughput.print_trajectory()
-
-    successful_query_throughput = perfdb.get_throughput(filter_func=lambda row: row['request_result'] in [
-        'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease'])
+    sq_throughput = sq_perfdb.get_throughput()
+    sq_throughput.print_detailed_trajectory()
     print('Info:', 'Successful Query Request Throughput:')
-    successful_query_throughput.print_trajectory()
+    sq_throughput.print_trajectory()
 
-    num_clients = perfdb.get_num_clients()
-    num_dbproxy_db = dbproxy_stats_db.get_num_dbproxy()
-    print('Info:', 'num_clients', num_clients)
-    print('Info:', 'num_dbproxy_db', num_dbproxy_db)
+    print('Info:')
+    print('Info:', 'Num Successful Query Request', len(sq_perfdb))
+
+    print('Info:')
+    print('Info:', 'Latency (mean, stddev, geomean, median)')
+    print('Info:', sq_perfdb.get_latency_stats())
+
+    print('Info:')
+    print('Info:', 'num_clients', sq_perfdb.get_num_clients())
+    print('Info:', 'num_dbproxy_db', dbproxy_stats_db.get_num_dbproxy())
 
 
 if __name__ == '__main__':
