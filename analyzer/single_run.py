@@ -18,11 +18,9 @@ class DBRow(dict):
 
     def pretty_print_row(self):
         modified_row = self.copy()
-        modified_row['initial_timestamp'] = modified_row['initial_timestamp'].isoformat(
-        )
+        modified_row['initial_timestamp'] = modified_row['initial_timestamp'].isoformat()
         modified_row['final_timestamp'] = modified_row['final_timestamp'].isoformat()
-        print(
-            'Info:', *map(lambda kv: (str(kv[0]), str(kv[1])), modified_row.items()))
+        print('Info:', *map(lambda kv: (str(kv[0]), str(kv[1])), modified_row.items()))
 
 
 class DB(list):
@@ -40,18 +38,17 @@ class DB(list):
         for row in self:
             DBRow(row).pretty_print_row()
 
+def successful_query_filter(row):
+    return row['request_result'] == 'Ok' and row['request_type'] in ['ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease']
 
 class PerfDB(DB):
     def __init__(self, perf_csv_path=None, data=None):
         if perf_csv_path is not None:
             super(PerfDB, self).__init__(csv_path=perf_csv_path, data=data)
             for row in self:
-                row['initial_timestamp'] = dateutil_parser.isoparse(
-                    row['initial_timestamp'])
-                row['final_timestamp'] = dateutil_parser.isoparse(
-                    row['final_timestamp'])
-                row['latency'] = (row['final_timestamp'] -
-                                  row['initial_timestamp']).total_seconds()
+                row['initial_timestamp'] = dateutil_parser.isoparse(row['initial_timestamp'])
+                row['final_timestamp'] = dateutil_parser.isoparse(row['final_timestamp'])
+                row['latency'] = (row['final_timestamp'] - row['initial_timestamp']).total_seconds()
         elif data is not None:
             super(PerfDB, self).__init__(data=data)
 
@@ -76,20 +73,17 @@ class PerfDB(DB):
             return
 
         # Base is set to be the earliest initial_timestamp
-        first_timestamp = min(db, key=lambda row: row['initial_timestamp'])[
-            'initial_timestamp']
+        first_timestamp = min(db, key=lambda row: row['initial_timestamp'])['initial_timestamp']
         print('Info:', 'first_timestamp:', first_timestamp)
 
         # Sort all rows by final_timestamp
         db = sorted(db, key=lambda row: row['final_timestamp'])
-        grouped_by_sec = itertools.groupby(db, key=lambda row: int(
-            (row['final_timestamp']-first_timestamp)/interval_length))
+        grouped_by_sec = itertools.groupby(db, key=lambda row: int((row['final_timestamp']-first_timestamp)/interval_length))
 
         groups_of_rows = list()
         secs = list()
         for sec, rows in grouped_by_sec:
-            groups_of_rows.append(
-                sorted(rows, key=lambda row: row['final_timestamp']))
+            groups_of_rows.append(sorted(rows, key=lambda row: row['final_timestamp']))
             secs.append(sec)
 
         return Throughput(zip(secs, groups_of_rows))
@@ -137,8 +131,7 @@ class Throughput(list):
         for item in trajectory:
             print('Info:', item)
         print('Info:')
-        print('Info:', 'Peak throughput is', max(
-            trajectory, key=lambda kv: kv[1]))
+        print('Info:', 'Peak throughput is', max(trajectory, key=lambda kv: kv[1]))
         print('Info:')
 
     def print_detailed_trajectory(self):
@@ -158,8 +151,7 @@ class DbproxyStatsDB(DB):
 
 
 def init(parser):
-    parser.add_argument('--log_dir', type=str, required=True,
-                        help='log file directory for single run')
+    parser.add_argument('--log_dir', type=str, required=True, help='log file directory for single run')
 
 
 def main(args):
@@ -167,13 +159,9 @@ def main(args):
     perfdb = PerfDB(perf_csv_path=os.path.join(args.log_dir, 'perf.csv'))
 
     # Parse dbproxy stats csv
-    dbproxy_stats_db = DbproxyStatsDB(
-        os.path.join(args.log_dir, 'dbproxy_stats.csv'))
+    dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv'))
 
     # Apply filter on perfdb
-    def successful_query_filter(row):
-        return row['request_result'] == 'Ok' and row['request_type'] in [
-            'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease']
     sq_perfdb = perfdb.get_filtered(successful_query_filter)
 
     sq_throughput = sq_perfdb.get_throughput()
