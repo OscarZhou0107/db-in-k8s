@@ -111,7 +111,7 @@ impl Dispatcher {
     ) {
         tokio::spawn(async move {
             {
-                let finish = false;
+                let mut finish = false;
                 let conn = pool.get().await.unwrap();
                 conn.simple_query("START TRANSACTION;").await.unwrap();
                 while let Some(operation) = rec.recv().await {
@@ -125,11 +125,11 @@ impl Dispatcher {
                         }
                         Task::COMMIT => {
                             raw = conn.simple_query("COMMIT;").await;
-                            //finish = true;
+                            finish = true;
                         }
                         Task::ABORT => {
                             raw = conn.simple_query("ROLLBACK;").await;
-                            //finish = true;
+                            finish = true;
                         }
                         _ => {
                             panic!("Unexpected operation type");
