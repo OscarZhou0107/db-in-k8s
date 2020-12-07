@@ -217,6 +217,8 @@ impl State {
             "Expecting ReadOnly access pattern for the query"
         );
 
+        debug!("entering wait_on_version {:?} {:?}", msqlquery, txvn);
+
         if let Some(txvn) = txvn {
             // The scheduler blocks read queries until at least one database has, for all tables in the query,
             // version numbers that are greater than or equal to the version numbers assigned to the transaction
