@@ -128,6 +128,11 @@ impl DbVN {
             *self.0.entry(table).or_default() += 1;
         });
     }
+
+    /// Get the sum of VNs of all tables
+    pub fn get_version_sum(&self) -> VN {
+        self.0.iter().fold(0, |s, (_, vn)| s + vn)
+    }
 }
 
 #[cfg(test)]

@@ -151,11 +151,11 @@ async fn logging(log_dir: String, state: State) {
     info!("Preparing {} for performance logging", cur_log_dir.display());
     fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
 
-    let mut csv_path_builder = PathBuf::from(cur_log_dir);
-    csv_path_builder.push("perf.csv");
-    let csv_path = csv_path_builder.as_path();
-
-    let mut wrt = csv::Writer::from_path(csv_path).unwrap();
+    // performance logging
+    let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
+    perf_csv_path_builder.push("perf.csv");
+    let perf_csv_path = perf_csv_path_builder.as_path();
+    let mut wrt = csv::Writer::from_path(perf_csv_path).unwrap();
     state
         .collect_client_records()
         .await
@@ -163,7 +163,23 @@ async fn logging(log_dir: String, state: State) {
         .map(|(_, reqrecord)| reqrecord.get_performance_records())
         .flatten()
         .for_each(|r| wrt.serialize(r).unwrap());
-    info!("Dumped performance logging to {}", csv_path.display());
+    info!("Dumped performance logging to {}", perf_csv_path.display());
+
+    // dbvn logging
+    let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
+    dbproxy_stats_path_builder.push("dbproxy_stats.csv");
+    let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
+    let mut wrt = csv::Writer::from_path(dbproxy_stats_csv_path).unwrap();
+    wrt.write_record(&["dbproxy_addr", "dbproxy_vn_sum"]).unwrap();
+    state
+        .share_dbvn_manager()
+        .read()
+        .await
+        .inner()
+        .iter()
+        .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
+        .for_each(|d| wrt.serialize(d).unwrap());
+    info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
 }
 
 #[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool))]
