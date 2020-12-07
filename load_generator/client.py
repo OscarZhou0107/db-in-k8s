@@ -30,6 +30,8 @@ DEBUG = 0
 WRONG_PASSWD_FRENQUENCY = 1 # out of 10
 MAX_STRING_LEN = 10
 MAX_NUM_LEN = 12
+Hack = 1
+# TODO: if change, remember to change web_to_sql.py
 
 def determineNext(curr_index, prob):
     row = prob[curr_index]
@@ -310,6 +312,12 @@ class Client:
     
 
     def doAdminConf(self): # state 0
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # getBook
         i_id = randint(1, NUM_ITEM)
         response = self.getBook(i_id)
@@ -368,6 +376,12 @@ class Client:
         return True
 
     def doAdminReq(self): # state 1
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # getBook
         response = self.getBook(-1)
         # DispOnly
@@ -377,6 +391,12 @@ class Client:
         return True
 
     def doBestSell(self): # state 2
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -395,6 +415,12 @@ class Client:
         return True
 
     def doBuyConf(self): # state 3
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # getCDiscount
         query = sql.replaceVars(sql.sqlNameToCommand["getCDiscount"], 1, [self.c_id])
         response = self.send_query_and_receive_response(query, "getCDiscount")
@@ -566,6 +592,12 @@ class Client:
         return True
 
     def doBuyReq(self): # state 4
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         flag = randint(0, 1)
         if (flag == 1): # only if flag is Y == 1
             if self.load: # only if both c_uname and c_passwd are given (implied by load)
@@ -664,6 +696,12 @@ class Client:
         return True
 
     def doCustReg(self): # state 5
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # getUserName
         query = sql.replaceVars(sql.sqlNameToCommand["getUserName"], 1, [self.c_id])
         response = self.send_query_and_receive_response(query, "getUserName")
@@ -679,6 +717,12 @@ class Client:
         return True
 
     def doHome(self): # state 6
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # say hello - getName - c_id, shopping_id
         if not self.load: # only getName if it is a new connection or if the customer is not in the db
             query = sql.replaceVars(sql.sqlNameToCommand["getName"], 1, [self.c_id])
@@ -703,6 +747,12 @@ class Client:
         return True
 
     def doNewProd(self): # state 7
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -721,8 +771,14 @@ class Client:
         return True
 
     def doOrderDisp(self): # state 8
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # 1. getPassword 
-        if self.load: # only if both c_uname and c_passwd are given (implied by load)
+        if self.load and self.c_uname: # only if both c_uname and c_passwd are given (implied by load)
             query = sql.replaceVars(sql.sqlNameToCommand["getPassword"], 1, ["'" + self.c_uname.strip("'") + "'"])
             response = self.send_query_and_receive_response(query, "getPassword")
             # DispOnly
@@ -769,9 +825,21 @@ class Client:
         return True
 
     def doOrderInq(self): # state 9
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         return True
 
     def doProdDet(self): # state 10
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         response = self.getBook(-1)
         # DispOnly
         if self.isErr(response):
@@ -780,6 +848,12 @@ class Client:
         return True
 
     def doSearchReq(self): # state 11
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -788,6 +862,12 @@ class Client:
         return True
 
     def doSearchResult(self): # state 12
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # promo - getRelated
         response = self.getRelated()
         if self.isErr(response):
@@ -830,6 +910,12 @@ class Client:
         return True
 
     def doShopCart(self): # state 13
+        if Hack:
+            response = self.getRelated()
+            if self.isErr(response):
+                self.logger.error("Response to getRelated has error")
+                return False
+        
         # createEmptyCart (sequence)
         if not self.shopping_id: # only createEmptyCart (sequence) if no shopping_id yet
             # 1. createEmptyCart

@@ -1,5 +1,7 @@
 import sql
 import json
+
+'''
 urlSql = {
     "home": [ # hello
         "getName", 
@@ -117,6 +119,149 @@ urlSql = {
         "getBook"
         ],
     "adminConf": [
+        "getBook",
+        # a sequence: adminUpdate
+        "adminUpdate",
+        "adminUpdateRelated",
+        "adminUpdateRelated1"
+        ]
+    # hello - getName. promo - getRelated
+}
+'''
+
+urlSql = {
+    "home": [
+        "getRelated", 
+        # hello
+        "getName", 
+        # promo
+        "getRelated" 
+        ], 
+    "shopCart": [
+        "getRelated", 
+        # a sequence: createEmptyCart
+        "createEmptyCart", # execute only if client.shopping_id == null
+        "createEmptyCartInsertV2",
+        
+        # another sequence: doCart
+        # inner sequence: addItem
+        "addItem", 
+        "addItemUpdate",
+        "addItemPut",
+
+        # another inner sequence: refreshCart
+        "refreshCartRemove",
+        "refreshCartUpdate",
+
+        # another inner sequnce: addRandomItemToCartIfNecessary
+        "addRandomItemToCartIfNecessary",
+        "getRelated1",
+        # inner inner sequence: addItem
+        "addItem", 
+        "addItemUpdate",
+        "addItemPut",
+
+        "resetCartTime",
+        "getCart",
+        # sequence end
+
+        # promo
+        "getRelated"
+        ],
+    "orderInq": [
+        "getRelated", 
+        ], # ...nothing...?
+    "orderDisp": [
+        "getRelated", 
+        "getPassword",
+        # need valid username and password 
+        # a sequence: GetMostRecentOrder
+        "getMostRecentOrderId",
+        "getMostRecentOrderOrder",
+        "getMostRecentOrderLines"
+        ],
+    "searchReq": [
+        "getRelated", 
+        # promo
+        "getRelated" 
+        ],
+    "searchResult": [
+        "getRelated", 
+        # promo
+        "getRelated",
+        # 1 out of 3
+        "doAuthorSearch",
+        "doTitleSearch",
+        "doSubjectSearch"
+        ],
+    "newProd": [
+        "getRelated", 
+        # promo
+        "getRelated",
+        "getNewProducts"
+        ],
+    "bestSell": [
+        "getRelated", 
+        # promo
+        "getRelated",
+        "getBestSellers"
+        ],
+    "prodDet": [
+        "getRelated", 
+        "getBook"
+        ],
+    "custReg": [
+        "getRelated", 
+        "getUserName"
+        ],
+    "buyReq": [
+        "getRelated", 
+        "getCustomer",
+        "refreshSession",
+        # a sequnce: createNewCustomer
+        # inner sequence: enterAddress
+        "enterAddressId", 
+        "enterAddressMatch", 
+        "enterAddressMaxId", 
+        "enterAddressInsert", 
+        "createNewCustomerMaxId",
+        "createNewCustomer",
+
+        "getCart"
+        ],
+    "buyConf": [
+        "getRelated", 
+        # a sequence: doBuyConfirm 
+        #    -> two versions: customer input new data vs. use address on file
+        "getCDiscount",
+        "getCart",
+
+        # Option 1 - inner sequence: enterAddress
+        "enterAddressId", 
+        "enterAddressMatch", 
+        "enterAddressMaxId", 
+        "enterAddressInsert", 
+        # or Option 2
+        "getCAddr",
+
+        # another inner sequnce: enterOrder
+        "getCAddrId", # same sql as getCAddr
+        "enterOrderMaxId",
+        "enterOrderInsert",
+        # loop based on how many lines there are in cart (returned by getCart)
+        "addOrderLine",
+        "getStock",
+        "setStock",
+
+        "enterCCXact",
+        "clearCart"
+        ],
+    "adminReq": [
+        "getRelated", 
+        "getBook"
+        ],
+    "adminConf": [
+        "getRelated", 
         "getBook",
         # a sequence: adminUpdate
         "adminUpdate",
