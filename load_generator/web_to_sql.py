@@ -107,10 +107,11 @@ urlSql = {
         "enterOrderMaxId",
         "enterOrderInsert",
         # loop based on how many lines there are in cart (returned by getCart)
+        # early release only in the last loop
         "addOrderLine",
         "getStock",
         "setStock",
-
+        # loop end
         "enterCCXact",
         "clearCart"
         ],
