@@ -19,6 +19,29 @@ pub enum AccessPattern {
     Mixed,
 }
 
+impl AccessPattern {
+    pub fn is_write_only(&self) -> bool {
+        match &self {
+            Self::WriteOnly => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_read_only(&self) -> bool {
+        match &self {
+            Self::ReadOnly => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_mixed(&self) -> bool {
+        match &self {
+            Self::Mixed => true,
+            _ => false,
+        }
+    }
+}
+
 /// Helper function
 fn remove_whitespace(s: &mut String) {
     s.retain(|c| !c.is_whitespace());
@@ -286,6 +309,7 @@ where
 #[cfg(test)]
 mod tests_tableop {
     use super::*;
+
     #[test]
     fn test_new() {
         assert_eq!(
@@ -300,6 +324,33 @@ mod tests_tableop {
             TableOp::new(" table0 table1 ", RWOperation::R).unwrap(),
             (String::from("table0table1"), RWOperation::R)
         );
+    }
+}
+
+/// Unit test for `AccessPattern`
+#[cfg(test)]
+mod tests_access_pattern {
+    use super::*;
+
+    #[test]
+    fn test_is_mixed() {
+        assert!(AccessPattern::Mixed.is_mixed());
+        assert!(!AccessPattern::Mixed.is_read_only());
+        assert!(!AccessPattern::Mixed.is_write_only());
+    }
+
+    #[test]
+    fn test_is_read_only() {
+        assert!(!AccessPattern::ReadOnly.is_mixed());
+        assert!(AccessPattern::ReadOnly.is_read_only());
+        assert!(!AccessPattern::ReadOnly.is_write_only());
+    }
+
+    #[test]
+    fn test_is_write_only() {
+        assert!(!AccessPattern::WriteOnly.is_mixed());
+        assert!(!AccessPattern::WriteOnly.is_read_only());
+        assert!(AccessPattern::WriteOnly.is_write_only());
     }
 }
 
