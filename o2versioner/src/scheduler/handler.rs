@@ -131,7 +131,7 @@ pub async fn main(conf: Config) {
 
         // main_handle can either run to finish or be the result
         // of the above stop_tx.send()
-        main_handle.await.unwrap();
+        main_handle.await.expect("main_handle crashed");
 
         // At this point, we just want to cancel the admin_handle
         tokio::select! {
