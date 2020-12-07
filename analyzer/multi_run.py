@@ -52,6 +52,7 @@ def plot_charts(database):
     figname = 'scalability_' + str(len(database)) + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S')
     fig = plt.figure(figname, figsize=figsize)
     fig.suptitle( 'Scalability of Throughput with varying Number of Clients and Dbproxies', fontsize=16)
+    fig.set_tight_layout(True)
 
     ax = fig.add_subplot()
     for num_dbproxy, dataset in database_by_num_dbproxy.items():
@@ -67,16 +68,25 @@ def plot_charts(database):
         dataset = sorted(dataset, key=lambda x: x[1])
 
         run_names, nums_clients, max_sq_throughputs, latencies = list(zip(*dataset))[0:4]
-        _, max_thorughputs = tuple(zip(*max_sq_throughputs))
+        _, max_throughputs = tuple(zip(*max_sq_throughputs))
+        mean_latencies = tuple(zip(*latencies))[3]
         
         print('nums_clients', nums_clients)
-        print('max_throughputs', max_thorughputs)
+        print('max_throughputs', max_throughputs)
+        print('latencies (mean, stddev, geomean, median)', latencies)
         
-        ax.plot(nums_clients, max_thorughputs, label=num_dbproxy, marker='o')  # , picker=True, pickradius=2)
+        # Left y-axis for throughput
+        ax.plot(nums_clients, max_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='o')  # , picker=True, pickradius=2)
         ax.set(xlabel='Number of Clients', ylabel='Peak Throughput on Successful Queries (#queries/sec)')
         ax.grid(axis='x', linestyle='--')
         ax.grid(axis='y', linestyle='-')
-        ax.legend()
+        ax.legend(loc='upper left')
+
+        # Right y-axis for latency
+        ax2 = ax.twinx()
+        ax2.set(ylabel='Median Latency on Successful Queries (sec)')
+        ax2.plot(nums_clients, mean_latencies, label=str(num_dbproxy) + ' dbproxies', linestyle=':', marker='^')
+        ax2.legend(loc='upper right')
 
     plt.show()
 
