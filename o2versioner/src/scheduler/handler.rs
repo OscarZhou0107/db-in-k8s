@@ -177,6 +177,10 @@ async fn logging(log_dir: String, state: State) {
         .await
         .inner()
         .iter()
+        .map(|(dbproxy_addr, vndb)| {
+            info!("{} {:?}", dbproxy_addr, vndb);
+            (dbproxy_addr, vndb)
+        })
         .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
         .for_each(|d| wrt.serialize(d).unwrap());
     info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
