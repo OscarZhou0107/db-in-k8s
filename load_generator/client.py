@@ -6,6 +6,7 @@ from random import randint
 from random import uniform
 import argparse
 import json
+import csv
 import sys
 import logging
 import os
@@ -25,7 +26,7 @@ OK = "Ok"
 NUM_ITEM = 1000
 NUM_QTY = 10
 NUM_PAIR = 10
-DEBUG = 1
+DEBUG = 0
 WRONG_PASSWD_FRENQUENCY = 1 # out of 10
 MAX_STRING_LEN = 100
 MAX_NUM_LEN = 12
@@ -61,10 +62,10 @@ def generateRandomNum():
     return int("".join(res))
 
 def generateRandomSubject():
-    subjects = ['ARTS', 'BIOGRAPHIES', 'BUSINESS', 'CHILDREN', 'COMPUTERS', 'COOKING', 
-                'HEALTH', 'HISTORY', 'HOME', 'HUMOR', 'LITERATURE', 'MYSTERY', 'NON-FICTION', 
-                'PARENTING', 'POLITICS', 'REFERENCE', 'RELIGION', 'ROMANCE', 'SCIENCE-FICTION', 
-                'SCIENCE-NATURE', 'SELF-HELP', 'SPORTS', 'TRAVEL', 'YOUTH']
+    subjects = ["""'ARTS'""", """'BIOGRAPHIES'""", """'BUSINESS'""", """'CHILDREN'""", """'COMPUTERS'""", """'COOKING'""", 
+                """'HEALTH'""", """'HISTORY'""", """'HOME'""", """'HUMOR'""", """'LITERATURE'""", """'MYSTERY'""", """'NON-FICTION'""", 
+                """'PARENTING'""", """'POLITICS'""", """'REFERENCE'""", """'RELIGION'""", """'ROMANCE'""", """'SCIENCE-FICTION'""", 
+                """'SCIENCE-NATURE'""", """'SELF-HELP'""", """'SPORTS'""", """'TRAVEL'""", """'YOUTH'"""]
     index = randint(0, len(subjects)-1)
     return subjects[index]
 
@@ -103,7 +104,7 @@ class Client:
         logname = "./logs/client_" + str(c_id) + "_process_" + str(os.getpid()) + ".log"
         logging.basicConfig(
             level=logging.DEBUG,
-            #level=logging.CRITICAL,
+            #level=logging.WARNING,
             format='%(asctime)s,%(msecs)d %(name)s [%(levelname)s] %(message)s',
             # write to both stdout and log file
             handlers=[
@@ -893,20 +894,23 @@ class Client:
         self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
-
         if OK not in response["reply"]["Query"]:
             self.logger.error("Response to {} contains error".format(name))
             return "Err"
 
-        csv = response["reply"]["Query"][OK]
-        if not csv:
+        response = response["reply"]["Query"][OK]
+        self.logger.critical("csv string: {}".format(response))
+        if not response:
             self.logger.warning("Response to {} is empty".format(name))
             return "Empty"
 
-        # TODO: will get result in .csv, parse to list -> result[row][col]
-        result = csv
+        result = list(csv.reader(response.splitlines()))
+        for i in range(len(result)):
+            for j in range(len(result[0])):
+                if result[i][j].startswith('"') and result[i][j].endswith('"'):
+                    result[i][j] = result[i][j][1:-1]
+        self.logger.info("csv list: {}".format(result))
         
-
         if DEBUG:
             return ["0"] * 20 
         
@@ -1074,7 +1078,7 @@ class Client:
 if __name__ == "__main__":
     # use port 56728 for testing
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int)
+    parser.add_argument("--port", type=int, default=1077)
     parser.add_argument("--c_id", type=int)
     parser.add_argument("--mix", type=int, default=0)
     args = parser.parse_args()
