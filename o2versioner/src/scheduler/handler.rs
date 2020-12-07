@@ -264,12 +264,13 @@ async fn process_connection(
     let conn_state_cloned = conn_state.clone();
 
     // Process a stream of incoming messages from a single tcp connection
+    let dispatcher_addr_cloned = dispatcher_addr.clone();
     serded_read
         .and_then(move |msg| {
             let conf_cloned = conf.clone();
             let conn_state_cloned = conn_state_cloned.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
-            let dispatcher_addr_cloned = dispatcher_addr.clone();
+            let dispatcher_addr_cloned = dispatcher_addr_cloned.clone();
             debug!("<- {:?}", msg);
 
             async move {
@@ -290,16 +291,19 @@ async fn process_connection(
         .map(|_| ())
         .await;
 
-    let conn_state = Arc::try_unwrap(conn_state).unwrap().into_inner();
-    info!("Connection dropped. {:?}", conn_state);
+    let mut conn_state = Arc::try_unwrap(conn_state).unwrap().into_inner();
 
     if conn_state.current_txvn().is_some() {
-        error!("Unclosed transaction. {:?}", conn_state.current_txvn());
-        panic!(
-            "Connection dropped with unclosed transaction. {:?}",
+        warn!(
+            "Unclosed transaction. Aborting the transaction.. {:?}",
             conn_state.current_txvn()
         );
+
+        let response = process_endtx(Msql::EndTx(MsqlEndTx::rollback()), &mut conn_state, &dispatcher_addr).await;
+        warn!("Aborting unclosed transaction successfully. {:?}", response);
     }
+
+    info!("Connection dropped. {:?}", conn_state);
 }
 
 #[instrument(name="request", skip(conf, msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, id=field::Empty, txid=field::Empty, cmd=field::Empty))]
