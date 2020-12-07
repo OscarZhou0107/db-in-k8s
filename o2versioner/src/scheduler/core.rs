@@ -1,14 +1,17 @@
 use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
+use chrono::Utc;
 use futures::prelude::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
-use tracing::warn;
+use tracing::{info, warn};
 
 #[derive(Debug, Clone)]
 /// A collection of shared variables across
@@ -51,6 +54,53 @@ impl State {
             })
             .collect()
             .await
+    }
+
+    /// Dump the performance logging
+    pub async fn dump_perf_log<S: Into<String>>(&self, log_dir: S, debug: bool) {
+        // Prepare the logging directory
+        let mut path_builder = PathBuf::from(log_dir.into());
+        let log_dir_name = if debug {
+            format!("{}_debug", Utc::now().format("%y%m%d_%H%M%S").to_string())
+        } else {
+            Utc::now().format("%y%m%d_%H%M%S").to_string()
+        };
+        path_builder.push(log_dir_name);
+        let cur_log_dir = path_builder.as_path();
+        info!("Preparing {} for performance logging", cur_log_dir.display());
+        fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
+
+        // Performance logging
+        let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
+        perf_csv_path_builder.push("perf.csv");
+        let perf_csv_path = perf_csv_path_builder.as_path();
+        let mut wrt = csv::Writer::from_path(perf_csv_path).unwrap();
+        self.collect_client_records()
+            .await
+            .into_iter()
+            .map(|(_, reqrecord)| reqrecord.get_performance_records())
+            .flatten()
+            .for_each(|r| wrt.serialize(r).unwrap());
+        info!("Dumped performance logging to {}", perf_csv_path.display());
+
+        // Dbvn logging
+        let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
+        dbproxy_stats_path_builder.push("dbproxy_stats.csv");
+        let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
+        let mut wrt = csv::Writer::from_path(dbproxy_stats_csv_path).unwrap();
+        wrt.write_record(&["dbproxy_addr", "dbproxy_vn_sum"]).unwrap();
+        self.dbvn_manager
+            .read()
+            .await
+            .inner()
+            .iter()
+            .map(|(dbproxy_addr, vndb)| {
+                info!("{} {:?}", dbproxy_addr, vndb);
+                (dbproxy_addr, vndb)
+            })
+            .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
+            .for_each(|d| wrt.serialize(d).unwrap());
+        info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
     }
 }
 

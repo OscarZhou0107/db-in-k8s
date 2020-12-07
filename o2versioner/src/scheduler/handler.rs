@@ -9,14 +9,11 @@ use crate::core::*;
 use crate::util::config::*;
 use crate::util::tcp;
 use bb8::Pool;
-use chrono::Utc;
 use futures::prelude::*;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::fs;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
@@ -126,6 +123,7 @@ pub async fn main(conf: Config) {
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),
+                conf.clone(),
             )
             .in_current_span(),
         );
@@ -145,65 +143,24 @@ pub async fn main(conf: Config) {
 
     // Dump logging files
     if let Some(log_dir) = conf.scheduler.performance_logging {
-        logging(log_dir, state).await
+        state.dump_perf_log(log_dir, false).await
     }
 
     info!("DIES");
 }
 
-async fn logging<S: Into<String>>(log_dir: S, state: State) {
-    let log_dir = log_dir.into();
-    let mut path_builder = PathBuf::from(log_dir);
-    path_builder.push(Utc::now().format("%y%m%d_%H%M%S").to_string());
-    let cur_log_dir = path_builder.as_path();
-    info!("Preparing {} for performance logging", cur_log_dir.display());
-    fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
-
-    // performance logging
-    let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
-    perf_csv_path_builder.push("perf.csv");
-    let perf_csv_path = perf_csv_path_builder.as_path();
-    let mut wrt = csv::Writer::from_path(perf_csv_path).unwrap();
-    state
-        .collect_client_records()
-        .await
-        .into_iter()
-        .map(|(_, reqrecord)| reqrecord.get_performance_records())
-        .flatten()
-        .for_each(|r| wrt.serialize(r).unwrap());
-    info!("Dumped performance logging to {}", perf_csv_path.display());
-
-    // dbvn logging
-    let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
-    dbproxy_stats_path_builder.push("dbproxy_stats.csv");
-    let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
-    let mut wrt = csv::Writer::from_path(dbproxy_stats_csv_path).unwrap();
-    wrt.write_record(&["dbproxy_addr", "dbproxy_vn_sum"]).unwrap();
-    state
-        .share_dbvn_manager()
-        .read()
-        .await
-        .inner()
-        .iter()
-        .map(|(dbproxy_addr, vndb)| {
-            info!("{} {:?}", dbproxy_addr, vndb);
-            (dbproxy_addr, vndb)
-        })
-        .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
-        .for_each(|d| wrt.serialize(d).unwrap());
-    info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
-}
-
-#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool))]
+#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state, conf))]
 async fn admin(
     admin_addr: SocketAddr,
     stop_tx: Option<oneshot::Sender<()>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     state: State,
+    conf: Config,
 ) {
     start_admin_tcplistener(admin_addr, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
         let state = state.clone();
+        let conf = conf.clone();
         async move {
             let command = UniCase::new(msg);
             if command == UniCase::new("block") || command == UniCase::new("unblock") {
@@ -240,7 +197,12 @@ async fn admin(
                 );
                 (reply, false)
             } else if command == UniCase::new("debug") {
-                logging("./debug", state).await;
+                state
+                    .dump_perf_log(
+                        conf.scheduler.performance_logging.unwrap_or(String::from("debug")),
+                        true,
+                    )
+                    .await;
                 (format!("Check scheduler terminal"), true)
             } else {
                 (format!("Unknown command: {}", command), true)
