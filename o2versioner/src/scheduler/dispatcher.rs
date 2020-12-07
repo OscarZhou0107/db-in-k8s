@@ -113,6 +113,14 @@ impl State {
             txvn,
         } = request;
 
+
+        // HACK
+        if let Ok(_) = command.try_get_endtx() {
+            if request_meta.request_id == 0 || request_meta.request_id == 1 {
+                panic!("Emtpy transaction");
+            }
+        }
+
         let msg = Message::MsqlRequest(request_meta, command.clone(), txvn.clone());
         let shared_reply_channel = Arc::new(Mutex::new(reply_ch));
 
