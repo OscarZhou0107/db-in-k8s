@@ -4,6 +4,7 @@ dispatcher_queue_size = 500
 max_connection = 50
 sequencer_pool_size = 20
 transceiver_queue_size = 20
+disable_early_release = false
 
 [sequencer]
 addr = "127.0.0.1:9876"

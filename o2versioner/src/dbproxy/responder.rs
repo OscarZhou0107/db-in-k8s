@@ -26,7 +26,7 @@ impl Responder {
                 match result.result_type {
                     QueryResultType::END => {
                         println!("Trying to release a version");
-                        println!("{:?}", result.contained_newer_versions.clone());
+                        println!("Responder: {:?}", result.contained_newer_versions.clone());
                         version
                             .lock()
                             .await
@@ -34,6 +34,7 @@ impl Responder {
                     }
                     _ => match result.flush_early_release() {
                         Ok(request) => {
+                            println!("Doing a early release {:?}", request);
                             version.lock().await.release_on_request(request);
                         }
                         Err(_) => {}

@@ -101,17 +101,9 @@ impl QueueMessage {
             }
         }
 
-        let result_type;
-        let mut contained_newer_versions: TxVN = TxVN::new();
-
-        match self.operation_type {
-            Task::READ | Task::WRITE => {
-                result_type = QueryResultType::QUERY;
-            }
-            Task::COMMIT | Task::ABORT => {
-                contained_newer_versions = self.versions.unwrap();
-                result_type = QueryResultType::END;
-            }
+        let result_type = match self.operation_type {
+            Task::READ | Task::WRITE => QueryResultType::QUERY,
+            Task::COMMIT | Task::ABORT => QueryResultType::END,
             _ => {
                 panic!("Illegal operation");
             }
@@ -122,7 +114,7 @@ impl QueueMessage {
             result: result,
             result_type: result_type,
             succeed: succeed,
-            contained_newer_versions: contained_newer_versions,
+            contained_newer_versions: self.versions.unwrap(),
             contained_early_release_version: self.early_release,
         }
     }
@@ -153,6 +145,7 @@ impl PendingQueue {
     pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
         let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
             .then(move |op| {
+                println!("msql is: {:?}", op.msql);
                 let version = version.clone();
                 async move {
                     if let Ok(query) = op.msql.try_get_query() {
