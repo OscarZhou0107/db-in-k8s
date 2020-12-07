@@ -26,8 +26,8 @@ def parse_single_run(run_name, args):
     dbproxy_stats_db = single_run.DbproxyStatsDB(
         os.path.join(os.path.join(args.dir, run_name), 'dbproxy_stats.csv'))
 
-    info_str = format('Info: Parsed {} with {} clients, {} dbproxies, {} unfiltered requests',
-                      run_name, perfdb.get_num_clients(), dbproxy_stats_db.get_num_dbproxy(), len(perfdb))
+    info_str = 'Info: Parsed {} with {} clients, {} dbproxies, {} unfiltered requests'.format(
+        run_name, perfdb.get_num_clients(), dbproxy_stats_db.get_num_dbproxy(), len(perfdb))
     print(info_str)
 
     return (perfdb, dbproxy_stats_db)

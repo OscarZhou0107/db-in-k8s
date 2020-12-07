@@ -25,10 +25,11 @@ class DBRow(dict):
 
 
 class DB(list):
-    def __init__(self, csv_path=None, data=None):
+    def __init__(self, csv_path=None, data=None, debug=False):
         if csv_path is not None:
             with open(csv_path) as csvfile:
-                print('Info:', 'Parsing', csv_path)
+                if debug:
+                    print('Info:', 'Parsing', csv_path)
                 csvreader = csv.DictReader(csvfile)
                 super(DB, self).__init__(csvreader)
         elif data is not None:
