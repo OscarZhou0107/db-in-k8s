@@ -3,7 +3,6 @@ use bb8_postgres::bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use futures::prelude::*;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
@@ -22,7 +21,7 @@ impl Dispatcher {
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
-            println!("Dispathcer Started");
+            println!("Dispatcher Started");
 
             let mut task_notify = pending_queue.lock().await.get_notify();
             let mut version_notify = version.lock().await.get_notify();
@@ -109,7 +108,7 @@ impl Dispatcher {
             {
                 let finish = false;
                 let conn = pool.get().await.unwrap();
-                conn.simple_query("START TRANSACTION;").await;
+                conn.simple_query("START TRANSACTION;").await.unwrap();
                 while let Some(operation) = rec.recv().await {
                     let raw;
                     match operation.operation_type {
