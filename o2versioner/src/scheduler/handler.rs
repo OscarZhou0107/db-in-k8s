@@ -196,14 +196,14 @@ async fn admin(
                     .await
                 );
                 (reply, false)
-            } else if command == UniCase::new("debug") {
+            } else if command == UniCase::new("dump_perf") {
                 state
                     .dump_perf_log(
                         conf.scheduler.performance_logging.unwrap_or(String::from("debug")),
                         true,
                     )
                     .await;
-                (format!("Check scheduler terminal"), true)
+                (format!("Perf logging dumped. Check scheduler terminal"), true)
             } else {
                 (format!("Unknown command: {}", command), true)
             }
