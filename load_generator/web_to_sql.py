@@ -77,13 +77,13 @@ urlSql = {
         "getCustomer",
         "refreshSession",
         # a sequnce: createNewCustomer
-        "createNewCustomer",
         # inner sequence: enterAddress
         "enterAddressId", 
         "enterAddressMatch", 
-        "enterAddressInsert", 
         "enterAddressMaxId", 
+        "enterAddressInsert", 
         "createNewCustomerMaxId",
+        "createNewCustomer",
 
         "getCart"
         ],
@@ -96,8 +96,8 @@ urlSql = {
         # Option 1 - inner sequence: enterAddress
         "enterAddressId", 
         "enterAddressMatch", 
-        "enterAddressInsert", 
         "enterAddressMaxId", 
+        "enterAddressInsert", 
         # or Option 2
         "getCAddr",
 
@@ -244,96 +244,95 @@ if __name__ == "__main__":
             else:
                 print("    {}".format(name))
 
-
-
 '''
-    newProd
-    {"request_msql_text": {"tableops": "READ item author '", "op": "begin_tx"}}
-        getRelated []
-        getNewProducts []
-    bestSell
-    {"request_msql_text": {"tableops": "READ item orderline orders author '", "op": "begin_tx"}}
-        getRelated []
-        getBestSellers []
-    searchResult
-    {"request_msql_text": {"tableops": "READ item author '", "op": "begin_tx"}}
-        getRelated []
-        doAuthorSearch []
-        doTitleSearch []
-        doSubjectSearch []
-    buyReq
-    {"request_msql_text": {"tableops": "READ shopping_cart_line country item WRITE customer address'", "op": "begin_tx"}}
-        getCustomer []
-        refreshSession []
-        createNewCustomer []
-        enterAddressId ['country']
-        enterAddressMatch []
-        enterAddressInsert []
-        enterAddressMaxId ['address']
-        createNewCustomerMaxId ['customer']
-        getCart []
-    home
-    {"request_msql_text": {"tableops": "READ customer item '", "op": "begin_tx"}}
-        getName ['customer']
-        getRelated []
-    prodDet
-    {"request_msql_text": {"tableops": "READ item author '", "op": "begin_tx"}}
-        getBook []
-    orderInq
-    {"request_msql_text": {"tableops": " '", "op": "begin_tx"}}
-    orderDisp
-    {"request_msql_text": {"tableops": "READ customer order_line country item address cc_xacts orders '", "op": "begin_tx"}}
-        getPassword []
-        getMostRecentOrderId []
-        getMostRecentOrderOrder ['customer', 'country', 'cc_xacts', 'orders', 'address']
-        getMostRecentOrderLines []
-    custReg
-    {"request_msql_text": {"tableops": "READ customer '", "op": "begin_tx"}}
-        getUserName []
-    searchReq
-    {"request_msql_text": {"tableops": "READ item '", "op": "begin_tx"}}
-        getRelated []
-    buyConf
-    {"request_msql_text": {"tableops": "READ customer country WRITE shopping_cart_line order_line item address cc_xacts orders'", "op": "begin_tx"}}
-        getCDiscount []
-        getCart []
-        enterAddressId []
-        enterAddressMatch []
-        enterAddressInsert []
-        enterAddressMaxId []
-        getCAddr []
-        getCAddrId ['customer']
-        enterOrderMaxId []
-        enterOrderInsert ['orders']
-        addOrderLine ['order_line']
-        getStock []
-        setStock ['item']
-        enterCCXact ['country', 'cc_xacts', 'address']
-        clearCart []
-    adminReq
-    {"request_msql_text": {"tableops": "READ item author '", "op": "begin_tx"}}
-        getBook []
-    adminConf
-    {"request_msql_text": {"tableops": "READ author orders order_line WRITE item'", "op": "begin_tx"}}
-        getBook ['author']
-        adminUpdate []
-        adminUpdateRelated ['orders', 'order_line']
-        adminUpdateRelated1 []
-    shopCart
-    {"request_msql_text": {"tableops": "READ item WRITE shopping_cart_line shopping_cart'", "op": "begin_tx"}}
-        createEmptyCart []
-        createEmptyCartInsertV2 []
-        addItem []
-        addItemUpdate []
-        addItemPut []
-        refreshCartRemove []
-        refreshCartUpdate []
-        addRandomItemToCartIfNecessary []
-        getRelated1 []
-        addItem []
-        addItemUpdate []
-        addItemPut []
-        resetCartTime ['shopping_cart']
-        getCart ['shopping_cart_line']
-        getRelated []
+newProd
+{"request_msql_text": {"tableops": "READ item author ", "op": "begin_tx"}}
+    getRelated
+    getNewProducts
+bestSell
+{"request_msql_text": {"tableops": "READ item order_line author ", "op": "begin_tx"}}
+    getRelated
+    getBestSellers
+searchResult
+{"request_msql_text": {"tableops": "READ item author ", "op": "begin_tx"}}
+    getRelated
+    doAuthorSearch
+    doTitleSearch
+    doSubjectSearch
+buyReq
+{"request_msql_text": {"tableops": "READ shopping_cart_line country item WRITE customer address", "op": "begin_tx"}}
+    getCustomer
+    refreshSession
+    enterAddressId ['country']
+    enterAddressMatch
+    enterAddressMaxId
+    enterAddressInsert ['address']
+    createNewCustomerMaxId
+    createNewCustomer ['customer']
+    getCart
+home
+{"request_msql_text": {"tableops": "READ customer item ", "op": "begin_tx"}}
+    getName ['customer']
+    getRelated
+prodDet
+{"request_msql_text": {"tableops": "READ item author ", "op": "begin_tx"}}
+    getBook
+orderInq
+{"request_msql_text": {"tableops": " ", "op": "begin_tx"}}
+orderDisp
+{"request_msql_text": {"tableops": "READ customer order_line country item address cc_xacts orders ", "op": "begin_tx"}}
+    getPassword
+    getMostRecentOrderId
+    getMostRecentOrderOrder ['customer', 'country', 'cc_xacts', 'orders', 'address']
+    getMostRecentOrderLines
+custReg
+{"request_msql_text": {"tableops": "READ customer ", "op": "begin_tx"}}
+    getUserName
+searchReq
+{"request_msql_text": {"tableops": "READ item ", "op": "begin_tx"}}
+    getRelated
+buyConf
+{"request_msql_text": {"tableops": "READ customer country WRITE shopping_cart_line order_line item address cc_xacts orders", "op": "begin_tx"}}
+    getCDiscount
+    getCart
+    enterAddressId
+    enterAddressMatch
+    enterAddressMaxId
+    enterAddressInsert
+    getCAddr
+    getCAddrId ['customer']
+    enterOrderMaxId
+    enterOrderInsert ['orders']
+    addOrderLine ['order_line']
+    getStock
+    setStock ['item']
+    enterCCXact ['country', 'cc_xacts', 'address']
+    clearCart
+adminReq
+{"request_msql_text": {"tableops": "READ item author ", "op": "begin_tx"}}
+    getBook
+adminConf
+{"request_msql_text": {"tableops": "READ author orders order_line WRITE item", "op": "begin_tx"}}
+    getBook ['author']
+    adminUpdate
+    adminUpdateRelated ['orders', 'order_line']
+    adminUpdateRelated1
+shopCart
+{"request_msql_text": {"tableops": "READ item WRITE shopping_cart_line shopping_cart", "op": "begin_tx"}}
+    createEmptyCart
+    createEmptyCartInsertV2
+    addItem
+    addItemUpdate
+    addItemPut
+    refreshCartRemove
+    refreshCartUpdate
+    addRandomItemToCartIfNecessary
+    getRelated1
+    addItem
+    addItemUpdate
+    addItemPut
+    resetCartTime ['shopping_cart']
+    getCart ['shopping_cart_line']
+    getRelated
+
 '''

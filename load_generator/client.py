@@ -28,7 +28,7 @@ NUM_QTY = 10
 NUM_PAIR = 10
 DEBUG = 0
 WRONG_PASSWD_FRENQUENCY = 1 # out of 10
-MAX_STRING_LEN = 100
+MAX_STRING_LEN = 10
 MAX_NUM_LEN = 12
 
 def determineNext(curr_index, prob):
@@ -567,7 +567,7 @@ class Client:
         if (flag == 1): # only if flag is Y == 1
             if self.load: # only if both c_uname and c_passwd are given (implied by load)
                 # getCustomer
-                query = sql.replaceVars(sql.sqlNameToCommand["getCustomer"], 1, [self.c_uname])
+                query = sql.replaceVars(sql.sqlNameToCommand["getCustomer"], 1, ["'" + self.c_uname + "'"])
                 response = self.send_query_and_receive_response(query, "getCustomer")
                 # DispOnly
                 if self.isErr(response):
@@ -607,9 +607,7 @@ class Client:
            
             #   2. createNewCustomerMaxId
             query = sql.sqlNameToCommand["createNewCustomerMaxId"]
-            # EarlyRelease - customer
-            ertables = ["customer"]
-            response = self.send_query_and_receive_response(query, "createNewCustomerMaxId", ertables)
+            response = self.send_query_and_receive_response(query, "createNewCustomerMaxId")
             # ReadResponse - SELECT max(c_id)
             if self.isErr(response):
                 self.logger.error("Response to createNewCustomerMaxId has error")
@@ -632,12 +630,12 @@ class Client:
             c_lname = generateRandomString()
             c_phone = generateRandomNum()
             c_email = generateRandomString()
-            c_last_login = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            c_since = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            c_login = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            c_expiration = (datetime.datetime.now() + datetime.timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
+            c_last_login = "'" + str(datetime.datetime.now().strftime('%Y-%m-%d')) + "'" 
+            c_since = "'" + str(datetime.datetime.now().strftime('%Y-%m-%d')) + "'"
+            c_login = "'" + str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + "'"
+            c_expiration = "'" + str((datetime.datetime.now() + datetime.timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')) + "'"
             c_discount = randint(0, 50) * 1.0
-            c_birthdate = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            c_birthdate = "'" + str(datetime.datetime.now().strftime('%Y-%m-%d')) + "'"
             c_data = generateRandomString()
             cust_info = [   max_id, c_uname, c_passwd, c_fname, c_lname, 
                             addr_id, c_phone, c_email, c_since, c_last_login,
@@ -645,7 +643,9 @@ class Client:
                             c_birthdate, c_data
                         ]
             query = sql.replaceVars(sql.sqlNameToCommand["createNewCustomer"], 17, cust_info)
-            response = self.send_query_and_receive_response(query, "createNewCustomer")
+            # EarlyRelease - customer
+            ertables = ["customer"]
+            response = self.send_query_and_receive_response(query, "createNewCustomer", ertables)
             # UpdateOnly
             if self.isErr(response):
                 self.logger.error("Response to createNewCustomer has error")
@@ -1138,11 +1138,7 @@ class Client:
                 self.logger.warning("Response to enterAddressMatch is empty")
                 #   c. enterAddressMaxId
                 query = sql.sqlNameToCommand["enterAddressMaxId"]
-                # EarlyRelease - address; if self.curr == buyReq
-                ertables = []
-                if self.curr == "buyReq":
-                    ertables = ["address"]
-                response = self.send_query_and_receive_response(query, "enterAddressMaxId", ertables)
+                response = self.send_query_and_receive_response(query, "enterAddressMaxId")
                 # ReadResponse - SELECT max(addr_id)
                 if self.isErr(response):
                     self.logger.error("Response to enterAddressMaxId has error")
@@ -1150,11 +1146,15 @@ class Client:
                 if self.isEmpty(response):
                     self.logger.warning("Response to enterAddressMaxId is empty")
                     return False # max has to have a number
-                addr_id = response[0][0] + 1
+                addr_id = int(response[0][0]) + 1
 
                 #   d. enterAddressInsert
                 query = sql.replaceVars(sql.sqlNameToCommand["enterAddressInsert"], 7, [addr_id, street1, street2, city, state, zzip, co_id])
-                response = self.send_query_and_receive_response(query, "enterAddressInsert")
+                # EarlyRelease - address; if self.curr == buyReq
+                ertables = []
+                if self.curr == "buyReq":
+                    ertables = ["address"]
+                response = self.send_query_and_receive_response(query, "enterAddressInsert", ertables)
                 # UpdateOnly
                 if self.isErr(response):
                     self.logger.error("Response to enterAddressInsert has error")
