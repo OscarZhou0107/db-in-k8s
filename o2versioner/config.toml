@@ -13,18 +13,9 @@ max_connection = 50
 [[dbproxy]]
 addr = "127.0.0.1:8876"
 dbname = "tpcw"
-host = "34.122.129.200"
+host = "localhost"
 password = "Abc@123"
 port = "5432"
 user = "postgres"
-
-[[dbproxy]]
-addr = "127.0.0.1:8876"
-dbname = "tpcw"
-host = "34.70.96.183"
-password = "Abc@123"
-port = "5432"
-user = "postgres"
-
 
 
