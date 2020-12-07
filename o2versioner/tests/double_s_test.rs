@@ -143,8 +143,8 @@ async fn run_double_s() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr));
-    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, true));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, true));
 
     sleep(Duration::from_millis(300)).await;
 
@@ -269,8 +269,8 @@ async fn run_double_s() {
     .unwrap();
 }
 
-#[instrument(name="dbproxy(mock)" skip(addr))]
-pub async fn mock_dbproxy<A>(addr: A)
+#[instrument(name="dbproxy(mock)" skip(addr, random_delay))]
+pub async fn mock_dbproxy<A>(addr: A, random_delay: bool)
 where
     A: ToSocketAddrs,
 {
@@ -302,9 +302,11 @@ where
                             debug!("<- {:?}", msg);
 
                             // Simulate some load
-                            let sleep_time = rand::rngs::OsRng::default().gen_range(20, 200);
-                            info!("Works for {} ms", sleep_time);
-                            sleep(Duration::from_millis(sleep_time)).await;
+                            if random_delay {
+                                let sleep_time = rand::rngs::OsRng::default().gen_range(20, 200);
+                                info!("Works for {} ms", sleep_time);
+                                sleep(Duration::from_millis(sleep_time)).await;
+                            }
 
                             match msg {
                                 scheduler_dbproxy::Message::MsqlRequest(client_addr, msql, _txvn) => {
