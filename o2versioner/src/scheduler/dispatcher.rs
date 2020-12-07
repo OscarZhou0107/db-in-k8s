@@ -218,7 +218,7 @@ impl State {
         );
 
         debug!(
-            "entering wait_on_version {:?} {:?} {:?}",
+            "entering wait_on_version {:?} | {:?} | {:?}",
             msqlquery,
             txvn,
             self.dbvn_manager.read().await.inner()
