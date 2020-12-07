@@ -203,8 +203,8 @@ class Client:
             format='%(asctime)s,%(msecs)d %(name)s [%(levelname)s] %(message)s',
             # write to both stdout and log file
             handlers=[
-                logging.FileHandler(logname, mode="w"),
-                logging.StreamHandler(sys.stdout)
+                logging.FileHandler(logname, mode="w")#,
+                #logging.StreamHandler(sys.stdout)
             ]
         )
         # set name for this logger
@@ -598,7 +598,7 @@ class Client:
     def doBuyReq(self): # state 4
         flag = randint(0, 1)
         if (flag == 1): # only if flag is Y == 1
-            if self.load: # only if both c_uname and c_passwd are given (implied by load)
+            if self.load and self.c_uname: # only if both c_uname and c_passwd are given (implied by load)
                 # getCustomer
                 query = sql.replaceVars(sql.sqlNameToCommand["getCustomer"], 1, ["'" + self.c_uname.strip("'") + "'"])
                 response = self.send_query_and_receive_response(query, "getCustomer")
@@ -764,7 +764,7 @@ class Client:
 
     def doOrderDisp(self): # state 8
         # 1. getPassword 
-        if self.load: # only if both c_uname and c_passwd are given (implied by load)
+        if self.load and self.c_uname: # only if both c_uname and c_passwd are given (implied by load)
             query = sql.replaceVars(sql.sqlNameToCommand["getPassword"], 1, ["'" + self.c_uname.strip("'") + "'"])
             response = self.send_query_and_receive_response(query, "getPassword")
             # DispOnly
