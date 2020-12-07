@@ -37,7 +37,7 @@ def parse_single_run(run_name, args):
     return (run_name, perfdb, dbproxy_stats_db)
 
 
-def plot_charts(database):
+def plot_charts(args, database):
     '''
     [(run_name, PerfDB, DbproxyStatsDB)]
     '''
@@ -88,15 +88,26 @@ def plot_charts(database):
         ax2.plot(nums_clients, mean_latencies, label=str(num_dbproxy) + ' dbproxies', linestyle=':', marker='^')
         ax2.legend(loc='upper right')
 
+    if args.output:
+        filename = os.path.join(args.output, figname)
+        plt.savefig(filename)
+        print('Info:', 'Chart is dumped to', filename)
+
     plt.show()
 
 
 def init(parser):
     parser.add_argument('--dir', type=str, required=True, help='log files directory for all runs')
     parser.add_argument('--debug', action='store_true', help='debug messages')
+    parser.add_argument('--output', type=str, help='directory to dump the files')
 
 
 def main(args):
+    if args.output is not None:
+        print('Info', 'Preparing', args.output, 'for dumping files')
+        if not os.path.exists(args.output):
+            os.mkdirs(args.output)
+
     run_names = [o for o in os.listdir(args.dir) if os.path.isdir(os.path.join(args.dir, o))]
     print('Info:', 'Found metric data of', len(run_names), 'runs')
 
@@ -107,7 +118,7 @@ def main(args):
     print('Info:')
     print('Info:', 'Parsing took', float_fmt(end - start), 'seconds')
 
-    plot_charts(database)
+    plot_charts(args, database)
 
 
 if __name__ == '__main__':
