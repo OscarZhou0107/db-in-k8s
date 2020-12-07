@@ -1,5 +1,7 @@
 [scheduler]
 addr = "127.0.0.1:1077"
+admin_addr = "127.0.0.1:9999"
+performance_loggin = "./logging"
 dispatcher_queue_size = 500
 max_connection = 50
 sequencer_pool_size = 20

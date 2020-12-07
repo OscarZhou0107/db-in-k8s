@@ -146,18 +146,22 @@ impl PendingQueue {
         let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
             .then(move |op| {
                 println!("msql is: {:?}", op.msql);
+                println!("txvn is: {:?}", op.versions);
                 let version = version.clone();
                 async move {
-                    if let Ok(query) = op.msql.try_get_query() {
-                        (
+                    match &op.msql {
+                        Msql::Query(query) => (
+                            op.clone(),
+                            version.lock().await.violate_version(query.tableops(), &op.versions),
+                        ),
+                        Msql::EndTx(_) => (
                             op.clone(),
                             version
                                 .lock()
                                 .await
-                                .violate_version(query.tableops(), &op.clone().versions),
-                        )
-                    } else {
-                        (op, false)
+                                .violate_version(&op.versions.as_ref().unwrap().get_tableops(), &op.versions),
+                        ),
+                        _ => (op.clone(), false),
                     }
                 }
             })

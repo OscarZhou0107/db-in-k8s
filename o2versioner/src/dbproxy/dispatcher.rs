@@ -55,6 +55,11 @@ impl Dispatcher {
                         let pool_cloned = pool.clone();
                         let sender_cloned = sender.clone();
 
+                        match op.operation_type {
+                            Task::COMMIT | Task::ABORT => { println!("A end task was blocked"); },
+                            _=> {}
+                        };
+
                         if !lock.contains_key(op_cloned.versions.clone().unwrap().uuid()) {
                             let (ts, tr) = mpsc::channel(100);
                             lock.insert(op_cloned.versions.clone().unwrap().uuid().clone(), ts);
