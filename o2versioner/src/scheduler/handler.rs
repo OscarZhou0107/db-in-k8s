@@ -120,8 +120,15 @@ pub async fn main(conf: Config) {
 
     // Allow scheduler to be terminated by admin
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
-        let admin_handle =
-            tokio::spawn(admin(admin_addr.parse().unwrap(), stop_tx, sequencer_socket_pool).in_current_span());
+        let admin_handle = tokio::spawn(
+            admin(
+                admin_addr.parse().unwrap(),
+                stop_tx,
+                sequencer_socket_pool,
+                state.clone(),
+            )
+            .in_current_span(),
+        );
 
         // main_handle can either run to finish or be the result
         // of the above stop_tx.send()
@@ -144,7 +151,8 @@ pub async fn main(conf: Config) {
     info!("DIES");
 }
 
-async fn logging(log_dir: String, state: State) {
+async fn logging<S: Into<String>>(log_dir: S, state: State) {
+    let log_dir = log_dir.into();
     let mut path_builder = PathBuf::from(log_dir);
     path_builder.push(Utc::now().format("%y%m%d_%H%M%S").to_string());
     let cur_log_dir = path_builder.as_path();
@@ -191,9 +199,11 @@ async fn admin(
     admin_addr: SocketAddr,
     stop_tx: Option<oneshot::Sender<()>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
+    state: State,
 ) {
     start_admin_tcplistener(admin_addr, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
+        let state = state.clone();
         async move {
             let command = UniCase::new(msg);
             if command == UniCase::new("block") || command == UniCase::new("unblock") {
@@ -229,6 +239,9 @@ async fn admin(
                     .await
                 );
                 (reply, false)
+            } else if command == UniCase::new("debug") {
+                logging("./debug", state).await;
+                (format!("Check scheduler terminal"), true)
             } else {
                 (format!("Unknown command: {}", command), true)
             }
