@@ -32,7 +32,7 @@ impl PostgresSqlConnPool {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct QueueMessage {
     pub identifier: RequestMeta,
     pub operation_type: Task,
@@ -135,6 +135,7 @@ impl PendingQueue {
     }
 
     pub fn push(&mut self, op: QueueMessage) {
+        debug!("PendingQueue pushed {:?} and notify all tasks waiting", op);
         self.queue.push(op);
         self.notify.notify_one();
     }
@@ -374,7 +375,7 @@ impl QueryResult {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Task {
     BEGIN,
     READ,

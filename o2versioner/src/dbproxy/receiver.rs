@@ -21,7 +21,7 @@ impl Receiver {
         info!("Receiver started");
 
         while let Some(msg) = deserializer.try_next().await.unwrap() {
-            debug!("Receiver a new request");
+            debug!("Receiver received a new request from scheduler");
             match msg {
                 Message::MsqlRequest(meta, request, versions) => {
                     debug!("Responder: {:?}", versions.clone());

@@ -18,94 +18,92 @@ pub struct Dispatcher {}
 impl Dispatcher {
     pub async fn run(
         pending_queue: Arc<Mutex<PendingQueue>>,
-        sender: mpsc::Sender<QueryResult>,
+        responder_sender: mpsc::Sender<QueryResult>,
         config: tokio_postgres::Config,
         mut version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
+        let postgres_pool_size = 80;
+        let transaction_channel_queue_size = 100;
         info!("Dispatcher Started");
 
         let mut task_notify = pending_queue.lock().await.get_notify();
         let mut version_notify = version.lock().await.get_notify();
 
-        let manager = PostgresConnectionManager::new(config, NoTls);
-        let pool = Pool::builder().max_size(50).build(manager).await.unwrap();
+        let pool = Pool::builder()
+            .max_size(postgres_pool_size)
+            .build(PostgresConnectionManager::new(config, NoTls))
+            .await
+            .unwrap();
 
         loop {
             Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
             debug!("Dispatcher get a notification");
-
             debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
-
             debug!("version is: {:?}", version.lock().await.db_version);
             let operations = pending_queue
                 .lock()
                 .await
                 .get_all_version_ready_task(&mut version)
                 .await;
-
             debug!("Operation batch size is {}", operations.len());
 
-            {
-                let mut lock = transactions.lock().await;
-
-                operations.iter().for_each(|op| {
-                    let op_cloned = op.clone();
+            // Changed previous serial for loop to concurrent
+            stream::iter(operations.clone())
+                .for_each(|op| {
                     let pool_cloned = pool.clone();
-                    let sender_cloned = sender.clone();
+                    let responder_sender_cloned = responder_sender.clone();
+                    let transactions_cloned = transactions.clone();
 
-                    if !lock.contains_key(op_cloned.versions.as_ref().unwrap().uuid()) {
-                        let (ts, tr) = mpsc::channel(100);
-                        lock.insert(op_cloned.versions.as_ref().unwrap().uuid().clone(), ts);
+                    async move {
+                        let mut transactions_lock = transactions_cloned.lock().await;
 
-                        // When to join this task?
-                        tokio::spawn(Self::spawn_transaction(pool_cloned, tr, sender_cloned));
-                    }
-                });
-            }
-            let senders: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
-            {
-                let lock = transactions.lock().await;
-                let mut lock_2 = senders.lock().await;
+                        let transaction_sender = transactions_lock
+                            .entry(op.versions.as_ref().unwrap().uuid().clone())
+                            .or_insert_with(|| {
+                                // Start a new transaction if not existed yet
+                                // Save this newly opened transaction, associates an tx with the transaction, so
+                                // upcoming requests can go to the transaction via tx
+                                debug!(
+                                    "Opening a new transaction for ({})",
+                                    op.versions.as_ref().unwrap().uuid()
+                                );
 
-                operations.iter().for_each(|op| {
-                    if !lock_2.contains_key(op.versions.clone().unwrap().uuid()) {
-                        lock_2.insert(
-                            op.versions.clone().unwrap().uuid().clone(),
-                            lock.get(op.versions.clone().unwrap().uuid()).unwrap().clone(),
+                                let (transaction_tx, transaction_rx) = mpsc::channel(transaction_channel_queue_size);
+
+                                // A task represents an ongoing transaction, probably just leaves it hanging around.
+                                // listens on the rx for upcoming requests
+                                tokio::spawn(Self::spawn_transaction(
+                                    pool_cloned,
+                                    transaction_rx,
+                                    responder_sender_cloned,
+                                ));
+
+                                transaction_tx
+                            });
+
+                        // Send the request to the existing transaction listener
+                        debug!(
+                            "Sending a new operation to an existing transaction ({})",
+                            op.versions.as_ref().unwrap().uuid()
                         );
+                        transaction_sender.send(op).await.map_err(|e| e.to_string()).unwrap();
                     }
-                });
-            }
-
-            {
-                let lock = senders.lock().await;
-                stream::iter(operations)
-                    .for_each(|op| async {
-                        debug!("Sending a new operation");
-                        let op = op;
-                        lock.get(op.versions.clone().unwrap().uuid())
-                            .unwrap()
-                            .send(op.clone())
-                            .await
-                            .map_err(|e| e.to_string())
-                            .unwrap();
-                    })
-                    .await;
-            }
+                })
+                .await;
         }
     }
 
     async fn spawn_transaction(
         pool: Pool<PostgresConnectionManager<NoTls>>,
-        mut rec: mpsc::Receiver<QueueMessage>,
-        sender: mpsc::Sender<QueryResult>,
+        mut transaction_listener: mpsc::Receiver<QueueMessage>,
+        responder_sender: mpsc::Sender<QueryResult>,
     ) {
         let mut finish = false;
         let conn = pool.get().await.unwrap();
         conn.simple_query("START TRANSACTION;").await.unwrap();
-        while let Some(operation) = rec.recv().await {
+        while let Some(operation) = transaction_listener.recv().await {
             let raw;
             match operation.operation_type {
                 Task::READ => {
@@ -131,7 +129,11 @@ impl Dispatcher {
                 }
             }
 
-            let _ = sender.send(operation.into_sqlresponse(raw)).await;
+            responder_sender
+                .send(operation.into_sqlresponse(raw))
+                .await
+                .map_err(|e| e.to_string())
+                .unwrap();
 
             if finish {
                 break;
@@ -143,8 +145,8 @@ impl Dispatcher {
         let n1 = new_task_notify.notified();
         let n2 = version_notify.notified();
         tokio::select! {
-           _ = n1 => {}
-           _ = n2 => {}
+           _ = n1 => {debug!("new_task_notify")}
+           _ = n2 => {debug!("version_notify")}
         };
     }
 }
