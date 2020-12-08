@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timedelta
 import statistics
 import math
+import gzip
 
 try:
     from dateutil import parser as dateutil_parser
@@ -23,10 +24,25 @@ class DBRow(dict):
         print('Info:', *map(lambda kv: (str(kv[0]), str(kv[1])), modified_row.items()))
 
 
+class OpenAnyFile():
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        if self.path.endswith('gz'):
+            self.fd = gzip.open(self.path, 'rt')
+        else:
+            self.fd = open(self.path)
+        return self.fd
+
+    def __exit__(self, type, value, traceback):
+        self.fd.close()
+
+
 class DB(list):
     def __init__(self, csv_path=None, data=None, debug=False):
         if csv_path is not None:
-            with open(csv_path) as csvfile:
+            with OpenAnyFile(csv_path) as csvfile:
                 if debug:
                     print('Info:', 'Parsing', csv_path)
                 csvreader = csv.DictReader(csvfile)
@@ -156,10 +172,10 @@ def init(parser):
 
 def main(args):
     # Parse perf csv
-    perfdb = PerfDB(perf_csv_path=os.path.join(args.log_dir, 'perf.csv'))
+    perfdb = PerfDB(perf_csv_path=os.path.join(args.log_dir, 'perf.csv.gz'))
 
     # Parse dbproxy stats csv
-    dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv'))
+    dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv.gz'))
 
     # Apply filter on perfdb
     sq_perfdb = perfdb.get_filtered(successful_query_filter)
