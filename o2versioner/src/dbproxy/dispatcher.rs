@@ -13,7 +13,7 @@ use tokio_postgres::NoTls;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-pub struct Dispatcher {}
+pub struct Dispatcher;
 
 impl Dispatcher {
     pub async fn run(
@@ -73,10 +73,11 @@ impl Dispatcher {
 
                                 // A task represents an ongoing transaction, probably just leaves it hanging around.
                                 // listens on the rx for upcoming requests
-                                tokio::spawn(Self::spawn_transaction(
+                                tokio::spawn(TransactionExecutioner::run(
                                     pool_cloned,
                                     transaction_rx,
                                     responder_sender_cloned,
+                                    op.versions.as_ref().unwrap().uuid().clone(),
                                 ));
 
                                 transaction_tx
@@ -94,13 +95,28 @@ impl Dispatcher {
         }
     }
 
-    async fn spawn_transaction(
+    async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>, version_notify: &mut Arc<Notify>) {
+        let n1 = new_task_notify.notified();
+        let n2 = version_notify.notified();
+        tokio::select! {
+           _ = n1 => {debug!("new_task_notify")}
+           _ = n2 => {debug!("version_notify")}
+        };
+    }
+}
+
+struct TransactionExecutioner;
+
+impl TransactionExecutioner {
+    pub async fn run(
         pool: Pool<PostgresConnectionManager<NoTls>>,
         mut transaction_listener: mpsc::Receiver<QueueMessage>,
         responder_sender: mpsc::Sender<QueryResult>,
+        transaction_uuid: Uuid,
     ) {
         let mut finish = false;
         let conn = pool.get().await.unwrap();
+        info!("Deploying new transaction executioner {}", transaction_uuid);
         conn.simple_query("START TRANSACTION;").await.unwrap();
         while let Some(operation) = transaction_listener.recv().await {
             let raw;
@@ -138,15 +154,8 @@ impl Dispatcher {
                 break;
             }
         }
-    }
 
-    async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>, version_notify: &mut Arc<Notify>) {
-        let n1 = new_task_notify.notified();
-        let n2 = version_notify.notified();
-        tokio::select! {
-           _ = n1 => {debug!("new_task_notify")}
-           _ = n2 => {debug!("version_notify")}
-        };
+        info!("Terminating transaction executioner {}", transaction_uuid);
     }
 }
 
