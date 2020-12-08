@@ -6,25 +6,34 @@ use o2versioner::util::config::Config;
 use o2versioner::{scheduler_main, sequencer_main};
 use tracing::info;
 
-pub fn init_logger() {
-    let collector = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .with_target(false)
-        .without_time()
-        .finish();
-    tracing::subscriber::set_global_default(collector).unwrap();
-}
+pub fn init_logger() {}
 
 /// cargo run -- <args>
 #[tokio::main]
 async fn main() {
-    println!("current dir is: {}",env::current_dir().unwrap().to_str().unwrap());
+    // Parse args
     let matches = parse_args();
 
-    init_logger();
+    // Set tracing
+    let max_level = match matches.occurrences_of("v") {
+        0 => tracing::Level::INFO,
+        1 => tracing::Level::DEBUG,
+        2 | _ => tracing::Level::TRACE,
+    };
+    println!("Verbosity set to {:?}", max_level);
+    let collector = tracing_subscriber::fmt()
+        .with_max_level(max_level)
+        .with_target(false)
+        .without_time()
+        .finish();
+    tracing::subscriber::set_global_default(collector).unwrap();
+
+    // Parse config
+    info!("current dir is: {}", env::current_dir().unwrap().to_str().unwrap());
     let conf = Config::from_file(matches.value_of("config").unwrap());
     info!("{:?}", conf);
 
+    // Launch binary
     if matches.is_present("dbproxy") {
         let index: usize = matches.value_of("dbindex").unwrap().to_string().parse().unwrap();
         dbproxy::main(conf.dbproxy.get(index).unwrap().clone()).await
@@ -67,5 +76,6 @@ fn parse_args() -> ArgMatches<'static> {
                 .args(&["dbproxy", "scheduler", "sequencer"])
                 .required(true),
         )
+        .arg(Arg::with_name("v").short("v").multiple(true).help("v-debug, vv-trace"))
         .get_matches()
 }
