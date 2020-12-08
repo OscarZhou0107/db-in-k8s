@@ -11,7 +11,7 @@ use tokio::sync::oneshot;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, instrument, warn, Instrument, Span};
+use tracing::{field, info, instrument, trace, warn, Instrument, Span};
 
 pub type StopTx = oneshot::Sender<()>;
 type StopRx = oneshot::Receiver<()>;
@@ -135,14 +135,14 @@ where
         .fold(
             (serded_read, serded_write, &mut responses),
             |(mut serded_read, mut serded_write, responses), send_msg| async move {
-                debug!("-> {:?}", send_msg);
+                trace!("-> {:?}", send_msg);
                 responses.push(
                     serded_write
                         .send(send_msg)
                         .and_then(|_| serded_read.try_next())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap();
-                            debug!("<- {:?}", received_msg);
+                            trace!("<- {:?}", received_msg);
                             received_msg
                         })
                         .await,
@@ -153,7 +153,7 @@ where
         )
         .await;
 
-    debug!("Current task finished");
+    trace!("Current task finished");
 
     responses
 }
@@ -210,7 +210,7 @@ mod tests_tcppool {
     use bb8::Pool;
     use futures::future;
     use std::time::Duration;
-    use tracing::{debug, info_span, Instrument};
+    use tracing::{info_span, trace, Instrument};
 
     /// cargo test -- --show-output
     #[tokio::test]
@@ -228,7 +228,7 @@ mod tests_tcppool {
 
         let server_handle = tokio::spawn(async move {
             tests_helper::mock_echo_server(port, Some(pool_size)).await;
-            debug!("server_handle finished");
+            trace!("server_handle finished");
         });
 
         let client_handles = tokio::spawn({
@@ -252,7 +252,7 @@ mod tests_tcppool {
                     )
                     .instrument(info_span!("client0"))
                     .await;
-                    debug!("client0_handle finished");
+                    trace!("client0_handle finished");
                 });
 
                 let pool_cloned = pool.clone();
@@ -261,17 +261,17 @@ mod tests_tcppool {
                     tests_helper::mock_json_client(&mut tcp_stream, vec!["hello1".to_owned(), "hello11".to_owned()])
                         .instrument(info_span!("client1"))
                         .await;
-                    debug!("client1_handle finished");
+                    trace!("client1_handle finished");
                 });
 
                 tokio::try_join!(client0_handle, client1_handle).unwrap();
-                debug!("pool dropped automatically")
+                trace!("pool dropped automatically")
             };
             fut.instrument(info_span!("super_clients"))
         });
 
         tokio::try_join!(server_handle, client_handles).unwrap();
-        debug!("test_pool_lifetime finished!")
+        trace!("test_pool_lifetime finished!")
     }
 
     /// cargo test -- --show-output
@@ -297,7 +297,7 @@ mod tests_tcppool {
         // and then server_handle can properly terminate.
         let server_handle = tokio::spawn(async move {
             tests_helper::mock_echo_server(port, Some(pool_size)).await;
-            debug!("server_handle finished");
+            trace!("server_handle finished");
         });
 
         let pool_cloned = pool.clone();
@@ -306,7 +306,7 @@ mod tests_tcppool {
             tests_helper::mock_json_client(&mut tcp_stream, vec![String::from("hello0"), String::from("hello00")])
                 .instrument(info_span!("client0"))
                 .await;
-            debug!("client0_handle finished");
+            trace!("client0_handle finished");
         });
 
         let pool_cloned = pool.clone();
@@ -315,7 +315,7 @@ mod tests_tcppool {
             tests_helper::mock_json_client(&mut tcp_stream, vec!["hello1".to_owned(), "hello11".to_owned()])
                 .instrument(info_span!("client1"))
                 .await;
-            debug!("client1_handle finished");
+            trace!("client1_handle finished");
         });
 
         // pool connections must have already been dropped
@@ -327,6 +327,6 @@ mod tests_tcppool {
         )
         .await
         .is_ok());
-        debug!("test_pool_lifetime finished!")
+        trace!("test_pool_lifetime finished!")
     }
 }

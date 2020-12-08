@@ -9,7 +9,7 @@ use tokio::sync::{oneshot, Mutex};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{trace, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Main entrance for Sequencer
 ///
@@ -80,9 +80,9 @@ async fn process_connection(
                 match msg {
                     Message::RequestTxVN(client_meta, sqlbegintx) => {
                         Span::current().record("client", &&client_meta.to_string()[..]);
-                        debug!("<- {:?}", sqlbegintx);
+                        trace!("<- {:?}", sqlbegintx);
                         let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
-                        debug!("-> {:?}", txvn);
+                        trace!("-> {:?}", txvn);
                         Ok(Message::ReplyTxVN(txvn))
                     }
                     Message::RequestBlock => {

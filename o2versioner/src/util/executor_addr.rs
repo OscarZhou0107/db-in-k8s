@@ -109,6 +109,6 @@ where
 //     Request: ExecutorRequest,
 // {
 //     fn drop(&mut self) {
-//         debug!("Dropping ExecutorAddr");
+//         trace!("Dropping ExecutorAddr");
 //     }
 // }

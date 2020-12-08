@@ -8,13 +8,13 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tracing::dispatcher::DefaultGuard;
-use tracing::{debug, error, field, info, info_span, instrument, Instrument, Span};
+use tracing::{debug, error, field, info_span, instrument, trace, Instrument, Span};
 
 #[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_logger() -> DefaultGuard {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_test_writer()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::TRACE)
         .with_target(false)
         .without_time()
         .finish();
@@ -47,7 +47,7 @@ where
             tokio::io::copy(&mut reader, &mut writer)
                 .then(move |result| {
                     match result {
-                        Ok(amt) => debug!("-> ECHOED {} BYTES", amt),
+                        Ok(amt) => trace!("-> ECHOED {} BYTES", amt),
                         Err(e) => error!("-> ERROR ON ECHOING: {}", e),
                     };
                     future::ready(())
@@ -105,7 +105,7 @@ where
                     !send_msg.contains("\n"),
                     "mock_ascii_client send message should not contain any newline characters"
                 );
-                debug!("-> {:?}", send_msg);
+                trace!("-> {:?}", send_msg);
                 send_msg += "\n";
                 responses.push(
                     tcp_write
@@ -113,7 +113,7 @@ where
                         .and_then(|_| line_reader.next_line())
                         .map_ok(|received_msg| {
                             let received_msg = received_msg.unwrap().trim().to_owned();
-                            info!("<- {:?}", received_msg);
+                            debug!("<- {:?}", received_msg);
                             received_msg
                         })
                         .await,
@@ -124,7 +124,7 @@ where
         )
         .await;
 
-    debug!("Current task finished");
+    trace!("Current task finished");
 
     responses
 }

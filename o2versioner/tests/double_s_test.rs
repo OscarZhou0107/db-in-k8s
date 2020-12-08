@@ -14,7 +14,7 @@ use tokio::time::{sleep, Duration};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info, info_span, instrument, Instrument};
+use tracing::{info, info_span, instrument, trace, Instrument};
 
 fn transaction_samples() -> Vec<Vec<Message>> {
     vec![
@@ -442,7 +442,7 @@ where
                 serded_read
                     .and_then(move |msg| {
                         async move {
-                            debug!("<- {:?}", msg);
+                            trace!("<- {:?}", msg);
 
                             // Simulate some load
                             if random_delay {
@@ -467,7 +467,7 @@ where
                             }
                         }
                     })
-                    .inspect_ok(|m| debug!("dbproxy mock replies {:?}", m))
+                    .inspect_ok(|m| trace!("dbproxy mock replies {:?}", m))
                     .forward(serded_write)
                     .map(|_| ())
                     .await;
