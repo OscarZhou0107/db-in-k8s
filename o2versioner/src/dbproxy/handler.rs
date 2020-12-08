@@ -45,15 +45,19 @@ pub async fn main(conf: DbProxyConfig) {
         responder_sender,
         config,
         version.clone(),
-        transactions,
+        transactions.clone(),
     ));
 
     info!("Starting Responder...");
     let responder_handle = tokio::spawn(Responder::run(responder_receiver, version, tcp_write));
 
     info!("Starting Receiver...");
-    let receiver_handle = tokio::spawn(Receiver::run(pending_queue, tcp_read));
+    let receiver_handle = tokio::spawn(Receiver::run(pending_queue.clone(), tcp_read));
 
-    tokio::try_join!(responder_handle, dispatcher_handle, receiver_handle).unwrap();
+    let res = tokio::try_join!(responder_handle, dispatcher_handle, receiver_handle);
     info!("End");
+    info!("Pending queue size is {}", pending_queue.lock().await.queue.len());
+    info!("Transactions size is {}", transactions.lock().await.len());
+
+    res.unwrap();
 }
