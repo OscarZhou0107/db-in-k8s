@@ -18,27 +18,23 @@ impl Receiver {
             SymmetricalJson::<Message>::default(),
         );
 
-        let handler = tokio::spawn(async move {
-            info!("Receiver started");
+        info!("Receiver started");
 
-            while let Some(msg) = deserializer.try_next().await.unwrap() {
-                debug!("Receiver a new request");
-                match msg {
-                    Message::MsqlRequest(meta, request, versions) => {
-                        debug!("Responder: {:?}", versions.clone());
+        while let Some(msg) = deserializer.try_next().await.unwrap() {
+            debug!("Receiver a new request");
+            match msg {
+                Message::MsqlRequest(meta, request, versions) => {
+                    debug!("Responder: {:?}", versions.clone());
 
-                        pending_queue
-                            .lock()
-                            .await
-                            .push(QueueMessage::new(meta, request, versions));
-                    }
-                    _ => debug!("nope"),
+                    pending_queue
+                        .lock()
+                        .await
+                        .push(QueueMessage::new(meta, request, versions));
                 }
+                _ => debug!("nope"),
             }
-            debug!("Receiver finished its jobs");
-        });
-
-        handler.await.unwrap();
+        }
+        debug!("Receiver finished its jobs");
     }
 }
 

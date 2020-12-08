@@ -24,12 +24,10 @@ pub async fn main(conf: DbProxyConfig) {
     let transactions = Arc::new(Mutex::new(HashMap::new()));
 
     //Global version//
-    let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
-    let version_2 = Arc::clone(&version);
+    let version = Arc::new(Mutex::new(DbVersion::new(Default::default())));
 
     //PendingQueue
-    let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-    let pending_queue_2: Arc<Mutex<PendingQueue>> = Arc::clone(&pending_queue);
+    let pending_queue = Arc::new(Mutex::new(PendingQueue::new()));
 
     //Responder sender and receiver
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
@@ -42,12 +40,20 @@ pub async fn main(conf: DbProxyConfig) {
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
     info!("Starting Dispatcher...");
-    Dispatcher::run(pending_queue, responder_sender, config, version, transactions);
+    let dispatcher_handle = tokio::spawn(Dispatcher::run(
+        pending_queue.clone(),
+        responder_sender,
+        config,
+        version.clone(),
+        transactions,
+    ));
 
     info!("Starting Responder...");
-    Responder::run(responder_receiver, version_2, tcp_write);
+    let responder_handle = tokio::spawn(Responder::run(responder_receiver, version, tcp_write));
 
     info!("Starting Receiver...");
-    Receiver::run(pending_queue_2, tcp_read).await;
+    let receiver_handle = tokio::spawn(Receiver::run(pending_queue, tcp_read));
+
+    tokio::try_join!(responder_handle, dispatcher_handle, receiver_handle).unwrap();
     info!("End");
 }

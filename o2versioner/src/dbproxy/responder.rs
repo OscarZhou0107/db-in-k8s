@@ -14,44 +14,46 @@ pub struct Responder {}
 
 // Box<SymmetricallyFramed<FramedWrite<OwnedWriteHalf, LengthDelimitedCodec>,Message,SymmetricalJson<Message>>>
 impl Responder {
-    pub fn run(mut receiver: mpsc::Receiver<QueryResult>, version: Arc<Mutex<DbVersion>>, tcp_write: OwnedWriteHalf) {
-        tokio::spawn(async move {
-            info!("Responder started");
-            let mut serializer = SymmetricallyFramed::new(
-                FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
-                SymmetricalJson::<Message>::default(),
-            );
+    pub async fn run(
+        mut receiver: mpsc::Receiver<QueryResult>,
+        version: Arc<Mutex<DbVersion>>,
+        tcp_write: OwnedWriteHalf,
+    ) {
+        info!("Responder started");
+        let mut serializer = SymmetricallyFramed::new(
+            FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
+            SymmetricalJson::<Message>::default(),
+        );
 
-            while let Some(mut result) = receiver.recv().await {
-                debug!("Responder got a result to return");
-                match result.result_type {
-                    QueryResultType::END => {
-                        debug!("Trying to release a version");
-                        debug!("Responder: {:?}", result.contained_newer_versions.clone());
-                        version
-                            .lock()
-                            .await
-                            .release_on_transaction(result.contained_newer_versions.clone());
-                    }
-                    _ => match result.flush_early_release() {
-                        Ok(request) => {
-                            debug!("Doing a early release {:?}", request);
-                            version.lock().await.release_on_request(request);
-                        }
-                        Err(_) => {}
-                    },
+        while let Some(mut result) = receiver.recv().await {
+            debug!("Responder got a result to return");
+            match result.result_type {
+                QueryResultType::END => {
+                    debug!("Trying to release a version");
+                    debug!("Responder: {:?}", result.contained_newer_versions.clone());
+                    version
+                        .lock()
+                        .await
+                        .release_on_transaction(result.contained_newer_versions.clone());
                 }
-
-                serializer
-                    .send(Message::MsqlResponse(
-                        result.identifier.clone(),
-                        result.into_msql_response(),
-                    ))
-                    .await
-                    .unwrap();
+                _ => match result.flush_early_release() {
+                    Ok(request) => {
+                        debug!("Doing a early release {:?}", request);
+                        version.lock().await.release_on_request(request);
+                    }
+                    Err(_) => {}
+                },
             }
-            info!("Responder finishes its job");
-        });
+
+            serializer
+                .send(Message::MsqlResponse(
+                    result.identifier.clone(),
+                    result.into_msql_response(),
+                ))
+                .await
+                .unwrap();
+        }
+        info!("Responder finishes its job");
     }
 }
 
@@ -119,7 +121,7 @@ mod tests_test {
             let (tcp_stream, _) = listener.accept().await.unwrap();
             let (_, tcp_write) = tcp_stream.into_split();
 
-            Responder::run(receiver, version, tcp_write);
+            Responder::run(receiver, version, tcp_write).await;
         });
     }
 

@@ -16,132 +16,127 @@ use uuid::Uuid;
 pub struct Dispatcher {}
 
 impl Dispatcher {
-    pub fn run(
+    pub async fn run(
         pending_queue: Arc<Mutex<PendingQueue>>,
         sender: mpsc::Sender<QueryResult>,
         config: tokio_postgres::Config,
         mut version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
-        tokio::spawn(async move {
-            info!("Dispatcher Started");
+        info!("Dispatcher Started");
 
-            let mut task_notify = pending_queue.lock().await.get_notify();
-            let mut version_notify = version.lock().await.get_notify();
+        let mut task_notify = pending_queue.lock().await.get_notify();
+        let mut version_notify = version.lock().await.get_notify();
 
-            let manager = PostgresConnectionManager::new(config, NoTls);
-            let pool = Pool::builder().max_size(50).build(manager).await.unwrap();
+        let manager = PostgresConnectionManager::new(config, NoTls);
+        let pool = Pool::builder().max_size(50).build(manager).await.unwrap();
 
-            loop {
-                Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
+        loop {
+            Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
-                debug!("Dispatcher get a notification");
+            debug!("Dispatcher get a notification");
 
-                debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
+            debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
 
-                debug!("version is: {:?}", version.lock().await.db_version);
-                let operations = pending_queue
-                    .lock()
-                    .await
-                    .get_all_version_ready_task(&mut version)
-                    .await;
+            debug!("version is: {:?}", version.lock().await.db_version);
+            let operations = pending_queue
+                .lock()
+                .await
+                .get_all_version_ready_task(&mut version)
+                .await;
 
-                debug!("Operation batch size is {}", operations.len());
+            debug!("Operation batch size is {}", operations.len());
 
-                {
-                    let mut lock = transactions.lock().await;
+            {
+                let mut lock = transactions.lock().await;
 
-                    operations.iter().for_each(|op| {
-                        let op_cloned = op.clone();
-                        let pool_cloned = pool.clone();
-                        let sender_cloned = sender.clone();
+                operations.iter().for_each(|op| {
+                    let op_cloned = op.clone();
+                    let pool_cloned = pool.clone();
+                    let sender_cloned = sender.clone();
 
-                        if !lock.contains_key(op_cloned.versions.clone().unwrap().uuid()) {
-                            let (ts, tr) = mpsc::channel(100);
-                            lock.insert(op_cloned.versions.clone().unwrap().uuid().clone(), ts);
-                            Self::spawn_transaction(pool_cloned, tr, sender_cloned);
-                        };
-                    });
-                }
-                let senders: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>> =
-                    Arc::new(Mutex::new(HashMap::new()));
-                {
-                    let lock = transactions.lock().await;
-                    let mut lock_2 = senders.lock().await;
+                    if !lock.contains_key(op_cloned.versions.as_ref().unwrap().uuid()) {
+                        let (ts, tr) = mpsc::channel(100);
+                        lock.insert(op_cloned.versions.as_ref().unwrap().uuid().clone(), ts);
 
-                    operations.iter().for_each(|op| {
-                        if !lock_2.contains_key(op.versions.clone().unwrap().uuid()) {
-                            lock_2.insert(
-                                op.versions.clone().unwrap().uuid().clone(),
-                                lock.get(op.versions.clone().unwrap().uuid()).unwrap().clone(),
-                            );
-                        }
-                    });
-                }
-
-                {
-                    let lock = senders.lock().await;
-                    stream::iter(operations)
-                        .for_each(|op| async {
-                            debug!("Sending a new operation");
-                            let op = op;
-                            lock.get(op.versions.clone().unwrap().uuid())
-                                .unwrap()
-                                .send(op.clone())
-                                .await
-                                .map_err(|e| e.to_string())
-                                .unwrap();
-                        })
-                        .await;
-                }
+                        // When to join this task?
+                        tokio::spawn(Self::spawn_transaction(pool_cloned, tr, sender_cloned));
+                    }
+                });
             }
-        });
+            let senders: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>> = Arc::new(Mutex::new(HashMap::new()));
+            {
+                let lock = transactions.lock().await;
+                let mut lock_2 = senders.lock().await;
+
+                operations.iter().for_each(|op| {
+                    if !lock_2.contains_key(op.versions.clone().unwrap().uuid()) {
+                        lock_2.insert(
+                            op.versions.clone().unwrap().uuid().clone(),
+                            lock.get(op.versions.clone().unwrap().uuid()).unwrap().clone(),
+                        );
+                    }
+                });
+            }
+
+            {
+                let lock = senders.lock().await;
+                stream::iter(operations)
+                    .for_each(|op| async {
+                        debug!("Sending a new operation");
+                        let op = op;
+                        lock.get(op.versions.clone().unwrap().uuid())
+                            .unwrap()
+                            .send(op.clone())
+                            .await
+                            .map_err(|e| e.to_string())
+                            .unwrap();
+                    })
+                    .await;
+            }
+        }
     }
 
-    fn spawn_transaction(
+    async fn spawn_transaction(
         pool: Pool<PostgresConnectionManager<NoTls>>,
         mut rec: mpsc::Receiver<QueueMessage>,
         sender: mpsc::Sender<QueryResult>,
     ) {
-        tokio::spawn(async move {
-            {
-                let mut finish = false;
-                let conn = pool.get().await.unwrap();
-                conn.simple_query("START TRANSACTION;").await.unwrap();
-                while let Some(operation) = rec.recv().await {
-                    let raw;
-                    match operation.operation_type {
-                        Task::READ => {
-                            raw = conn
-                                .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
-                                .await;
-                        }
-                        Task::WRITE => {
-                            raw = conn
-                                .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
-                                .await;
-                        }
-                        Task::COMMIT => {
-                            raw = conn.simple_query("COMMIT;").await;
-                            finish = true;
-                        }
-                        Task::ABORT => {
-                            raw = conn.simple_query("ROLLBACK;").await;
-                            finish = true;
-                        }
-                        _ => {
-                            panic!("Unexpected operation type");
-                        }
-                    }
-
-                    let _ = sender.send(operation.into_sqlresponse(raw)).await;
-
-                    if finish {
-                        break;
-                    }
+        let mut finish = false;
+        let conn = pool.get().await.unwrap();
+        conn.simple_query("START TRANSACTION;").await.unwrap();
+        while let Some(operation) = rec.recv().await {
+            let raw;
+            match operation.operation_type {
+                Task::READ => {
+                    raw = conn
+                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                        .await;
+                }
+                Task::WRITE => {
+                    raw = conn
+                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                        .await;
+                }
+                Task::COMMIT => {
+                    raw = conn.simple_query("COMMIT;").await;
+                    finish = true;
+                }
+                Task::ABORT => {
+                    raw = conn.simple_query("ROLLBACK;").await;
+                    finish = true;
+                }
+                _ => {
+                    panic!("Unexpected operation type");
                 }
             }
-        });
+
+            let _ = sender.send(operation.into_sqlresponse(raw)).await;
+
+            if finish {
+                break;
+            }
+        }
     }
 
     async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>, version_notify: &mut Arc<Notify>) {
