@@ -9,9 +9,10 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio_postgres::Config;
+use tracing::info;
 
 pub async fn main(conf: DbProxyConfig) {
-    println!("Starting dbproxy...");
+    info!("Starting dbproxy...");
     let mut config = Config::new();
     config.user(&conf.user);
     config.password(conf.password);
@@ -35,19 +36,18 @@ pub async fn main(conf: DbProxyConfig) {
         mpsc::channel(100);
 
     let listener = TcpListener::bind(conf.addr).await.unwrap();
-    println!("Binding to tcp listener...");
+    info!("Binding to tcp listener...");
     let (tcp_stream, _) = listener.accept().await.unwrap();
-    println!("Connection established...");
+    info!("Connection established...");
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
-    println!("Starting Dispatcher...");
+    info!("Starting Dispatcher...");
     Dispatcher::run(pending_queue, responder_sender, config, version, transactions);
 
-    println!("Starting Responder...");
+    info!("Starting Responder...");
     Responder::run(responder_receiver, version_2, tcp_write);
 
-    println!("Starting Receiver...");
+    info!("Starting Receiver...");
     Receiver::run(pending_queue_2, tcp_read).await;
-    
-    println!("End");
+    info!("End");
 }

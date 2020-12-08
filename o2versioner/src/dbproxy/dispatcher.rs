@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::NoTls;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 pub struct Dispatcher {}
@@ -23,7 +24,7 @@ impl Dispatcher {
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
         tokio::spawn(async move {
-            println!("Dispatcher Started");
+            info!("Dispatcher Started");
 
             let mut task_notify = pending_queue.lock().await.get_notify();
             let mut version_notify = version.lock().await.get_notify();
@@ -34,18 +35,18 @@ impl Dispatcher {
             loop {
                 Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
-                println!("Dispathcer get a notification");
+                debug!("Dispatcher get a notification");
 
-                println!("Pending queue size is {}", pending_queue.lock().await.queue.len());
+                debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
 
-                println!("version is: {:?}", version.lock().await.db_version);
+                debug!("version is: {:?}", version.lock().await.db_version);
                 let operations = pending_queue
                     .lock()
                     .await
                     .get_all_version_ready_task(&mut version)
                     .await;
 
-                println!("Operation batch size is {}", operations.len());
+                debug!("Operation batch size is {}", operations.len());
 
                 {
                     let mut lock = transactions.lock().await;
@@ -54,11 +55,6 @@ impl Dispatcher {
                         let op_cloned = op.clone();
                         let pool_cloned = pool.clone();
                         let sender_cloned = sender.clone();
-
-                        match op.operation_type {
-                            Task::COMMIT | Task::ABORT => { println!("A end task was blocked"); },
-                            _=> {}
-                        };
 
                         if !lock.contains_key(op_cloned.versions.clone().unwrap().uuid()) {
                             let (ts, tr) = mpsc::channel(100);
@@ -87,7 +83,7 @@ impl Dispatcher {
                     let lock = senders.lock().await;
                     stream::iter(operations)
                         .for_each(|op| async {
-                            println!("Sending a new operation");
+                            debug!("Sending a new operation");
                             let op = op;
                             lock.get(op.versions.clone().unwrap().uuid())
                                 .unwrap()

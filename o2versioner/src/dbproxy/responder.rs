@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
+use tracing::{debug, info};
 
 pub struct Responder {}
 
@@ -15,18 +16,18 @@ pub struct Responder {}
 impl Responder {
     pub fn run(mut receiver: mpsc::Receiver<QueryResult>, version: Arc<Mutex<DbVersion>>, tcp_write: OwnedWriteHalf) {
         tokio::spawn(async move {
-            println!("Responder started");
+            info!("Responder started");
             let mut serializer = SymmetricallyFramed::new(
                 FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
                 SymmetricalJson::<Message>::default(),
             );
 
             while let Some(mut result) = receiver.recv().await {
-                println!("Responder got a result to return");
+                debug!("Responder got a result to return");
                 match result.result_type {
                     QueryResultType::END => {
-                        println!("Trying to release a version");
-                        println!("Responder: {:?}", result.contained_newer_versions.clone());
+                        debug!("Trying to release a version");
+                        debug!("Responder: {:?}", result.contained_newer_versions.clone());
                         version
                             .lock()
                             .await
@@ -34,7 +35,7 @@ impl Responder {
                     }
                     _ => match result.flush_early_release() {
                         Ok(request) => {
-                            println!("Doing a early release {:?}", request);
+                            debug!("Doing a early release {:?}", request);
                             version.lock().await.release_on_request(request);
                         }
                         Err(_) => {}
@@ -49,7 +50,7 @@ impl Responder {
                     .await
                     .unwrap();
             }
-            println!("Responder finishes its job");
+            info!("Responder finishes its job");
         });
     }
 }
