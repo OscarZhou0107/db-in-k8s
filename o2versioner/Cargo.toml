@@ -14,6 +14,7 @@ chrono = {version = "0.4", features = ["serde"]}
 clap = "2.33"
 config = "0.10"
 csv = "1.1"
+flate2 = "1.0"
 futures = "0.3"
 itertools = "0.9"
 rand = "0.7"
