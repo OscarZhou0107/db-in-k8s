@@ -13,6 +13,9 @@ except:
     print('Error:', 'pip install python-dateutil')
 
 
+def geomean(data):
+    return math.exp(math.fsum(math.log(x) for x in data) / len(data))
+
 class DBRow(dict):
     def __init___(self, row):
         super(DBRow, self).__init__(row)
@@ -117,10 +120,6 @@ class PerfDB(DB):
             return
 
         latency = list(map(lambda row: row['latency'], db))
-
-        def geomean(data):
-            return math.exp(math.fsum(math.log(x) for x in data) / len(data))
-
         return (statistics.mean(latency), statistics.stdev(latency), geomean(latency), statistics.median(latency))
 
     def get_filtered(self, filter_func):
@@ -137,8 +136,12 @@ class Throughput(list):
     def get_trajectory(self):
         return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), self))
 
-    def get_peak(self):    
-        return max(self.get_trajectory(), key=lambda kv: kv[1])
+    def get_stats(self):
+        '''
+        (peak, mean, stddev, geomean, median)
+        '''
+        values = list(map(lambda kv: kv[1], self.get_trajectory()))
+        return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
 
     def print_trajectory(self):
         print('Info:')
@@ -146,9 +149,6 @@ class Throughput(list):
         trajectory = self.get_trajectory()
         for item in trajectory:
             print('Info:', item)
-        print('Info:')
-        print('Info:', 'Peak throughput is', max(trajectory, key=lambda kv: kv[1]))
-        print('Info:')
 
     def print_detailed_trajectory(self):
         for (sec, group_of_rows) in self:
@@ -189,7 +189,12 @@ def main(args):
     print('Info:', 'Num Successful Query Request', len(sq_perfdb))
 
     print('Info:')
-    print('Info:', 'Latency (mean, stddev, geomean, median)')
+    print('Info:', 'Throughput')
+    print('Info:', '(peak, mean, stddev, geomean, median)')
+    print('Info:', sq_throughput.get_stats())
+    print('Info:')
+    print('Info:', 'Latency')
+    print('Info:', '(mean, stddev, geomean, median)')
     print('Info:', sq_perfdb.get_latency_stats())
 
     print('Info:')

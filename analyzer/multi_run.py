@@ -62,21 +62,21 @@ def plot_charts(args, database):
         dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_query_filter), x[1]), dataset))
 
         # [(run_name, num_clients, max_sq_throughput, latency(mean, stddev, geomean, median), sq_perf_db, perfdb)]
-        dataset = list(map(lambda x: (x[0], x[1], x[2].get_throughput().get_peak(), x[2].get_latency_stats(), x[2], x[3]), dataset))
+        dataset = list(map(lambda x: (x[0], x[1], x[2].get_throughput().get_stats(), x[2].get_latency_stats(), x[2], x[3]), dataset))
 
         # Sort by num_clients
         dataset = sorted(dataset, key=lambda x: x[1])
 
-        run_names, nums_clients, max_sq_throughputs, latencies = list(zip(*dataset))[0:4]
-        _, max_throughputs = tuple(zip(*max_sq_throughputs))
+        run_names, nums_clients, sq_throughputs_stats, latencies = list(zip(*dataset))[0:4]
+        peak_throughputs = tuple(zip(*sq_throughputs_stats))[0]
         mean_latencies = tuple(zip(*latencies))[3]
         
         print('nums_clients', nums_clients)
-        print('max_throughputs', max_throughputs)
+        print('peak_throughputs', peak_throughputs)
         print('latencies (mean, stddev, geomean, median)', latencies)
         
         # Left y-axis for throughput
-        ax.plot(nums_clients, max_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='o')  # , picker=True, pickradius=2)
+        ax.plot(nums_clients, peak_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='o')  # , picker=True, pickradius=2)
         ax.set(xlabel='Number of Clients', ylabel='Peak Throughput on Successful Queries (#queries/sec)')
         ax.grid(axis='x', linestyle='--')
         ax.grid(axis='y', linestyle='-')
