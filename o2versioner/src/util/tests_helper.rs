@@ -21,6 +21,17 @@ pub fn init_logger() -> DefaultGuard {
     tracing::subscriber::set_default(subscriber)
 }
 
+#[must_use = "Dropping the guard unregisters the subscriber."]
+pub fn init_fast_logger() -> DefaultGuard {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_test_writer()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .without_time()
+        .finish();
+    tracing::subscriber::set_default(subscriber)
+}
+
 /// A mock echo server for testing
 #[instrument(name="echo(mock)" skip(addr, max_connection))]
 pub async fn mock_echo_server<A>(addr: A, max_connection: Option<u32>)

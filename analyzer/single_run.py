@@ -165,7 +165,7 @@ def main(args):
     sq_perfdb = perfdb.get_filtered(successful_query_filter)
 
     sq_throughput = sq_perfdb.get_throughput()
-    sq_throughput.print_detailed_trajectory()
+    # sq_throughput.print_detailed_trajectory()
     print('Info:', 'Successful Query Request Throughput:')
     sq_throughput.print_trajectory()
 
