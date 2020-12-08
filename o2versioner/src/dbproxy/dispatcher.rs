@@ -49,7 +49,6 @@ impl Dispatcher {
                 .await;
             debug!("Operation batch size is {}", operations.len());
 
-            // Changed previous serial for loop to concurrent
             stream::iter(operations.clone())
                 .for_each(|op| {
                     let pool_cloned = pool.clone();
