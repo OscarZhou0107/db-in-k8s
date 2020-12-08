@@ -73,7 +73,7 @@ impl Dispatcher {
 
                                 // A task represents an ongoing transaction, probably just leaves it hanging around.
                                 // listens on the rx for upcoming requests
-                                tokio::spawn(TransactionExecutioner::run(
+                                tokio::spawn(TransactionExecutor::run(
                                     pool_cloned,
                                     transaction_rx,
                                     responder_sender_cloned,
@@ -105,9 +105,9 @@ impl Dispatcher {
     }
 }
 
-struct TransactionExecutioner;
+struct TransactionExecutor;
 
-impl TransactionExecutioner {
+impl TransactionExecutor {
     pub async fn run(
         pool: Pool<PostgresConnectionManager<NoTls>>,
         mut transaction_listener: mpsc::Receiver<QueueMessage>,
