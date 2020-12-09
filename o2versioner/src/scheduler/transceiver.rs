@@ -2,7 +2,7 @@ use crate::comm::scheduler_dbproxy::*;
 use crate::util::executor_addr::*;
 use futures::prelude::*;
 use std::collections::HashMap;
-use std::collections::LinkedList;
+use std::collections::VecDeque;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{trace, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{field, info, info_span, instrument, trace, warn, Instrument, Span};
 
 /// Request sent from dispatcher direction
 #[derive(Debug)]
@@ -63,7 +63,7 @@ impl Transceiver {
         let (reader, mut writer) = socket.into_split();
 
         // (ClientAddr) -> LinkedList<RequestWrapper<TransceiverRequest>>
-        let outstanding_req: HashMap<SocketAddr, LinkedList<RequestWrapper<TransceiverRequest>>> = HashMap::new();
+        let outstanding_req: HashMap<SocketAddr, VecDeque<RequestWrapper<TransceiverRequest>>> = HashMap::new();
         let outstanding_req = Arc::new(Mutex::new(outstanding_req));
 
         // Spawn dbproxy reader, processing reply from dbproxy in serial one after one
@@ -80,12 +80,26 @@ impl Transceiver {
                             let queue = guard
                                 .get_mut(&arrived_request_meta.client_addr)
                                 .expect("No client addr in outstanding_req");
-                            let (popped_request, reply_ch) =
-                                queue.pop_back().expect("No record in outstanding_req").unwrap();
+
+                            let queue_idx = queue
+                                .iter()
+                                .position(|req_wrapper| {
+                                    req_wrapper.request().dbproxy_msg.try_get_request_meta().unwrap()
+                                        == arrived_request_meta
+                                })
+                                .expect("No record in outstanding_req (position)");
+                            let (popped_request, reply_ch) = queue
+                                .remove(queue_idx)
+                                .expect("No record in outstanding_req (remove)")
+                                .unwrap();
+
+                            if queue_idx != 0 {
+                                warn!("conn fifo is popping at an out-of-order position {}", queue_idx);
+                            }
                             if queue.len() > 0 {
-                                info!("conn fifo has {} after Pop back", queue.len());
+                                info!("conn fifo has {} after Pop", queue.len());
                             } else {
-                                trace!("conn fifo has {} after Pop back", queue.len());
+                                trace!("conn fifo has {} after Pop", queue.len());
                             }
                             let popped_request_meta = popped_request.dbproxy_msg.try_get_request_meta().unwrap();
 
@@ -116,11 +130,11 @@ impl Transceiver {
                     let mut guard = outstanding_req.lock().await;
                     let queue = guard.entry(client_addr.clone()).or_default();
                     if queue.len() > 0 {
-                        info!("conn fifo has {} before Push front", queue.len());
+                        info!("conn fifo has {} before Push", queue.len());
                     } else {
-                        trace!("conn fifo has {} before Push front", queue.len());
+                        trace!("conn fifo has {} before Push", queue.len());
                     }
-                    queue.push_front(request);
+                    queue.push_back(request);
                     let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
                     let mut serded_write =
                         SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
