@@ -80,7 +80,7 @@ async fn process_connection(
                 match msg {
                     Message::RequestTxVN(client_meta, sqlbegintx) => {
                         Span::current().record("client", &&client_meta.to_string()[..]);
-                        trace!("<- {:?}", sqlbegintx);
+                        info!("<- {:?}", sqlbegintx);
                         let txvn = state_cloned.lock().await.assign_vn(sqlbegintx);
                         trace!("-> {:?}", txvn);
                         Ok(Message::ReplyTxVN(txvn))
