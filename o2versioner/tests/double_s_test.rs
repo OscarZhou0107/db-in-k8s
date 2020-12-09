@@ -254,8 +254,8 @@ async fn run_double_s_limited() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, true));
-    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, true));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, None));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, None));
 
     sleep(Duration::from_millis(300)).await;
 
@@ -351,8 +351,8 @@ async fn run_double_s_unlimited() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, false));
-    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, false));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, Some(Duration::from_millis(5))));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, Some(Duration::from_millis(250))));
 
     sleep(Duration::from_millis(300)).await;
 
@@ -412,8 +412,8 @@ async fn run_double_s_unlimited() {
     .unwrap();
 }
 
-#[instrument(name="dbproxy(mock)" skip(addr, random_delay))]
-pub async fn mock_dbproxy<A>(addr: A, random_delay: bool)
+#[instrument(name="dbproxy(mock)" skip(addr, delay))]
+pub async fn mock_dbproxy<A>(addr: A, delay: Option<Duration>)
 where
     A: ToSocketAddrs,
 {
@@ -445,11 +445,13 @@ where
                             trace!("<- {:?}", msg);
 
                             // Simulate some load
-                            if random_delay {
-                                let sleep_time = rand::rngs::OsRng::default().gen_range(20, 200);
-                                info!("Works for {} ms", sleep_time);
-                                sleep(Duration::from_millis(sleep_time)).await;
-                            }
+                            let sleep_time = if let Some(delay) = delay {
+                                delay
+                            } else {
+                                Duration::from_millis(rand::rngs::OsRng::default().gen_range(20, 200))
+                            };
+                            info!("Works for {:?}", sleep_time);
+                            sleep(sleep_time).await;
 
                             match msg {
                                 scheduler_dbproxy::Message::MsqlRequest(client_addr, msql, _txvn) => {
