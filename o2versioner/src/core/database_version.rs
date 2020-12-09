@@ -86,18 +86,19 @@ impl DbVN {
     /// ```
     ///
     /// # Notes:
-    /// 1. A write query is executed only when the version numbers for each table at the
+    /// 1. An empty `txtablevns` will return `true`
+    /// 2. A write query is executed only when the version numbers for each table at the
     /// database match the version numbers in the query.
-    /// 2. A read query is executed only when the version numbers for each table at the
+    /// 3. A read query is executed only when the version numbers for each table at the
     /// database are greater than or equal to the version numbers in the query.
-    /// 3. As `TxVN` removes duplicated tables by merging R into W operations,
+    /// 4. As `TxVN` removes duplicated tables by merging R into W operations,
     /// a Read-only query can sometimes be associated with a W VN since the table may be
     /// updated in other queries in the same transaction, and this is totally allowed and supported.
-    /// 3a. Firstly, the table with both W and R within a transaction will be assigned a W VN.
-    /// 3b. Secondly, if a W VN is assigned, all W and R queries will be adhered to the W VN. On
+    /// 5a. Firstly, the table with both W and R within a transaction will be assigned a W VN.
+    /// 5b. Secondly, if a W VN is assigned, all W and R queries will be adhered to the W VN. On
     /// the other hand, if a R VN is assigned, when queries with that table performs a W will raise an error,
     /// this is not allow!
-    /// 3c. W VN is must more strict than R VN, so database version will never > the assigned VN,
+    /// 6c. W VN is must more strict than R VN, so database version will never > the assigned VN,
     /// until the transaction owning that VN is ended. In such case, although the read-only
     /// query is still executed based on the read-only VN rule, tables using W VN are still implicitly
     /// blocked until the database version == the assigned VN.
@@ -276,13 +277,15 @@ mod tests_dbvn {
         assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops0).unwrap()));
 
         assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops1).unwrap()));
-        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops1,).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops1).unwrap()));
 
-        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops2,).unwrap()));
-        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops2,).unwrap()));
-        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops2,).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops2).unwrap()));
+        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops2).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn2.get_from_tableops(&tableops2).unwrap()));
 
-        assert!(dbvn.can_execute_query(&txvn3.get_from_tableops(&tableops3,).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn3.get_from_tableops(&tableops3).unwrap()));
+
+        assert!(dbvn.can_execute_query(&[]));
     }
 
     #[test]
@@ -311,9 +314,9 @@ mod tests_dbvn {
             TableOp::new("t1", RWOperation::R),
         ]);
 
-        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops,).unwrap()));
-        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn0.get_from_tableops(&tableops).unwrap()));
+        assert!(!dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops).unwrap()));
         dbvn.release_version(txvn0.into_dbvn_release_request());
-        assert!(dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops,).unwrap()));
+        assert!(dbvn.can_execute_query(&txvn1.get_from_tableops(&tableops).unwrap()));
     }
 }
