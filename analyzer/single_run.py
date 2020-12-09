@@ -213,7 +213,7 @@ def main(args):
     # sr_throughput.print_detailed_trajectory()
     # sr_throughput.print_trajectory()
     print('Info:')
-    print('Info:', 'Successful Request Throughput: -', len(sr_perfdb))
+    print('Info:', 'Successful Request Throughput:', len(sr_perfdb))
 
     print('Info:')
     print('Info:', 'Throughput')
