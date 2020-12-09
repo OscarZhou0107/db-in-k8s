@@ -8,7 +8,7 @@ use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, Notify, RwLock};
-use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{debug, error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 
 /// Response sent from dispatcher to handler
 #[derive(Debug)]
@@ -70,7 +70,7 @@ impl State {
 
         Span::current().record("message", &&request.request_meta.to_string()[..]);
         Span::current().record("cmd", &request.command.as_ref());
-        debug!("<- {:?} {:?}", request.command, request.txvn);
+        trace!("<- {:?} {:?}", request.command, request.txvn);
 
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
@@ -121,7 +121,7 @@ impl State {
             .then(move |(dbproxy_addr, transceiver_addr)| {
                 let msg = msg.clone();
                 let dbproxy_addr_clone = dbproxy_addr.clone();
-                debug!("-> {:?}", msg);
+                trace!("-> {:?}", msg);
                 async move {
                     transceiver_addr
                         .request_nowait(TransceiverRequest {
@@ -177,7 +177,7 @@ impl State {
                             let er_token = txvn
                                 .early_release_request(ertables)
                                 .expect("Early release requesting tables not in TxVN");
-                            debug!("Early releasing {:?}", er_token);
+                            trace!("Early releasing {:?}", er_token);
                             self.release_version(&dbproxy_addr, er_token).await;
                             Some(txvn)
                         }
@@ -185,7 +185,7 @@ impl State {
                             let re_token = txvn_cloned
                                 .expect("EndTx must include Some(TxVN)")
                                 .into_dbvn_release_request();
-                            debug!("Releasing {:?}", re_token);
+                            trace!("Releasing {:?}", re_token);
                             self.release_version(&dbproxy_addr, re_token).await;
                             None
                         }
@@ -194,19 +194,19 @@ impl State {
 
                     // If the oneshot channel is not consumed, consume it to send the reply back to handler
                     if let Some(reply) = shared_reply_channel_cloned.lock().await.take() {
-                        debug!("~~ {:?}", msqlresponse);
+                        trace!("~~ {:?}", msqlresponse);
                         reply
                             .send(DispatcherReply::new(msqlresponse, txvn))
                             .expect(&format!("Cannot reply response to handler"));
                     } else {
-                        debug!("Not reply to handler: {:?}", msqlresponse);
+                        trace!("Not reply to handler: {:?}", msqlresponse);
                     }
                 }
                 .instrument(info_span!("<-dbproxy", N = num_dbproxy, message = %dbproxy_addr))
             })
             .await;
 
-        info!("all tasks done");
+        debug!("all tasks done");
     }
 
     #[instrument(skip(self), fields(msqlquery, txvn))]
@@ -217,7 +217,7 @@ impl State {
             "Expecting ReadOnly access pattern for the query"
         );
 
-        debug!(
+        trace!(
             "entering wait_on_version {:?} | {:?} | {:?}",
             msqlquery,
             txvn,
@@ -250,9 +250,10 @@ impl State {
 
             // For now, pick the first dbproxy from all available
             let selected_dbproxy = &avail_dbproxy[0];
-            debug!(
+            trace!(
                 "Found dbproxy {} for executing the ReadOnly query: {:?}",
-                selected_dbproxy.0, selected_dbproxy.1
+                selected_dbproxy.0,
+                selected_dbproxy.1
             );
             (
                 selected_dbproxy.0.clone(),

@@ -1,6 +1,7 @@
 use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
+use crate::util::common::create_zip_csv_writer;
 use chrono::Utc;
 use futures::prelude::*;
 use itertools::Itertools;
@@ -9,7 +10,6 @@ use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{info, warn};
 
@@ -68,13 +68,13 @@ impl State {
         path_builder.push(log_dir_name);
         let cur_log_dir = path_builder.as_path();
         info!("Preparing {} for performance logging", cur_log_dir.display());
-        fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
+        tokio::fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
 
         // Performance logging
         let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
-        perf_csv_path_builder.push("perf.csv");
+        perf_csv_path_builder.push("perf.csv.gz");
         let perf_csv_path = perf_csv_path_builder.as_path();
-        let mut wrt = csv::Writer::from_path(perf_csv_path).unwrap();
+        let mut wrt = create_zip_csv_writer(perf_csv_path).unwrap();
         self.collect_client_records()
             .await
             .into_iter()
@@ -85,9 +85,9 @@ impl State {
 
         // Dbvn logging
         let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
-        dbproxy_stats_path_builder.push("dbproxy_stats.csv");
+        dbproxy_stats_path_builder.push("dbproxy_stats.csv.gz");
         let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
-        let mut wrt = csv::Writer::from_path(dbproxy_stats_csv_path).unwrap();
+        let mut wrt = create_zip_csv_writer(dbproxy_stats_csv_path).unwrap();
         wrt.write_record(&["dbproxy_addr", "dbproxy_vn_sum"]).unwrap();
         self.dbvn_manager
             .read()

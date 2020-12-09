@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{trace, field, info, info_span, instrument, warn, Instrument, Span};
 
 /// Request sent from dispatcher direction
 #[derive(Debug)]
@@ -82,12 +82,16 @@ impl Transceiver {
                                 .expect("No client addr in outstanding_req");
                             let (popped_request, reply_ch) =
                                 queue.pop_back().expect("No record in outstanding_req").unwrap();
-                            info!("conn fifo has {} after Pop back", queue.len());
+                            if queue.len() > 0 {
+                                info!("conn fifo has {} after Pop back", queue.len());
+                            } else {
+                                trace!("conn fifo has {} after Pop back", queue.len());
+                            }
                             let popped_request_meta = popped_request.dbproxy_msg.try_get_request_meta().unwrap();
 
                             assert_eq!(popped_request_meta, arrived_request_meta);
 
-                            debug!("-> {:?}", msg);
+                            trace!("-> {:?}", msg);
                             reply_ch.unwrap().send(TransceiverReply { msg }).unwrap();
                         }
                         other => warn!("Unsupported {:?}", other),
@@ -108,10 +112,14 @@ impl Transceiver {
                     let client_addr = meta.client_addr.clone();
                     Span::current().record("message", &&meta.to_string()[..]);
 
-                    debug!("-> {:?}", dbproxy_msg);
+                    trace!("-> {:?}", dbproxy_msg);
                     let mut guard = outstanding_req.lock().await;
                     let queue = guard.entry(client_addr.clone()).or_default();
-                    info!("conn fifo has {} before Push front", queue.len());
+                    if queue.len() > 0 {
+                        info!("conn fifo has {} before Push front", queue.len());
+                    } else {
+                        trace!("conn fifo has {} before Push front", queue.len());
+                    }
                     queue.push_front(request);
                     let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
                     let mut serded_write =

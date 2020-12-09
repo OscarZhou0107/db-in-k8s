@@ -7,6 +7,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
+use tracing::{debug, info};
 
 pub struct Receiver {}
 
@@ -17,28 +18,23 @@ impl Receiver {
             SymmetricalJson::<Message>::default(),
         );
 
-        let handler = tokio::spawn(async move {
-            println!("Receiver started");
+        info!("Receiver started");
 
-            while let Some(msg) = deserializer.try_next().await.unwrap() {
-                println!("Receiver a new request");
-                match msg {
-                    Message::MsqlRequest(meta, request, versions) => {
+        while let Some(msg) = deserializer.try_next().await.unwrap() {
+            debug!("Receiver received a new request from scheduler");
+            match msg {
+                Message::MsqlRequest(meta, request, versions) => {
+                    debug!("Responder: {:?}", versions.clone());
 
-                        println!("Responder: {:?}", versions.clone());
-
-                        pending_queue
-                            .lock()
-                            .await
-                            .push(QueueMessage::new(meta, request, versions));
-                    }
-                    _ => println!("nope"),
+                    pending_queue
+                        .lock()
+                        .await
+                        .push(QueueMessage::new(meta, request, versions));
                 }
+                _ => debug!("nope"),
             }
-            println!("Receiver finished its jobs");
-        });
-
-        handler.await.unwrap();
+        }
+        debug!("Receiver finished its jobs");
     }
 }
 

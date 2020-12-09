@@ -21,7 +21,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, error, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 use unicase::UniCase;
 
 /// Main entrance for the Scheduler from appserver
@@ -271,7 +271,7 @@ async fn process_connection(
             let conn_state_cloned = conn_state_cloned.clone();
             let sequencer_socket_pool_cloned = sequencer_socket_pool.clone();
             let dispatcher_addr_cloned = dispatcher_addr_cloned.clone();
-            debug!("<- {:?}", msg);
+            trace!("<- {:?}", msg);
 
             async move {
                 Ok(process_request(
@@ -350,7 +350,7 @@ async fn process_request(
         }
         _ => scheduler_api::Message::InvalidRequest,
     };
-    debug!("-> {:?}", response);
+    trace!("-> {:?}", response);
 
     response
     // conn_state_guard should be dropped here

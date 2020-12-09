@@ -9,9 +9,10 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio_postgres::Config;
+use tracing::info;
 
 pub async fn main(conf: DbProxyConfig) {
-    println!("Starting dbproxy...");
+    info!("Starting dbproxy...");
     let mut config = Config::new();
     config.user(&conf.user);
     config.password(conf.password);
@@ -23,31 +24,40 @@ pub async fn main(conf: DbProxyConfig) {
     let transactions = Arc::new(Mutex::new(HashMap::new()));
 
     //Global version//
-    let version: Arc<Mutex<DbVersion>> = Arc::new(Mutex::new(DbVersion::new(Default::default())));
-    let version_2 = Arc::clone(&version);
+    let version = Arc::new(Mutex::new(DbVersion::new(Default::default())));
 
     //PendingQueue
-    let pending_queue: Arc<Mutex<PendingQueue>> = Arc::new(Mutex::new(PendingQueue::new()));
-    let pending_queue_2: Arc<Mutex<PendingQueue>> = Arc::clone(&pending_queue);
+    let pending_queue = Arc::new(Mutex::new(PendingQueue::new()));
 
     //Responder sender and receiver
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
 
     let listener = TcpListener::bind(conf.addr).await.unwrap();
-    println!("Binding to tcp listener...");
+    info!("Binding to tcp listener...");
     let (tcp_stream, _) = listener.accept().await.unwrap();
-    println!("Connection established...");
+    info!("Connection established...");
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
-    println!("Starting Dispatcher...");
-    Dispatcher::run(pending_queue, responder_sender, config, version, transactions);
+    info!("Starting Dispatcher...");
+    let dispatcher_handle = tokio::spawn(Dispatcher::run(
+        pending_queue.clone(),
+        responder_sender,
+        config,
+        version.clone(),
+        transactions.clone(),
+    ));
 
-    println!("Starting Responder...");
-    Responder::run(responder_receiver, version_2, tcp_write);
+    info!("Starting Responder...");
+    let responder_handle = tokio::spawn(Responder::run(responder_receiver, version, tcp_write));
 
-    println!("Starting Receiver...");
-    Receiver::run(pending_queue_2, tcp_read).await;
-    
-    println!("End");
+    info!("Starting Receiver...");
+    let receiver_handle = tokio::spawn(Receiver::run(pending_queue.clone(), tcp_read));
+
+    let res = tokio::try_join!(responder_handle, dispatcher_handle, receiver_handle);
+    info!("End");
+    info!("Pending queue size is {}", pending_queue.lock().await.queue.len());
+    info!("Transactions size is {}", transactions.lock().await.len());
+
+    res.unwrap();
 }

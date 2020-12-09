@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::{Config, NoTls, SimpleQueryMessage};
+use tracing::debug;
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -31,7 +32,7 @@ impl PostgresSqlConnPool {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct QueueMessage {
     pub identifier: RequestMeta,
     pub operation_type: Task,
@@ -77,12 +78,12 @@ impl QueueMessage {
             },
         }
 
-        QueueMessage {
-            identifier: identifier,
-            operation_type: operation_type,
-            msql: msql,
-            versions: versions,
-            early_release: early_release,
+        Self {
+            identifier,
+            operation_type,
+            msql,
+            versions,
+            early_release,
         }
     }
 
@@ -134,6 +135,7 @@ impl PendingQueue {
     }
 
     pub fn push(&mut self, op: QueueMessage) {
+        debug!("PendingQueue pushed {:?} and notify all tasks waiting", op);
         self.queue.push(op);
         self.notify.notify_one();
     }
@@ -145,8 +147,8 @@ impl PendingQueue {
     pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
         let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
             .then(move |op| {
-                println!("msql is: {:?}", op.msql);
-                println!("txvn is: {:?}", op.versions);
+                debug!("msql is: {:?}", op.msql);
+                debug!("txvn is: {:?}", op.versions);
                 let version = version.clone();
                 async move {
                     match &op.msql {
@@ -373,7 +375,7 @@ impl QueryResult {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Task {
     BEGIN,
     READ,

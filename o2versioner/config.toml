@@ -1,11 +1,11 @@
 [scheduler]
 addr = "127.0.0.1:2077"
 admin_addr = "127.0.0.1:9999"
-disable_early_release = false
+#disable_early_release = false
 dispatcher_queue_size = 500
 performance_logging = "./logging"
 sequencer_pool_size = 10
-transceiver_queue_size = 10
+transceiver_queue_size = 500
 
 [sequencer]
 addr = "127.0.0.1:9876"

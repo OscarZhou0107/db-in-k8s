@@ -1,3 +1,4 @@
+use crate::util::common::remove_whitespace;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -40,11 +41,6 @@ impl AccessPattern {
             _ => false,
         }
     }
-}
-
-/// Helper function
-fn remove_whitespace(s: &mut String) {
-    s.retain(|c| !c.is_whitespace());
 }
 
 /// Representing the access mode for `Self::table`, can be either `RWOperation::R` or `RWOperation::W`

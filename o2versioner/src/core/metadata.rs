@@ -60,6 +60,13 @@ impl RequestMeta {
             request_id,
         }
     }
+
+    pub fn to_client_meta(&self) -> ClientMeta {
+        ClientMeta {
+            client_addr: self.client_addr.clone(),
+            cur_txid: self.cur_txid,
+        }
+    }
 }
 
 /// Unit test for `ClientMeta`

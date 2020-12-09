@@ -14,7 +14,150 @@ use tokio::time::{sleep, Duration};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, info, info_span, instrument, Instrument};
+use tracing::{info, info_span, instrument, trace, Instrument};
+
+fn transaction_samples() -> Vec<Vec<Message>> {
+    vec![
+        vec![
+            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some("w1"),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w2 set name=\"ray\" where id = 22;",
+                "write w2",
+                Some("w2"),
+            )),
+            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+        ],
+        vec![
+            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 r1 WRITE w1 w2 w3")),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w2 set name=\"ray\" where id = 20;",
+                "write w2",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some("r1"))),
+            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w3 set name=\"ray\" where id = 22;",
+                "write w3",
+                Some("w3"),
+            )),
+            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+        ],
+        vec![
+            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ w2 WRITE w1 r0 r1")),
+            Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1", Some("w1"))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query(
+                "update w1 set name=\"ray\" where id = 20;",
+                "write w1",
+                Some(""),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update r0 set name=\"ray\" where id = 20;",
+                "write r0",
+                Some("r0"),
+            )),
+            Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some(""))),
+            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
+            Message::RequestMsqlText(MsqlText::query(
+                "update r1 set name=\"ray\" where id = 22;",
+                "write r1",
+                Some("r1"),
+            )),
+            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
+        ],
+        vec![Message::RequestMsqlText(MsqlText::query(
+            "select * from w1;",
+            "read w1",
+            Some(""),
+        ))],
+        vec![Message::RequestMsqlText(MsqlText::query(
+            "update w3 set name=\"ray\" where id = 22;",
+            "write w3",
+            Some(""),
+        ))],
+    ]
+}
 
 #[tokio::test]
 async fn test_double_s() {
@@ -45,50 +188,18 @@ async fn test_double_s() {
 
     sleep(Duration::from_millis(300)).await;
 
-    let tester_handle_0 = tokio::spawn(async move {
-        let msgs = vec![
-            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w2 set name=\"ray\" where id = 22;",
-                "write w2",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-        ];
+    let transaction_samples = transaction_samples();
 
-        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs)
+    let tester0_reqs = transaction_samples[0].clone();
+    let tester_handle_0 = tokio::spawn(async move {
+        tests_helper::mock_json_client(&mut TcpStream::connect(scheduler_addr).await.unwrap(), tester0_reqs)
             .instrument(info_span!("tester0"))
             .await;
     });
 
+    let tester1_reqs = transaction_samples[1].clone();
     let tester_handle_1 = tokio::spawn(async move {
-        let msgs = vec![
-            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w2 set name=\"ray\" where id = 22;",
-                "write w2",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-        ];
-
-        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs)
+        tests_helper::mock_json_client(&mut TcpStream::connect(scheduler_addr).await.unwrap(), tester1_reqs)
             .instrument(info_span!("tester1"))
             .await;
     });
@@ -99,8 +210,8 @@ async fn test_double_s() {
 
 #[tokio::test]
 #[ignore]
-/// Run `cargo test run_double_s -- --ignored --nocapture`
-async fn run_double_s() {
+/// Run `cargo test run_double_s_limited -- --ignored --nocapture`
+async fn run_double_s_limited() {
     let _guard = tests_helper::init_logger();
 
     let scheduler_addr = "127.0.0.1:56728";
@@ -143,92 +254,23 @@ async fn run_double_s() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr));
-    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, true));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, true));
 
     sleep(Duration::from_millis(300)).await;
 
-    let tx0 = vec![
-        Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
-        Message::RequestMsqlText(MsqlText::query(
-            "update w1 set name=\"ray\" where id = 20;",
-            "write w1",
-            Some("w1"),
-        )),
-        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
-        Message::RequestMsqlText(MsqlText::query(
-            "update w2 set name=\"ray\" where id = 22;",
-            "write w2",
-            Some("w2"),
-        )),
-        Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    ];
-
-    let tx1 = vec![
-        Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 r1 WRITE w2 w3")),
-        Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
-        Message::RequestMsqlText(MsqlText::query(
-            "update w2 set name=\"ray\" where id = 20;",
-            "write w2",
-            Some(""),
-        )),
-        Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some("r1"))),
-        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
-        Message::RequestMsqlText(MsqlText::query(
-            "update w3 set name=\"ray\" where id = 22;",
-            "write w3",
-            Some("w3"),
-        )),
-        Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    ];
-
-    let tx2 = vec![
-        Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ w1 w2 WRITE r0 r1")),
-        Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1", Some("w1"))),
-        Message::RequestMsqlText(MsqlText::query(
-            "update r0 set name=\"ray\" where id = 20;",
-            "write r0",
-            Some("r0"),
-        )),
-        Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some(""))),
-        Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
-        Message::RequestMsqlText(MsqlText::query(
-            "update r1 set name=\"ray\" where id = 22;",
-            "write r1",
-            Some("r1"),
-        )),
-        Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-    ];
-
-    let tx3 = vec![Message::RequestMsqlText(MsqlText::query(
-        "select * from w1;",
-        "read w1",
-        Some(""),
-    ))];
-
-    let tx4 = vec![Message::RequestMsqlText(MsqlText::query(
-        "update w3 set name=\"ray\" where id = 22;",
-        "write w3",
-        Some(""),
-    ))];
+    let transaction_samples = transaction_samples();
 
     let msgs0 = [
-        tx3.clone(),
-        tx4.clone(),
-        tx0.clone(),
-        tx1.clone(),
-        tx4.clone(),
-        tx4.clone(),
-        tx2.clone(),
-        tx0.clone(),
-        tx3.clone(),
-        tx2.clone(),
+        transaction_samples[3].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[4].clone(),
+        transaction_samples[2].clone(),
+        transaction_samples[4].clone(),
     ]
     .concat();
     let tester_handle_0 = tokio::spawn(async move {
-        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs0)
+        tests_helper::mock_json_client(&mut TcpStream::connect(scheduler_addr).await.unwrap(), msgs0)
             .instrument(info_span!("tester0"))
             .await;
 
@@ -236,21 +278,15 @@ async fn run_double_s() {
     });
 
     let msgs1 = [
-        tx4.clone(),
-        tx3.clone(),
-        tx2.clone(),
-        tx0.clone(),
-        tx1.clone(),
-        tx0.clone(),
-        tx3.clone(),
-        tx2.clone(),
-        tx1.clone(),
-        tx4.clone(),
+        transaction_samples[4].clone(),
+        transaction_samples[3].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[2].clone(),
+        transaction_samples[3].clone(),
     ]
     .concat();
     let tester_handle_1 = tokio::spawn(async move {
-        let mut tcp_stream = TcpStream::connect(scheduler_addr).await.unwrap();
-        tests_helper::mock_json_client(&mut tcp_stream, msgs1)
+        tests_helper::mock_json_client(&mut TcpStream::connect(scheduler_addr).await.unwrap(), msgs1)
             .instrument(info_span!("tester1"))
             .await;
 
@@ -269,8 +305,115 @@ async fn run_double_s() {
     .unwrap();
 }
 
-#[instrument(name="dbproxy(mock)" skip(addr))]
-pub async fn mock_dbproxy<A>(addr: A)
+#[tokio::test]
+#[ignore]
+/// Run `cargo test run_double_s_unlimited -- --ignored --nocapture`
+async fn run_double_s_unlimited() {
+    let _guard = tests_helper::init_fast_logger();
+
+    let scheduler_addr = "127.0.0.1:40001";
+    let dbproxy0_addr = "127.0.0.1:30001";
+    let dbproxy1_addr = "127.0.0.1:30002";
+    let conf = Config {
+        scheduler: SchedulerConfig {
+            addr: String::from(scheduler_addr),
+            admin_addr: Some(String::from("127.0.0.1:19999")),
+            max_connection: None,
+            sequencer_pool_size: 10,
+            dispatcher_queue_size: 5000,
+            transceiver_queue_size: 5000,
+            performance_logging: Some("./logging".to_owned()),
+            disable_early_release: false,
+        },
+        sequencer: SequencerConfig {
+            addr: String::from("127.0.0.1:20001"),
+            max_connection: None,
+        },
+        dbproxy: vec![
+            DbProxyConfig {
+                addr: String::from(dbproxy0_addr),
+                host: String::from("localhost"),
+                port: 5432,
+                user: String::from("postgres"),
+                password: String::from(""),
+                dbname: String::from("Test"),
+            },
+            DbProxyConfig {
+                addr: String::from(dbproxy1_addr),
+                host: String::from("localhost"),
+                port: 5432,
+                user: String::from("postgres"),
+                password: String::from(""),
+                dbname: String::from("Test"),
+            },
+        ],
+    };
+
+    let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
+    let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, false));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, false));
+
+    sleep(Duration::from_millis(300)).await;
+
+    let transaction_samples = transaction_samples();
+    let tx_sets = [
+        transaction_samples[3].clone(),
+        transaction_samples[4].clone(),
+        transaction_samples[0].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[4].clone(),
+        transaction_samples[0].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[2].clone(),
+        transaction_samples[0].clone(),
+        transaction_samples[3].clone(),
+        transaction_samples[2].clone(),
+        transaction_samples[3].clone(),
+        transaction_samples[4].clone(),
+        transaction_samples[0].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[0].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[2].clone(),
+        transaction_samples[0].clone(),
+        transaction_samples[1].clone(),
+        transaction_samples[2].clone(),
+    ]
+    .concat();
+
+    let mock_clients_handle = tokio::spawn(async move {
+        stream::iter(0..16)
+            .for_each_concurrent(None, move |id| {
+                let tx_sets = tx_sets.clone();
+                async move {
+                    tests_helper::mock_json_client(
+                        &mut TcpStream::connect(scheduler_addr).await.unwrap(),
+                        tx_sets.into_iter().cycle().take(100),
+                    )
+                    .instrument(info_span!("tester", id))
+                    .await;
+
+                    println!("\ntester_handle_{} DONE\n", id);
+                }
+            })
+            .await;
+    });
+
+    // Must run, otherwise it won't do the work
+    tokio::try_join!(
+        scheduler_handle,
+        sequencer_handle,
+        dbproxy0_handle,
+        dbproxy1_handle,
+        mock_clients_handle
+    )
+    .unwrap();
+}
+
+#[instrument(name="dbproxy(mock)" skip(addr, random_delay))]
+pub async fn mock_dbproxy<A>(addr: A, random_delay: bool)
 where
     A: ToSocketAddrs,
 {
@@ -299,12 +442,14 @@ where
                 serded_read
                     .and_then(move |msg| {
                         async move {
-                            debug!("<- {:?}", msg);
+                            trace!("<- {:?}", msg);
 
                             // Simulate some load
-                            let sleep_time = rand::rngs::OsRng::default().gen_range(20, 200);
-                            info!("Works for {} ms", sleep_time);
-                            sleep(Duration::from_millis(sleep_time)).await;
+                            if random_delay {
+                                let sleep_time = rand::rngs::OsRng::default().gen_range(20, 200);
+                                info!("Works for {} ms", sleep_time);
+                                sleep(Duration::from_millis(sleep_time)).await;
+                            }
 
                             match msg {
                                 scheduler_dbproxy::Message::MsqlRequest(client_addr, msql, _txvn) => {
@@ -322,7 +467,7 @@ where
                             }
                         }
                     })
-                    .inspect_ok(|m| debug!("dbproxy mock replies {:?}", m))
+                    .inspect_ok(|m| trace!("dbproxy mock replies {:?}", m))
                     .forward(serded_write)
                     .map(|_| ())
                     .await;
