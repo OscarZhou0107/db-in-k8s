@@ -434,7 +434,7 @@ mod tests_tableops {
                 TableOp::new("table_0", RWOperation::W)
             ])
             .into_vec(),
-            vec![TableOp::new("table_0", RWOperation::W,)]
+            vec![TableOp::new("table_0", RWOperation::W)]
         );
 
         assert_eq!(
@@ -456,7 +456,7 @@ mod tests_tableops {
             ])
             .into_vec(),
             vec![
-                TableOp::new("table_0", RWOperation::W,),
+                TableOp::new("table_0", RWOperation::W),
                 TableOp::new("table_1", RWOperation::R)
             ]
         );
