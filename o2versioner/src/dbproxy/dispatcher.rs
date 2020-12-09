@@ -141,30 +141,35 @@ impl TransactionExecutor {
     #[instrument(name = "trans_exec", skip(self), fields(message=field::Empty))]
     pub async fn run(mut self) {
         Span::current().record("message", &&self.client_meta.to_string()[..]);
-        let conn = self.pool.get().await.unwrap();
+        let mut conn = self.pool.get().await.unwrap();
         info!("Deploying {}", self.transaction_uuid);
         let mut total_sql_cmd: usize = 0;
-        conn.simple_query("START TRANSACTION;").await.unwrap();
+        let mut transc = Some(conn.transaction().await.expect("Cannot create a new transaction"));
         total_sql_cmd += 1;
+
+        // Default is rollback
+        let mut is_ended_by_rollback = true;
         while let Some(operation) = self.transaction_listener.recv().await {
-            let mut finish = false;
             let raw = match operation.operation_type {
                 Task::READ => {
-                    conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                    transc
+                        .as_ref()
+                        .unwrap()
+                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
                         .await
                 }
                 Task::WRITE => {
-                    conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                    transc
+                        .as_ref()
+                        .unwrap()
+                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
                         .await
                 }
                 Task::COMMIT => {
-                    finish = true;
-                    conn.simple_query("COMMIT;").await
+                    is_ended_by_rollback = false;
+                    transc.take().unwrap().commit().await.map(|_| Vec::new())
                 }
-                Task::ABORT => {
-                    finish = true;
-                    conn.simple_query("ROLLBACK;").await
-                }
+                Task::ABORT => transc.take().unwrap().rollback().await.map(|_| Vec::new()),
                 _ => panic!("Unexpected operation type"),
             };
 
@@ -176,14 +181,15 @@ impl TransactionExecutor {
 
             total_sql_cmd += 1;
 
-            if finish {
+            if transc.is_none() {
                 break;
             }
         }
 
+        let ending = if is_ended_by_rollback { "ROLLBACK" } else { "Commit" };
         info!(
-            "Finishing {} after executing {} commands",
-            self.transaction_uuid, total_sql_cmd
+            "Finishing {} after executing {} commands. {}",
+            self.transaction_uuid, total_sql_cmd, ending
         );
     }
 }
