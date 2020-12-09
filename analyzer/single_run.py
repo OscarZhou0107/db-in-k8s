@@ -167,6 +167,33 @@ class DbproxyStatsDB(DB):
     def get_num_dbproxy(self):
         return len(self)
 
+    def print_data(self):
+        print('Info:', 'Dbproxy Stats')
+        for row in self:
+            print('Info:', *row.values())
+
+
+def print_perfdb_success_ratio_stats(perfdb):
+    '''
+    Expecting an unfiltered perfdb
+    '''
+    # For each request
+    request_type_list = ['BeginTx', 'Commit', 'Rollback', 'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease', 'SingleReadOnly', 'SingleWriteOnly', None]
+    
+    def construct_filter(request_type, request_result):
+        def request_filter(row):
+            if request_type is None:
+                return row['request_result'] == request_result
+            else:
+                return row['request_result'] == request_result and row['request_type'] == request_type
+        return request_filter
+
+    print('Info:', 'Request Result Stats')
+    for request_type in request_type_list:
+        num_ok = len(perfdb.get_filtered(filter_func=construct_filter(request_type, 'Ok')))
+        num_err = len(perfdb.get_filtered(filter_func=construct_filter(request_type, 'Err')))
+        print('Info:', '{:<27} {:>7} Ok {:>7} Err {:>7.2f} Ratio'.format(str(request_type), num_ok, num_err, num_ok/(num_err+num_ok) if num_ok+num_err > 0 else 1))
+
 
 def init(parser):
     parser.add_argument('--log_dir', type=str, required=True, help='log file directory for single run')
@@ -184,11 +211,9 @@ def main(args):
 
     sr_throughput = sr_perfdb.get_throughput()
     # sr_throughput.print_detailed_trajectory()
-    print('Info:', 'Successful Request Throughput:')
-    sr_throughput.print_trajectory()
-
+    # sr_throughput.print_trajectory()
     print('Info:')
-    print('Info:', 'Num Successful Request', len(sr_perfdb))
+    print('Info:', 'Successful Request Throughput: -', len(sr_perfdb))
 
     print('Info:')
     print('Info:', 'Throughput')
@@ -202,6 +227,12 @@ def main(args):
     print('Info:')
     print('Info:', 'num_clients', sr_perfdb.get_num_clients())
     print('Info:', 'num_dbproxy_db', dbproxy_stats_db.get_num_dbproxy())
+
+    print('Info:')
+    print_perfdb_success_ratio_stats(perfdb)
+
+    print('Info:')
+    dbproxy_stats_db.print_data()
 
 
 if __name__ == '__main__':
