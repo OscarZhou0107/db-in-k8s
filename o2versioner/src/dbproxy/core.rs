@@ -112,9 +112,9 @@ impl QueueMessage {
 
         QueryResult {
             identifier: self.identifier,
-            result: result,
-            result_type: result_type,
-            succeed: succeed,
+            result,
+            result_type,
+            succeed,
             contained_newer_versions: self.versions.unwrap(),
             contained_early_release_version: self.early_release,
         }
@@ -365,11 +365,9 @@ impl QueryResult {
         message
     }
 
-    pub fn flush_early_release(&mut self) -> Result<DbVNReleaseRequest, &'static str> {
-        if let Some(early_release) = &self.contained_early_release_version {
-            return self
-                .contained_newer_versions
-                .early_release_request(early_release.clone());
+    pub fn acquire_early_release(&mut self) -> Result<DbVNReleaseRequest, &'static str> {
+        if let Some(early_release) = self.contained_early_release_version.take() {
+            return self.contained_newer_versions.early_release_request(early_release);
         }
         Err("No available early release")
     }

@@ -288,7 +288,7 @@ impl State {
             .release_version(dbproxy_addr, release_request);
 
         // Notify all others on any DbVN changes
-        self.dbvn_manager_notify.notify_one();
+        self.dbvn_manager_notify.notify_waiters();
     }
 }
 

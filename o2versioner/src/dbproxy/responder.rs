@@ -30,19 +30,20 @@ impl Responder {
             match result.result_type {
                 QueryResultType::END => {
                     debug!("Trying to release a version");
-                    debug!("Responder: {:?}", result.contained_newer_versions.clone());
+                    debug!("Responder: {:?}", result.contained_newer_versions);
                     version
                         .lock()
                         .await
                         .release_on_transaction(result.contained_newer_versions.clone());
                 }
-                _ => match result.flush_early_release() {
+                QueryResultType::QUERY => match result.acquire_early_release() {
                     Ok(request) => {
                         debug!("Doing a early release {:?}", request);
                         version.lock().await.release_on_request(request);
                     }
                     Err(_) => {}
                 },
+                _ => {}
             }
 
             serializer
