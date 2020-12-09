@@ -1,5 +1,5 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
-use crate::core::MsqlFinalString;
+use crate::core::*;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use futures::prelude::*;
@@ -59,30 +59,35 @@ impl Dispatcher {
                     let transactions_cloned = transactions.clone();
 
                     async move {
+                        let transaction_uuid = op.versions.as_ref().unwrap().uuid().clone();
                         let mut transactions_lock = transactions_cloned.lock().await;
 
-                        let transaction_sender = transactions_lock
-                            .entry(op.versions.as_ref().unwrap().uuid().clone())
-                            .or_insert_with(|| {
+                        let transaction_sender =
+                            transactions_lock.entry(transaction_uuid.clone()).or_insert_with(|| {
                                 // Start a new transaction if not existed yet
                                 // Save this newly opened transaction, associates an tx with the transaction, so
                                 // upcoming requests can go to the transaction via tx
-                                debug!(
-                                    "Opening a new transaction for ({})",
-                                    op.versions.as_ref().unwrap().uuid()
-                                );
+                                debug!("Opening a new transaction for ({})", transaction_uuid);
 
                                 let (transaction_tx, transaction_rx) = mpsc::channel(transaction_channel_queue_size);
 
                                 // A task represents an ongoing transaction, probably just leaves it hanging around.
                                 // listens on the rx for upcoming requests
-                                tokio::spawn(TransactionExecutor::run(
-                                    pool_cloned,
+                                let transaction_executor = TransactionExecutor::new(
+                                    transaction_uuid.clone(),
+                                    op.identifier.to_client_meta(),
                                     transaction_rx,
+                                    pool_cloned,
                                     responder_sender_cloned,
-                                    op.versions.as_ref().unwrap().uuid().clone(),
-                                ));
+                                );
+                                let transactions = transactions_cloned.clone();
+                                tokio::spawn(async move {
+                                    transaction_executor.run().await;
+                                    // Pop the transaction_tx of the finished running transaction executor from the transactions list
+                                    transactions.lock().await.remove(&transaction_uuid).unwrap();
+                                });
 
+                                // Insert the transaction_tx of the newly spanwed transaction executor into the transactions list
                                 transaction_tx
                             });
 
@@ -108,27 +113,40 @@ impl Dispatcher {
     }
 }
 
-struct TransactionExecutor;
+struct TransactionExecutor {
+    transaction_uuid: Uuid,
+    client_meta: ClientMeta,
+    transaction_listener: mpsc::Receiver<QueueMessage>,
+    pool: Pool<PostgresConnectionManager<NoTls>>,
+    responder_sender: mpsc::Sender<QueryResult>,
+}
 
 impl TransactionExecutor {
-    #[instrument(
-        name = "trans_exec",
-        skip(pool, transaction_listener, responder_sender, transaction_uuid),
-        fields(message=field::Empty)
-    )]
-    pub async fn run(
-        pool: Pool<PostgresConnectionManager<NoTls>>,
-        mut transaction_listener: mpsc::Receiver<QueueMessage>,
-        responder_sender: mpsc::Sender<QueryResult>,
+    pub fn new(
         transaction_uuid: Uuid,
-    ) {
-        Span::current().record("message", &&transaction_uuid.to_string()[..]);
-        let conn = pool.get().await.unwrap();
-        info!("Deploying");
-        let mut total_sql_cmd = 0;
+        client_meta: ClientMeta,
+        transaction_listener: mpsc::Receiver<QueueMessage>,
+        pool: Pool<PostgresConnectionManager<NoTls>>,
+        responder_sender: mpsc::Sender<QueryResult>,
+    ) -> Self {
+        Self {
+            transaction_uuid,
+            client_meta,
+            transaction_listener,
+            pool,
+            responder_sender,
+        }
+    }
+
+    #[instrument(name = "trans_exec", skip(self), fields(message=field::Empty))]
+    pub async fn run(mut self) {
+        Span::current().record("message", &&self.client_meta.to_string()[..]);
+        let conn = self.pool.get().await.unwrap();
+        info!("Deploying {}", self.transaction_uuid);
+        let mut total_sql_cmd: usize = 0;
         conn.simple_query("START TRANSACTION;").await.unwrap();
         total_sql_cmd += 1;
-        while let Some(operation) = transaction_listener.recv().await {
+        while let Some(operation) = self.transaction_listener.recv().await {
             let mut finish = false;
             let raw = match operation.operation_type {
                 Task::READ => {
@@ -150,7 +168,7 @@ impl TransactionExecutor {
                 _ => panic!("Unexpected operation type"),
             };
 
-            responder_sender
+            self.responder_sender
                 .send(operation.into_sqlresponse(raw))
                 .await
                 .map_err(|e| e.to_string())
@@ -163,7 +181,10 @@ impl TransactionExecutor {
             }
         }
 
-        info!("Finishing after executing {} commands", total_sql_cmd);
+        info!(
+            "Finishing {} after executing {} commands",
+            self.transaction_uuid, total_sql_cmd
+        );
     }
 }
 

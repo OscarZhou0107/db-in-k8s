@@ -78,12 +78,12 @@ impl QueueMessage {
             },
         }
 
-        QueueMessage {
-            identifier: identifier,
-            operation_type: operation_type,
-            msql: msql,
-            versions: versions,
-            early_release: early_release,
+        Self {
+            identifier,
+            operation_type,
+            msql,
+            versions,
+            early_release,
         }
     }
 
