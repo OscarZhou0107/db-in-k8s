@@ -161,7 +161,7 @@ impl PendingQueue {
                             version
                                 .lock()
                                 .await
-                                .violate_version(&op.versions.as_ref().unwrap().get_tableops(), &op.versions),
+                                .violate_version(&op.versions.as_ref().unwrap().to_tableops(), &op.versions),
                         ),
                         _ => (op.clone(), false),
                     }
