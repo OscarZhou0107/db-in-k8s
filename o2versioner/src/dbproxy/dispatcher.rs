@@ -123,36 +123,32 @@ impl TransactionExecutor {
         transaction_uuid: Uuid,
     ) {
         Span::current().record("message", &&transaction_uuid.to_string()[..]);
-
-        let mut finish = false;
         let conn = pool.get().await.unwrap();
         info!("Deploying");
+        let mut total_sql_cmd = 0;
         conn.simple_query("START TRANSACTION;").await.unwrap();
+        total_sql_cmd += 1;
         while let Some(operation) = transaction_listener.recv().await {
-            let raw;
-            match operation.operation_type {
+            let mut finish = false;
+            let raw = match operation.operation_type {
                 Task::READ => {
-                    raw = conn
-                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
-                        .await;
+                    conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                        .await
                 }
                 Task::WRITE => {
-                    raw = conn
-                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
-                        .await;
+                    conn.simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
+                        .await
                 }
                 Task::COMMIT => {
-                    raw = conn.simple_query("COMMIT;").await;
                     finish = true;
+                    conn.simple_query("COMMIT;").await
                 }
                 Task::ABORT => {
-                    raw = conn.simple_query("ROLLBACK;").await;
                     finish = true;
+                    conn.simple_query("ROLLBACK;").await
                 }
-                _ => {
-                    panic!("Unexpected operation type");
-                }
-            }
+                _ => panic!("Unexpected operation type"),
+            };
 
             responder_sender
                 .send(operation.into_sqlresponse(raw))
@@ -160,12 +156,14 @@ impl TransactionExecutor {
                 .map_err(|e| e.to_string())
                 .unwrap();
 
+            total_sql_cmd += 1;
+
             if finish {
                 break;
             }
         }
 
-        info!("Finishing");
+        info!("Finishing after executing {} commands", total_sql_cmd);
     }
 }
 
