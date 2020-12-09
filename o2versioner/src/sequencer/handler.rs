@@ -9,7 +9,7 @@ use tokio::sync::{oneshot, Mutex};
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{trace, field, info, info_span, instrument, warn, Instrument, Span};
+use tracing::{field, info, info_span, instrument, trace, warn, Instrument, Span};
 
 /// Main entrance for Sequencer
 ///
