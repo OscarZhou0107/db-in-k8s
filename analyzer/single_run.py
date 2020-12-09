@@ -57,8 +57,8 @@ class DB(list):
         for row in self:
             DBRow(row).pretty_print_row()
 
-def successful_query_filter(row):
-    return row['request_result'] == 'Ok' and row['request_type'] in ['ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease']
+def successful_request_filter(row):
+    return row['request_result'] == 'Ok'
 
 class PerfDB(DB):
     def __init__(self, perf_csv_path=None, data=None):
@@ -180,27 +180,27 @@ def main(args):
     dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv.gz'))
 
     # Apply filter on perfdb
-    sq_perfdb = perfdb.get_filtered(successful_query_filter)
+    sr_perfdb = perfdb.get_filtered(successful_request_filter)
 
-    sq_throughput = sq_perfdb.get_throughput()
-    # sq_throughput.print_detailed_trajectory()
-    print('Info:', 'Successful Query Request Throughput:')
-    sq_throughput.print_trajectory()
+    sr_throughput = sr_perfdb.get_throughput()
+    # sr_throughput.print_detailed_trajectory()
+    print('Info:', 'Successful Request Throughput:')
+    sr_throughput.print_trajectory()
 
     print('Info:')
-    print('Info:', 'Num Successful Query Request', len(sq_perfdb))
+    print('Info:', 'Num Successful Request', len(sr_perfdb))
 
     print('Info:')
     print('Info:', 'Throughput')
     print('Info:', '(peak, mean, stddev, geomean, median)')
-    print('Info:', sq_throughput.get_stats())
+    print('Info:', sr_throughput.get_stats())
     print('Info:')
     print('Info:', 'Latency')
     print('Info:', '(mean, stddev, geomean, median)')
-    print('Info:', sq_perfdb.get_latency_stats())
+    print('Info:', sr_perfdb.get_latency_stats())
 
     print('Info:')
-    print('Info:', 'num_clients', sq_perfdb.get_num_clients())
+    print('Info:', 'num_clients', sr_perfdb.get_num_clients())
     print('Info:', 'num_dbproxy_db', dbproxy_stats_db.get_num_dbproxy())
 
 

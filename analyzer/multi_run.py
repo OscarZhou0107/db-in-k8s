@@ -58,17 +58,17 @@ def plot_charts(args, database):
     for num_dbproxy, dataset in database_by_num_dbproxy.items():
         print(num_dbproxy)
 
-        # [(run_name, num_clients, sq_perf_db, perfdb)]
-        dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_query_filter), x[1]), dataset))
+        # [(run_name, num_clients, sr_perf_db, perfdb)]
+        dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_request_filter), x[1]), dataset))
 
-        # [(run_name, num_clients, max_sq_throughput, latency(mean, stddev, geomean, median), sq_perf_db, perfdb)]
+        # [(run_name, num_clients, max_sr_throughput, latency(mean, stddev, geomean, median), sr_perf_db, perfdb)]
         dataset = list(map(lambda x: (x[0], x[1], x[2].get_throughput().get_stats(), x[2].get_latency_stats(), x[2], x[3]), dataset))
 
         # Sort by num_clients
         dataset = sorted(dataset, key=lambda x: x[1])
 
-        run_names, nums_clients, sq_throughputs_stats, latencies = list(zip(*dataset))[0:4]
-        peak_throughputs = tuple(zip(*sq_throughputs_stats))[0]
+        run_names, nums_clients, sr_throughputs_stats, latencies = list(zip(*dataset))[0:4]
+        peak_throughputs = tuple(zip(*sr_throughputs_stats))[0]
         mean_latencies = tuple(zip(*latencies))[3]
         
         print('nums_clients', nums_clients)
