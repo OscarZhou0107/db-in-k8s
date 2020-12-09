@@ -1,6 +1,5 @@
-use crate::core::MsqlFinalString;
-
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
+use crate::core::MsqlFinalString;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use futures::prelude::*;
@@ -10,12 +9,16 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::NoTls;
-use tracing::{debug, info};
+use tracing::{debug, field, info, instrument, Span};
 use uuid::Uuid;
 
 pub struct Dispatcher;
 
 impl Dispatcher {
+    #[instrument(
+        name = "dispatcher",
+        skip(pending_queue, responder_sender, config, version, transactions)
+    )]
     pub async fn run(
         pending_queue: Arc<Mutex<PendingQueue>>,
         responder_sender: mpsc::Sender<QueryResult>,
@@ -108,15 +111,22 @@ impl Dispatcher {
 struct TransactionExecutor;
 
 impl TransactionExecutor {
+    #[instrument(
+        name = "trans_exec",
+        skip(pool, transaction_listener, responder_sender, transaction_uuid),
+        fields(message=field::Empty)
+    )]
     pub async fn run(
         pool: Pool<PostgresConnectionManager<NoTls>>,
         mut transaction_listener: mpsc::Receiver<QueueMessage>,
         responder_sender: mpsc::Sender<QueryResult>,
         transaction_uuid: Uuid,
     ) {
+        Span::current().record("message", &&transaction_uuid.to_string()[..]);
+
         let mut finish = false;
         let conn = pool.get().await.unwrap();
-        info!("Deploying new transaction executioner {}", transaction_uuid);
+        info!("Deploying");
         conn.simple_query("START TRANSACTION;").await.unwrap();
         while let Some(operation) = transaction_listener.recv().await {
             let raw;
@@ -155,7 +165,7 @@ impl TransactionExecutor {
             }
         }
 
-        info!("Terminating transaction executioner {}", transaction_uuid);
+        info!("Finishing");
     }
 }
 
