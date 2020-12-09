@@ -149,6 +149,8 @@ class Throughput(list):
         trajectory = self.get_trajectory()
         for item in trajectory:
             print('Info:', item)
+        print('Info:')
+        print('Info:', 'Peak throughput is', max(trajectory, key=lambda kv: kv[1]))
 
     def print_detailed_trajectory(self):
         for (sec, group_of_rows) in self:
