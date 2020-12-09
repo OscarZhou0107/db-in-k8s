@@ -351,8 +351,8 @@ async fn run_double_s_unlimited() {
 
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
-    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, Some(Duration::from_millis(5))));
-    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, Some(Duration::from_millis(250))));
+    let dbproxy0_handle = tokio::spawn(mock_dbproxy(dbproxy0_addr, Some(Duration::from_millis(2))));
+    let dbproxy1_handle = tokio::spawn(mock_dbproxy(dbproxy1_addr, Some(Duration::from_millis(150))));
 
     sleep(Duration::from_millis(300)).await;
 
@@ -384,7 +384,7 @@ async fn run_double_s_unlimited() {
     .concat();
 
     let mock_clients_handle = tokio::spawn(async move {
-        stream::iter(0..16)
+        stream::iter(0..8)
             .for_each_concurrent(None, move |id| {
                 let tx_sets = tx_sets.clone();
                 async move {
