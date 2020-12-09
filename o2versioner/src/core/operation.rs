@@ -120,7 +120,8 @@ impl TableOps {
         Self::from_iter(self)
     }
 
-    /// The access pattern of this `TableOps`
+    /// The access pattern of this `TableOps`. If `TableOps` is empty,
+    /// then `access_pattern()` returns `AccessPattern::ReadOnly`
     pub fn access_pattern(&self) -> AccessPattern {
         if self.0.iter().all(|tableop| tableop.op == RWOperation::R) {
             AccessPattern::ReadOnly
@@ -636,6 +637,8 @@ mod tests_tableops {
             .access_pattern(),
             AccessPattern::WriteOnly
         );
+
+        assert_eq!(TableOps::default().access_pattern(), AccessPattern::ReadOnly);
     }
 }
 
