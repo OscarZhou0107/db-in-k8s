@@ -1,6 +1,6 @@
 use crate::comm::MsqlResponse;
 use crate::core::DbVN;
-use crate::core::{DbVNReleaseRequest, EarlyReleaseTables, TableOps};
+use crate::core::{DbVNReleaseRequest, EarlyReleaseTables, TxTableVN};
 use crate::core::{Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
 use bb8_postgres::bb8::{Pool, PooledConnection};
@@ -151,20 +151,28 @@ impl PendingQueue {
                 debug!("txvn is: {:?}", op.versions);
                 let version = version.clone();
                 async move {
-                    match &op.msql {
-                        Msql::Query(query) => (
-                            op.clone(),
-                            version.lock().await.violate_version(query.tableops(), &op.versions),
-                        ),
-                        Msql::EndTx(_) => (
-                            op.clone(),
-                            version
-                                .lock()
-                                .await
-                                .violate_version(&op.versions.as_ref().unwrap().to_tableops(), &op.versions),
-                        ),
-                        _ => (op.clone(), false),
-                    }
+                    let violate_version = if let Some(txvn) = &op.versions {
+                        match &op.msql {
+                            Msql::Query(query) => {
+                                version
+                                    .lock()
+                                    .map(|version| {
+                                        let tbops = query.tableops();
+                                        let ertables = query.early_release_tables();
+                                        version.violate_version(&txvn.get_from_tableops(tbops).unwrap())
+                                            || version.violate_version(&txvn.get_from_ertables(ertables).unwrap())
+                                    })
+                                    .await
+                            }
+                            Msql::EndTx(_) => version.lock().await.violate_version(txvn.txtablevns()),
+                            _ => false,
+                        }
+                    } else {
+                        // If no txvn, then not going to be blocked for version
+                        false
+                    };
+
+                    (op.clone(), violate_version)
                 }
             })
             .collect()
@@ -199,13 +207,8 @@ impl DbVersion {
         self.notify.notify_one();
     }
 
-    pub fn violate_version(&self, table_ops: &TableOps, txvn: &Option<TxVN>) -> bool {
-        if let Some(txvn) = txvn {
-            return !self
-                .db_version
-                .can_execute_query(&txvn.get_from_tableops(table_ops).unwrap());
-        }
-        false
+    pub fn violate_version(&self, txtablevns: &[TxTableVN]) -> bool {
+        !self.db_version.can_execute_query(txtablevns)
     }
 
     pub fn get_notify(&self) -> Arc<Notify> {

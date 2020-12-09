@@ -39,6 +39,7 @@ impl Dispatcher {
             .await
             .unwrap();
 
+        let mut empty_spinning_count = 0;
         loop {
             Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
@@ -51,6 +52,16 @@ impl Dispatcher {
                 .get_all_version_ready_task(&mut version)
                 .await;
             debug!("Operation batch size is {}", operations.len());
+
+            // DEBUG. PANIC WHEN POTENTIAL BLOCKING
+            if operations.is_empty() {
+                empty_spinning_count += 1;
+                if empty_spinning_count >= 100 {
+                    panic!("Probably blocked due to version conflicts");
+                }
+            } else {
+                empty_spinning_count = 0;
+            }
 
             stream::iter(operations.clone())
                 .for_each(|op| {
