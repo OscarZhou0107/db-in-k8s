@@ -37,14 +37,22 @@ impl Dispatcher {
         let mut task_notify = pending_queue.lock().await.get_notify();
         let mut version_notify = version.lock().await.get_notify();
 
-        let pool = Pool::builder()
-            .max_size(postgres_pool_size)
-            .build(PostgresConnectionManager::new(
-                tokio_postgres::Config::from_str(&conf.sql_conf).unwrap(),
-                NoTls,
-            ))
-            .await
-            .unwrap();
+        let pool_opt = if conf.use_mock_db {
+            info!("Using mocked db");
+            None
+        } else {
+            info!("Connecting to db with: {}", conf.sql_conf);
+            Some(
+                Pool::builder()
+                    .max_size(postgres_pool_size)
+                    .build(PostgresConnectionManager::new(
+                        tokio_postgres::Config::from_str(&conf.sql_conf).unwrap(),
+                        NoTls,
+                    ))
+                    .await
+                    .unwrap(),
+            )
+        };
 
         let mut empty_spinning_count = 0;
         loop {
@@ -77,7 +85,7 @@ impl Dispatcher {
 
             stream::iter(operations.clone())
                 .for_each(|op| {
-                    let pool_cloned = pool.clone();
+                    let pool_opt_cloned = pool_opt.clone();
                     let responder_sender_cloned = responder_sender.clone();
                     let transactions_cloned = transactions.clone();
 
@@ -92,28 +100,25 @@ impl Dispatcher {
                                 // upcoming requests can go to the transaction via tx
                                 debug!("Opening a new transaction for ({})", transaction_uuid);
 
-                                let mock_transaction_executioner = false;
-                                let (transaction_tx, transaction_executor): (
-                                    mpsc::Sender<QueueMessage>,
-                                    Box<dyn Executor>,
-                                ) = if mock_transaction_executioner {
-                                    let (transaction_tx, transaction_executor) = MockTransactionExecutor::new(
-                                        transaction_uuid.clone(),
-                                        op.identifier.to_client_meta(),
-                                        transaction_channel_queue_size,
-                                        responder_sender_cloned,
-                                    );
-                                    (transaction_tx, Box::new(transaction_executor))
-                                } else {
-                                    let (transaction_tx, transaction_executor) = TransactionExecutor::new(
-                                        transaction_uuid.clone(),
-                                        op.identifier.to_client_meta(),
-                                        transaction_channel_queue_size,
-                                        pool_cloned,
-                                        responder_sender_cloned,
-                                    );
-                                    (transaction_tx, Box::new(transaction_executor))
-                                };
+                                let (transaction_tx, transaction_executor): (_, Box<dyn Executor>) =
+                                    if let Some(pool) = pool_opt_cloned {
+                                        let (transaction_tx, transaction_executor) = TransactionExecutor::new(
+                                            transaction_uuid.clone(),
+                                            op.identifier.to_client_meta(),
+                                            transaction_channel_queue_size,
+                                            pool,
+                                            responder_sender_cloned,
+                                        );
+                                        (transaction_tx, Box::new(transaction_executor))
+                                    } else {
+                                        let (transaction_tx, transaction_executor) = MockTransactionExecutor::new(
+                                            transaction_uuid.clone(),
+                                            op.identifier.to_client_meta(),
+                                            transaction_channel_queue_size,
+                                            responder_sender_cloned,
+                                        );
+                                        (transaction_tx, Box::new(transaction_executor))
+                                    };
 
                                 let transactions = transactions_cloned.clone();
                                 tokio::spawn(async move {

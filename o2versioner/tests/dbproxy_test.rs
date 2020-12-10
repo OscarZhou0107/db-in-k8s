@@ -277,6 +277,7 @@ fn helper_spawn_proxy(addr: SocketAddr) {
         let config = DbProxyConfig {
             addr: addr.to_string(),
             sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+            use_mock_db: false,
         };
 
         dbproxy::main(config).await;

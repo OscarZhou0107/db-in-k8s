@@ -60,6 +60,8 @@ impl SequencerConfig {
 pub struct DbProxyConfig {
     pub addr: String,
     pub sql_conf: String,
+    #[serde(default)]
+    pub use_mock_db: bool,
 }
 
 impl DbProxyConfig {
@@ -97,11 +99,13 @@ mod tests_config {
                 dbproxy: vec![
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8876"),
-                        sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()
+                        sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+                        use_mock_db: false
                     },
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8876"),
-                        sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()
+                        sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+                        use_mock_db: false
                     }
                 ]
             }

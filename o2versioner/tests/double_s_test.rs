@@ -236,10 +236,12 @@ async fn run_double_s_limited() {
             DbProxyConfig {
                 addr: String::from(dbproxy0_addr),
                 sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+                use_mock_db: false,
             },
             DbProxyConfig {
                 addr: String::from(dbproxy1_addr),
                 sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+                use_mock_db: false,
             },
         ],
     };
@@ -325,10 +327,12 @@ async fn run_double_s_unlimited() {
             DbProxyConfig {
                 addr: String::from(dbproxy0_addr),
                 sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+                use_mock_db: false,
             },
             DbProxyConfig {
                 addr: String::from(dbproxy1_addr),
                 sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
+                use_mock_db: false,
             },
         ],
     };

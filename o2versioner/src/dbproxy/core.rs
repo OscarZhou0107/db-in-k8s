@@ -7,7 +7,7 @@ use bb8_postgres::bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
 use csv::Writer;
 use futures::prelude::*;
-use itertools::Itertools;
+//use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
@@ -150,8 +150,8 @@ impl PendingQueue {
     pub async fn get_all_version_ready_task(&mut self, version: Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
         let partitioned_queue: Vec<_> = stream::iter(
             self.queue
-                .iter()
-                .unique_by(|q| q.versions.as_ref().unwrap().uuid().clone())
+                // .iter()
+                // .unique_by(|q| q.versions.as_ref().unwrap().uuid().clone())
                 .clone(),
         )
         .then(move |op| {
