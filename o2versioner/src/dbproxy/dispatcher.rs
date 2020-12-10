@@ -92,16 +92,7 @@ impl Dispatcher {
                                 // upcoming requests can go to the transaction via tx
                                 debug!("Opening a new transaction for ({})", transaction_uuid);
 
-                                // A task represents an ongoing transaction, probably just leaves it hanging around.
-                                // listens on the rx for upcoming requests
-                                // let (transaction_tx, transaction_executor) = TransactionExecutor::new(
-                                //     transaction_uuid.clone(),
-                                //     op.identifier.to_client_meta(),
-                                //     transaction_channel_queue_size,
-                                //     pool_cloned,
-                                //     responder_sender_cloned,
-                                // );
-                                let mock_transaction_executioner = true;
+                                let mock_transaction_executioner = false;
                                 let (transaction_tx, transaction_executor): (
                                     mpsc::Sender<QueueMessage>,
                                     Box<dyn Executor>,

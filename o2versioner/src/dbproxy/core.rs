@@ -7,6 +7,7 @@ use bb8_postgres::bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
 use csv::Writer;
 use futures::prelude::*;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
@@ -147,36 +148,41 @@ impl PendingQueue {
     }
 
     pub async fn get_all_version_ready_task(&mut self, version: Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
-        let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
-            .then(move |op| {
-                let version = version.clone();
-                async move {
-                    let violate_version = if let Some(txvn) = &op.versions {
-                        match &op.msql {
-                            Msql::Query(query) => {
-                                version
-                                    .lock()
-                                    .map(|version| {
-                                        let tbops = query.tableops();
-                                        let ertables = query.early_release_tables();
-                                        version.violate_version(&txvn.get_from_tableops(tbops).unwrap())
-                                            || version.violate_version(&txvn.get_from_ertables(ertables).unwrap())
-                                    })
-                                    .await
-                            }
-                            Msql::EndTx(_) => version.lock().await.violate_version(txvn.txtablevns()),
-                            _ => false,
+        let partitioned_queue: Vec<_> = stream::iter(
+            self.queue
+                .iter()
+                .unique_by(|q| q.versions.as_ref().unwrap().uuid().clone())
+                .clone(),
+        )
+        .then(move |op| {
+            let version = version.clone();
+            async move {
+                let violate_version = if let Some(txvn) = &op.versions {
+                    match &op.msql {
+                        Msql::Query(query) => {
+                            version
+                                .lock()
+                                .map(|version| {
+                                    let tbops = query.tableops();
+                                    let ertables = query.early_release_tables();
+                                    version.violate_version(&txvn.get_from_tableops(tbops).unwrap())
+                                        || version.violate_version(&txvn.get_from_ertables(ertables).unwrap())
+                                })
+                                .await
                         }
-                    } else {
-                        // If no txvn, then not going to be blocked for version
-                        false
-                    };
+                        Msql::EndTx(_) => version.lock().await.violate_version(txvn.txtablevns()),
+                        _ => false,
+                    }
+                } else {
+                    // If no txvn, then not going to be blocked for version
+                    false
+                };
 
-                    (op.clone(), violate_version)
-                }
-            })
-            .collect()
-            .await;
+                (op.clone(), violate_version)
+            }
+        })
+        .collect()
+        .await;
         let (unready_ops, ready_ops): (Vec<_>, Vec<_>) =
             partitioned_queue.into_iter().partition(|(_, violate)| *violate);
         self.queue = unready_ops.into_iter().map(|(op, _)| op).collect();
