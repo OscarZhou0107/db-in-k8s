@@ -26,7 +26,7 @@ OK = "Ok"
 NUM_ITEM = 1000
 NUM_QTY = 10
 NUM_PAIR = 10
-DEBUG = 0
+#DEBUG = 0
 WRONG_PASSWD_FRENQUENCY = 1 # out of 10
 MAX_STRING_LEN = 10
 MAX_NUM_LEN = 12
@@ -203,8 +203,8 @@ class Client:
             format='%(asctime)s,%(msecs)d %(name)s [%(levelname)s] %(message)s',
             # write to both stdout and log file
             handlers=[
-                logging.FileHandler(logname, mode="w")#,
-                #logging.StreamHandler(sys.stdout)
+                logging.FileHandler(logname, mode="w"),
+                logging.StreamHandler(sys.stdout)
             ]
         )
         # set name for this logger
@@ -1009,8 +1009,6 @@ class Client:
     '''
 
     def send_query_and_receive_response(self, query, name, ertables=[]):
-        if DEBUG and "shopping_cart" in query:
-            return ["0"] * 20 
         # take raw query, return result in list -> result[row][col]
         pairs = sql.sqlNameToOP[name]
         ops = {"READ":set(), "WRITE":set()}
@@ -1047,6 +1045,10 @@ class Client:
         self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
+        if DEBUG:
+            self.logger.warning("DEBUG mode on")
+            return ["0"] * 20 
+
         if ALLOW_ABORT and OK not in response["reply"]["Query"]:
             if "aborted" in response["reply"]["Query"]["Err"]:
                 return "Abort"
@@ -1067,9 +1069,6 @@ class Client:
                 if result[i][j].startswith('"') and result[i][j].endswith('"'):
                     result[i][j] = result[i][j][1:-1]
         self.logger.info("csv list: {}".format(result))
-        
-        if DEBUG:
-            return ["0"] * 20 
         
         return result
     
@@ -1254,6 +1253,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=1077)
     parser.add_argument("--c_id", type=int)
     parser.add_argument("--mix", type=int, default=0)
+    parser.add_argument("--debug", type=int, default=0)
     args = parser.parse_args()
 
     if args.mix == 0:
@@ -1271,6 +1271,8 @@ if __name__ == "__main__":
     if len(mix) != len(mix[0]):
         print("Probability table is not square! Terminating...")
         sys.exit()
+
+    DEBUG = args.debug
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
