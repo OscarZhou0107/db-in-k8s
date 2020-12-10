@@ -9,7 +9,7 @@ import multiprocessing
 
 DEBUG = 0
 
-def launch_client(cids, mix, pid, python, debug):
+def launch_client(cids, mix, pid, python, debug, mock_db):
     script = "client.py"
     if DEBUG:
         script = "test.py"
@@ -28,9 +28,9 @@ def launch_client(cids, mix, pid, python, debug):
             procs[subprocess.Popen([python, script, "--c_id", str(cid)])] = command
             #procs.add(subprocess.Popen(["python3", script]))
         else:
-            command = "{} {} --port {} --c_id {} --mix {} --debug {}".format(python, script, port, cid, mix, debug)
+            command = "{} {} --port {} --c_id {} --mix {} --debug {}".format(python, script, port, cid, mix, debug, mock_db)
             print(command)
-            procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug)]))] = command #, stderr=subprocess.PIPE))
+            procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug), "--mock_db", str(mock_db)]))] = command #, stderr=subprocess.PIPE))
 
     try:
         # p.poll() only gets return code
@@ -67,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--range", nargs='+', required=True)
     parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
     parser.add_argument("--debug", type=int, default=0)
+    parser.add_argument("--mock_db", type=int, default=0)
     args = parser.parse_args()
 
     mix = args.mix
@@ -78,7 +79,7 @@ if __name__ == "__main__":
     cids = list(range(int(cid_range[0]), int(cid_range[1])))
     pid = os.getpid()
     # put launch_client into a separate process
-    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, args.debug))
+    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, args.debug, args.mock_db))
     p.start()
 
     start_time = time.time()
