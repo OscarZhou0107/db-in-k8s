@@ -1,15 +1,19 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
 use crate::core::*;
+use crate::util::config::DbProxyConfig;
+use crate::util::executor::Executor;
+use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use futures::prelude::*;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::NoTls;
-use tracing::{debug, field, info, instrument, Span, trace};
+use tracing::{debug, field, info, instrument, trace, Span};
 use uuid::Uuid;
 
 pub struct Dispatcher;
@@ -17,12 +21,12 @@ pub struct Dispatcher;
 impl Dispatcher {
     #[instrument(
         name = "dispatcher",
-        skip(pending_queue, responder_sender, config, version, transactions)
+        skip(pending_queue, responder_sender, conf, version, transactions)
     )]
     pub async fn run(
         pending_queue: Arc<Mutex<PendingQueue>>,
         responder_sender: mpsc::Sender<QueryResult>,
-        config: tokio_postgres::Config,
+        conf: DbProxyConfig,
         version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
@@ -35,7 +39,10 @@ impl Dispatcher {
 
         let pool = Pool::builder()
             .max_size(postgres_pool_size)
-            .build(PostgresConnectionManager::new(config, NoTls))
+            .build(PostgresConnectionManager::new(
+                tokio_postgres::Config::from_str(&conf.sql_conf).unwrap(),
+                NoTls,
+            ))
             .await
             .unwrap();
 
@@ -53,13 +60,15 @@ impl Dispatcher {
                 .await;
             debug!("Operation batch size is {}", operations.len());
             trace!("Ready tasks are {:?}", operations);
-            
 
             // DEBUG. PANIC WHEN POTENTIAL BLOCKING
             if operations.is_empty() {
                 empty_spinning_count += 1;
                 if empty_spinning_count >= 100 {
-                    info!("I died with this pending queue : {:?}", pending_queue.lock().await.queue);
+                    info!(
+                        "I died with this pending queue : {:?}",
+                        pending_queue.lock().await.queue
+                    );
                     panic!("Probably blocked due to version conflicts");
                 }
             } else {
@@ -83,17 +92,38 @@ impl Dispatcher {
                                 // upcoming requests can go to the transaction via tx
                                 debug!("Opening a new transaction for ({})", transaction_uuid);
 
-                                let (transaction_tx, transaction_rx) = mpsc::channel(transaction_channel_queue_size);
-
                                 // A task represents an ongoing transaction, probably just leaves it hanging around.
                                 // listens on the rx for upcoming requests
-                                let transaction_executor = TransactionExecutor::new(
-                                    transaction_uuid.clone(),
-                                    op.identifier.to_client_meta(),
-                                    transaction_rx,
-                                    pool_cloned,
-                                    responder_sender_cloned,
-                                );
+                                // let (transaction_tx, transaction_executor) = TransactionExecutor::new(
+                                //     transaction_uuid.clone(),
+                                //     op.identifier.to_client_meta(),
+                                //     transaction_channel_queue_size,
+                                //     pool_cloned,
+                                //     responder_sender_cloned,
+                                // );
+                                let mock_transaction_executioner = true;
+                                let (transaction_tx, transaction_executor): (
+                                    mpsc::Sender<QueueMessage>,
+                                    Box<dyn Executor>,
+                                ) = if mock_transaction_executioner {
+                                    let (transaction_tx, transaction_executor) = MockTransactionExecutor::new(
+                                        transaction_uuid.clone(),
+                                        op.identifier.to_client_meta(),
+                                        transaction_channel_queue_size,
+                                        responder_sender_cloned,
+                                    );
+                                    (transaction_tx, Box::new(transaction_executor))
+                                } else {
+                                    let (transaction_tx, transaction_executor) = TransactionExecutor::new(
+                                        transaction_uuid.clone(),
+                                        op.identifier.to_client_meta(),
+                                        transaction_channel_queue_size,
+                                        pool_cloned,
+                                        responder_sender_cloned,
+                                    );
+                                    (transaction_tx, Box::new(transaction_executor))
+                                };
+
                                 let transactions = transactions_cloned.clone();
                                 tokio::spawn(async move {
                                     transaction_executor.run().await;
@@ -139,21 +169,29 @@ impl TransactionExecutor {
     pub fn new(
         transaction_uuid: Uuid,
         client_meta: ClientMeta,
-        transaction_listener: mpsc::Receiver<QueueMessage>,
+        transaction_channel_queue_size: usize,
         pool: Pool<PostgresConnectionManager<NoTls>>,
         responder_sender: mpsc::Sender<QueryResult>,
-    ) -> Self {
-        Self {
-            transaction_uuid,
-            client_meta,
-            transaction_listener,
-            pool,
-            responder_sender,
-        }
-    }
+    ) -> (mpsc::Sender<QueueMessage>, Self) {
+        let (transaction_tx, transaction_listener) = mpsc::channel(transaction_channel_queue_size);
 
+        (
+            transaction_tx,
+            Self {
+                transaction_uuid,
+                client_meta,
+                transaction_listener,
+                pool,
+                responder_sender,
+            },
+        )
+    }
+}
+
+#[async_trait]
+impl Executor for TransactionExecutor {
     #[instrument(name = "trans_exec", skip(self), fields(message=field::Empty))]
-    pub async fn run(mut self) {
+    pub async fn run(mut self: Box<Self>) {
         Span::current().record("message", &&self.client_meta.to_string()[..]);
         let mut conn = self.pool.get().await.unwrap();
         info!("Deploying {}", self.transaction_uuid);
@@ -196,6 +234,83 @@ impl TransactionExecutor {
             total_sql_cmd += 1;
 
             if transc.is_none() {
+                break;
+            }
+        }
+
+        let ending = if is_ended_by_rollback { "ROLLBACK" } else { "Commit" };
+        info!(
+            "Finishing {} after executing {} commands. {}",
+            self.transaction_uuid, total_sql_cmd, ending
+        );
+    }
+}
+
+struct MockTransactionExecutor {
+    transaction_uuid: Uuid,
+    client_meta: ClientMeta,
+    transaction_listener: mpsc::Receiver<QueueMessage>,
+    responder_sender: mpsc::Sender<QueryResult>,
+}
+
+impl MockTransactionExecutor {
+    pub fn new(
+        transaction_uuid: Uuid,
+        client_meta: ClientMeta,
+        transaction_channel_queue_size: usize,
+        responder_sender: mpsc::Sender<QueryResult>,
+    ) -> (mpsc::Sender<QueueMessage>, Self) {
+        let (transaction_tx, transaction_listener) = mpsc::channel(transaction_channel_queue_size);
+
+        (
+            transaction_tx,
+            Self {
+                transaction_uuid,
+                client_meta,
+                transaction_listener,
+                responder_sender,
+            },
+        )
+    }
+}
+
+#[async_trait]
+impl Executor for MockTransactionExecutor {
+    #[instrument(name = "trans_exec", skip(self), fields(message=field::Empty))]
+    pub async fn run(mut self: Box<Self>) {
+        Span::current().record("message", &&self.client_meta.to_string()[..]);
+        info!("Deploying {}", self.transaction_uuid);
+        let mut total_sql_cmd: usize = 0;
+        total_sql_cmd += 1;
+
+        // Default is rollback
+        let mut is_finished = false;
+        let mut is_ended_by_rollback = true;
+        while let Some(operation) = self.transaction_listener.recv().await {
+            let raw = match operation.operation_type {
+                Task::READ => Ok(vec![]),
+                Task::WRITE => Ok(vec![]),
+                Task::COMMIT => {
+                    is_finished = true;
+                    is_ended_by_rollback = false;
+                    Ok(vec![])
+                }
+                Task::ABORT => {
+                    is_finished = true;
+                    Ok(vec![])
+                }
+                _ => panic!("Unexpected operation type"),
+            };
+
+            self.responder_sender
+                .send(operation.into_sqlresponse(raw))
+                .await
+                .map_err(|e| e.to_string())
+                .unwrap();
+
+            total_sql_cmd += 1;
+
+            if is_finished {
                 break;
             }
         }

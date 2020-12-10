@@ -8,17 +8,10 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-use tokio_postgres::Config;
 use tracing::info;
 
 pub async fn main(conf: DbProxyConfig) {
     info!("Starting dbproxy...");
-    let mut config = Config::new();
-    config.user(&conf.user);
-    config.password(conf.password);
-    config.host(&conf.host);
-    config.port(conf.port);
-    config.dbname(&conf.dbname);
 
     //Map that holds all ongoing transactions
     let transactions = Arc::new(Mutex::new(HashMap::new()));
@@ -33,7 +26,7 @@ pub async fn main(conf: DbProxyConfig) {
     let (responder_sender, responder_receiver): (mpsc::Sender<QueryResult>, mpsc::Receiver<QueryResult>) =
         mpsc::channel(100);
 
-    let listener = TcpListener::bind(conf.addr).await.unwrap();
+    let listener = TcpListener::bind(&conf.addr).await.unwrap();
     info!("Binding to tcp listener...");
     let (tcp_stream, _) = listener.accept().await.unwrap();
     info!("Connection established...");
@@ -43,7 +36,7 @@ pub async fn main(conf: DbProxyConfig) {
     let dispatcher_handle = tokio::spawn(Dispatcher::run(
         pending_queue.clone(),
         responder_sender,
-        config,
+        conf,
         version.clone(),
         transactions.clone(),
     ));
