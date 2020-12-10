@@ -13,17 +13,9 @@ addr = "127.0.0.1:9876"
 # This is for UG
 [[dbproxy]]
 addr = "127.0.0.1:8875"
-dbname = "tpcw"
-host = "34.70.104.125"
-password = "Abc@123"
-port = "5432"
-user = "postgres"
+sql_conf = "host=34.70.104.125 port=5432 dbname=tpcw user=postgres password=Abc@123"
 
 # This is for Isac
 [[dbproxy]]
 addr = "127.0.0.1:8876"
-dbname = "tpcw"
-host = "34.69.18.204"
-password = "Abc@123"
-port = "5432"
-user = "postgres"
+sql_conf = "host=34.69.18.204 port=5432 dbname=tpcw user=postgres password=Abc@123"

@@ -59,11 +59,7 @@ impl SequencerConfig {
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 pub struct DbProxyConfig {
     pub addr: String,
-    pub host: String,
-    pub port: u16,
-    pub user: String,
-    pub password: String,
-    pub dbname: String,
+    pub sql_conf: String,
 }
 
 impl DbProxyConfig {
@@ -101,19 +97,11 @@ mod tests_config {
                 dbproxy: vec![
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8876"),
-                        host: String::from("localhost"),
-                        port: 5432,
-                        user: String::from("postgres"),
-                        password: String::from("Abc@123"),
-                        dbname: String::from("Test"),
+                        sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()
                     },
                     DbProxyConfig {
                         addr: String::from("127.0.0.1:8876"),
-                        host: String::from("localhost"),
-                        port: 5432,
-                        user: String::from("postgres"),
-                        password: String::from("Abc@123"),
-                        dbname: String::from("Test"),
+                        sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()
                     }
                 ]
             }
