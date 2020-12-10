@@ -554,7 +554,7 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn pending_queue_task_order_test() {
-        let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
+        let dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         let mut queue = PendingQueue::new();
 
         let message4 = QueueMessage::new(
@@ -630,7 +630,7 @@ mod tests {
         queue.push(message3);
         queue.push(message4);
 
-        let ready_tasks = queue.get_all_version_ready_task(&mut dbversion).await;
+        let ready_tasks = queue.get_all_version_ready_task(dbversion).await;
 
         ready_tasks.iter().for_each(|task| {
             println!("{}", task.identifier);
@@ -643,7 +643,7 @@ mod tests {
 
     #[tokio::test]
     async fn pending_queue_task_order_test_2() {
-        let mut dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
+        let dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         let mut queue = PendingQueue::new();
 
         let message4 = QueueMessage::new(
@@ -719,7 +719,7 @@ mod tests {
         queue.push(message3);
         queue.push(message4);
 
-        let ready_tasks = queue.get_all_version_ready_task(&mut dbversion).await;
+        let ready_tasks = queue.get_all_version_ready_task(dbversion).await;
 
         ready_tasks.iter().for_each(|task| {
             println!("{}", task.identifier);
