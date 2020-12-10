@@ -66,8 +66,8 @@ if __name__ == "__main__":
     parser.add_argument("--mix", type=int, required=True)
     parser.add_argument("--range", nargs='+', required=True)
     parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
-    parser.add_argument("--debug", type=int, default=0)
-    parser.add_argument("--mock_db", type=int, default=0)
+    parser.add_argument("--debug", action='store_true')
+    parser.add_argument("--mock_db", action='store_true')
     args = parser.parse_args()
 
     mix = args.mix
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     cids = list(range(int(cid_range[0]), int(cid_range[1])))
     pid = os.getpid()
     # put launch_client into a separate process
-    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, args.debug, args.mock_db))
+    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, int(args.debug), int(args.mock_db)))
     p.start()
 
     start_time = time.time()
