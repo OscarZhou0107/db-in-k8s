@@ -23,7 +23,7 @@ impl Dispatcher {
         pending_queue: Arc<Mutex<PendingQueue>>,
         responder_sender: mpsc::Sender<QueryResult>,
         config: tokio_postgres::Config,
-        mut version: Arc<Mutex<DbVersion>>,
+        version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) {
         let postgres_pool_size = 80;
@@ -49,7 +49,7 @@ impl Dispatcher {
             let operations = pending_queue
                 .lock()
                 .await
-                .get_all_version_ready_task(&mut version)
+                .get_all_version_ready_task(version.clone())
                 .await;
             debug!("Operation batch size is {}", operations.len());
             trace!("Ready tasks are {:?}", operations);

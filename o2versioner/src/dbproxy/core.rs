@@ -8,12 +8,12 @@ use bb8_postgres::PostgresConnectionManager;
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use std::{sync::Arc, collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::{Config, NoTls, SimpleQueryMessage};
 use tracing::debug;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct PostgresSqlConnPool {
@@ -56,6 +56,7 @@ impl QueueMessage {
                 match op.tableops().access_pattern() {
                     crate::core::AccessPattern::ReadOnly => {
                         operation_type = Task::READ;
+                        assert!(!op.has_early_release());
                     }
                     crate::core::AccessPattern::WriteOnly => {
                         operation_type = Task::WRITE;
@@ -145,7 +146,7 @@ impl PendingQueue {
         self.notify.clone()
     }
 
-    pub async fn get_all_version_ready_task(&mut self, version: &mut Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
+    pub async fn get_all_version_ready_task(&mut self, version: Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
         let partitioned_queue: Vec<_> = stream::iter(self.queue.clone())
             .then(move |op| {
                 let version = version.clone();
@@ -195,7 +196,7 @@ impl DbVersion {
         Self {
             db_version: db_versions,
             notify: Arc::new(Notify::new()),
-            next_op_in_transactions : HashMap::new(),
+            next_op_in_transactions: HashMap::new(),
         }
     }
 
@@ -208,7 +209,6 @@ impl DbVersion {
         self.db_version.release_version(release_request);
         debug!("Versions after release: {:?}", self.db_version);
         self.notify.notify_one();
-       
     }
 
     pub fn violate_version(&self, txtablevns: &[TxTableVN]) -> bool {
