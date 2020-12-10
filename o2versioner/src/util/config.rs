@@ -3,10 +3,21 @@ use serde::Deserialize;
 use std::net::SocketAddr;
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub scheduler: SchedulerConfig,
     pub sequencer: SequencerConfig,
     pub dbproxy: Vec<DbProxyConfig>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            scheduler: Default::default(),
+            sequencer: Default::default(),
+            dbproxy: Vec::new(),
+        }
+    }
 }
 
 impl Config {
@@ -22,19 +33,31 @@ impl Config {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[serde(default)]
 pub struct SchedulerConfig {
     pub addr: String,
-    #[serde(default)]
     pub admin_addr: Option<String>,
-    #[serde(default)]
     pub max_connection: Option<u32>,
     pub sequencer_pool_size: u32,
     pub dispatcher_queue_size: usize,
     pub transceiver_queue_size: usize,
-    #[serde(default)]
     pub performance_logging: Option<String>,
-    #[serde(default)]
     pub disable_early_release: bool,
+}
+
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            addr: String::new(),
+            admin_addr: None,
+            max_connection: None,
+            sequencer_pool_size: 10,
+            dispatcher_queue_size: 500,
+            transceiver_queue_size: 500,
+            performance_logging: None,
+            disable_early_release: false,
+        }
+    }
 }
 
 impl SchedulerConfig {
@@ -44,10 +67,19 @@ impl SchedulerConfig {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[serde(default)]
 pub struct SequencerConfig {
     pub addr: String,
-    #[serde(default)]
     pub max_connection: Option<u32>,
+}
+
+impl Default for SequencerConfig {
+    fn default() -> Self {
+        Self {
+            addr: String::new(),
+            max_connection: None,
+        }
+    }
 }
 
 impl SequencerConfig {
