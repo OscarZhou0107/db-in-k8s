@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::NoTls;
-use tracing::{debug, field, info, instrument, Span};
+use tracing::{debug, field, info, instrument, Span, trace};
 use uuid::Uuid;
 
 pub struct Dispatcher;
@@ -52,11 +52,14 @@ impl Dispatcher {
                 .get_all_version_ready_task(&mut version)
                 .await;
             debug!("Operation batch size is {}", operations.len());
+            trace!("Ready tasks are {:?}", operations);
+            
 
             // DEBUG. PANIC WHEN POTENTIAL BLOCKING
             if operations.is_empty() {
                 empty_spinning_count += 1;
                 if empty_spinning_count >= 100 {
+                    info!("I died with this pending queue : {:?}", pending_queue.lock().await.queue);
                     panic!("Probably blocked due to version conflicts");
                 }
             } else {

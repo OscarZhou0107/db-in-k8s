@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
-use tracing::{debug, info};
+use tracing::{Instrument, Span, debug, field, info, info_span};
 
 pub struct Receiver {}
 
@@ -22,17 +22,28 @@ impl Receiver {
 
         while let Some(msg) = deserializer.try_next().await.unwrap() {
             debug!("Receiver received a new request from scheduler");
-            match msg {
-                Message::MsqlRequest(meta, request, versions) => {
-                    debug!("Responder: {:?}", versions.clone());
 
-                    pending_queue
-                        .lock()
-                        .await
-                        .push(QueueMessage::new(meta, request, versions));
+            async {
+               
+                match msg {
+                    Message::MsqlRequest(meta, request, versions) => {
+                        Span::current().record("message", &&meta.to_string()[..]);
+                        Span::current().record("type", &request.as_ref());
+                        debug!("Txvn: {:?}", versions.clone());
+                        debug!("Request content is: {:?}", request.clone());
+    
+                        pending_queue
+                            .lock()
+                            .await
+                            .push(QueueMessage::new(meta, request, versions));
+                    }
+                    _ => debug!("nope"),
                 }
-                _ => debug!("nope"),
             }
+            .instrument(info_span!("receiver", message = field::Empty, "type" = field::Empty))
+            .await;
+
+       
         }
         debug!("Receiver finished its jobs");
     }
