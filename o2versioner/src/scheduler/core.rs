@@ -1,9 +1,8 @@
 use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
-use crate::util::common::create_zip_csv_writer;
+use crate::util::common::{create_zip_csv_writer, prepare_logging_dir};
 use crate::util::config::*;
-use chrono::Utc;
 use futures::prelude::*;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -68,16 +67,10 @@ impl State {
     pub async fn dump_perf_log(&self) -> Option<String> {
         if let Some(perf_log_path) = self.conf.scheduler.performance_logging.as_ref() {
             // Prepare the logging directory
-            let mut path_builder = PathBuf::from(perf_log_path);
-            let log_dir_name = Utc::now().format("%y%m%d_%H%M%S").to_string();
-
-            path_builder.push(log_dir_name);
-            let cur_log_dir = path_builder.as_path();
-            info!("Preparing {} for performance logging", cur_log_dir.display());
-            tokio::fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
+            let cur_log_dir = prepare_logging_dir(perf_log_path).await;
 
             // Performance logging
-            let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
+            let mut perf_csv_path_builder = PathBuf::from(&cur_log_dir);
             perf_csv_path_builder.push("perf.csv.gz");
             let perf_csv_path = perf_csv_path_builder.as_path();
             let mut wrt = create_zip_csv_writer(perf_csv_path).unwrap();
@@ -90,7 +83,7 @@ impl State {
             info!("Dumped performance logging to {}", perf_csv_path.display());
 
             // Dbvn logging
-            let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
+            let mut dbproxy_stats_path_builder = PathBuf::from(&cur_log_dir);
             dbproxy_stats_path_builder.push("dbproxy_stats.csv.gz");
             let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
             let mut wrt = create_zip_csv_writer(dbproxy_stats_csv_path).unwrap();
