@@ -233,7 +233,7 @@ def print_perfdb_success_ratio_stats(perfdb):
 
 
 def init(parser):
-    parser.add_argument('--log_dir', type=str, required=True, help='log file directory for single run')
+    parser.add_argument('log_dir', type=str, help='log file directory for single run')
 
 
 def main(args):
