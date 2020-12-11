@@ -5,11 +5,11 @@ use crate::core::{Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
 use bb8_postgres::bb8::{Pool, PooledConnection};
 use bb8_postgres::PostgresConnectionManager;
+use chrono::{DateTime, Utc};
 use csv::Writer;
 use futures::prelude::*;
-//use itertools::Itertools;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
@@ -151,17 +151,14 @@ impl PendingQueue {
     }
 
     pub async fn get_all_version_ready_task(&mut self, version: Arc<Mutex<DbVersion>>) -> Vec<QueueMessage> {
-        let partitioned_queue: Vec<_> = stream::iter(
-            self.queue
-                // .iter()
-                // .unique_by(|q| q.versions.as_ref().unwrap().uuid().clone())
-                .clone(),
-        )
-        .then(move |op| {
-            let version = version.clone();
-            async move {
-                let violate_version = if let Some(txvn) = &op.versions {
-                    match &op.msql {
+        let mut ready_queue = Vec::new();
+        let mut unready_queue = Vec::new();
+        let mut tx_set = HashSet::new();
+        for operation in self.queue.drain(..) {
+            let uuid = operation.versions.as_ref().unwrap().uuid().clone();
+            if tx_set.insert(uuid) {
+                let violate_version = if let Some(txvn) = &operation.versions {
+                    match &operation.msql {
                         Msql::Query(query) => {
                             version
                                 .lock()
@@ -181,16 +178,19 @@ impl PendingQueue {
                     false
                 };
 
-                (op.clone(), violate_version)
+                if violate_version {
+                    unready_queue.push(operation);
+                } else {
+                    ready_queue.push(operation);
+                }
+            } else {
+                unready_queue.push(operation);
             }
-        })
-        .collect()
-        .await;
-        let (unready_ops, ready_ops): (Vec<_>, Vec<_>) =
-            partitioned_queue.into_iter().partition(|(_, violate)| *violate);
-        self.queue = unready_ops.into_iter().map(|(op, _)| op).collect();
+        }
 
-        ready_ops.into_iter().map(|(op, _)| op).collect()
+        self.queue = unready_queue;
+
+        ready_queue
     }
 }
 
