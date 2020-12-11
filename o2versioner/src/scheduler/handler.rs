@@ -25,7 +25,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 use unicase::UniCase;
 
-/// Main entrance for the Scheduler from appserver
+/// Main entrance for the Scheduler
 ///
 /// Three flavors:
 /// 1. Unlimited, the server will keep running forever.
