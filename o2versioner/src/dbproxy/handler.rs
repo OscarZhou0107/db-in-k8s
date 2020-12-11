@@ -3,6 +3,7 @@ use super::dispatcher::Dispatcher;
 use super::receiver::Receiver;
 use super::responder::Responder;
 use crate::util::config::DbProxyConfig;
+use crate::util::executor::Executor;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -33,13 +34,14 @@ pub async fn main(conf: DbProxyConfig) {
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
     info!("Starting Dispatcher...");
-    let dispatcher_handle = tokio::spawn(Dispatcher::run(
+    let dispatcher = Dispatcher::new(
         pending_queue.clone(),
         responder_sender,
         conf,
         version.clone(),
         transactions.clone(),
-    ));
+    );
+    let dispatcher_handle = tokio::spawn(Box::new(dispatcher).run());
 
     info!("Starting Responder...");
     let responder_handle = tokio::spawn(Responder::run(responder_receiver, version, tcp_write));

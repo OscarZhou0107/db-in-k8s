@@ -16,28 +16,53 @@ use tokio_postgres::NoTls;
 use tracing::{debug, field, info, instrument, trace, Span};
 use uuid::Uuid;
 
-pub struct Dispatcher;
+pub struct Dispatcher {
+    pending_queue: Arc<Mutex<PendingQueue>>,
+    responder_sender: mpsc::Sender<QueryResult>,
+    conf: DbProxyConfig,
+    version: Arc<Mutex<DbVersion>>,
+    transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
+}
 
 impl Dispatcher {
-    #[instrument(
-        name = "dispatcher",
-        skip(pending_queue, responder_sender, conf, version, transactions)
-    )]
-    pub async fn run(
+    pub fn new(
         pending_queue: Arc<Mutex<PendingQueue>>,
         responder_sender: mpsc::Sender<QueryResult>,
         conf: DbProxyConfig,
         version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
-    ) {
+    ) -> Self {
+        Self {
+            pending_queue,
+            responder_sender,
+            conf,
+            version,
+            transactions,
+        }
+    }
+
+    async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>, version_notify: &mut Arc<Notify>) {
+        let n1 = new_task_notify.notified();
+        let n2 = version_notify.notified();
+        tokio::select! {
+           _ = n1 => {debug!("new_task_notify")}
+           _ = n2 => {debug!("version_notify")}
+        };
+    }
+}
+
+#[async_trait]
+impl Executor for Dispatcher {
+    #[instrument(name = "dispatcher", skip(self))]
+    async fn run(mut self: Box<Self>) {
         let postgres_pool_size = 80;
         let transaction_channel_queue_size = 100;
         info!("Dispatcher Started");
 
-        let mut task_notify = pending_queue.lock().await.get_notify();
-        let mut version_notify = version.lock().await.get_notify();
+        let mut task_notify = self.pending_queue.lock().await.get_notify();
+        let mut version_notify = self.version.lock().await.get_notify();
 
-        let pool_opt = if let Some(sql_conf) = &conf.sql_conf {
+        let pool_opt = if let Some(sql_conf) = &self.conf.sql_conf {
             info!("Connecting to db with: {}", sql_conf);
             Some(
                 Pool::builder()
@@ -60,14 +85,15 @@ impl Dispatcher {
                 Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
                 debug!("Dispatcher get a notification");
-                debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
-                debug!("Current Db Version is: {:?}", version.lock().await.db_version);
+                debug!("Pending queue size is {}", self.pending_queue.lock().await.queue.len());
+                debug!("Current Db Version is: {:?}", self.version.lock().await.db_version);
             }
 
-            let operations = pending_queue
+            let operations = self
+                .pending_queue
                 .lock()
                 .await
-                .get_all_version_ready_task(version.clone())
+                .get_all_version_ready_task(self.version.clone())
                 .await;
             previously_has_operation = !operations.is_empty();
             debug!("Operation batch size is {}", operations.len());
@@ -76,8 +102,8 @@ impl Dispatcher {
             stream::iter(operations.clone())
                 .for_each(|op| {
                     let pool_opt_cloned = pool_opt.clone();
-                    let responder_sender_cloned = responder_sender.clone();
-                    let transactions_cloned = transactions.clone();
+                    let responder_sender_cloned = self.responder_sender.clone();
+                    let transactions_cloned = self.transactions.clone();
 
                     async move {
                         let transaction_uuid = op.versions.as_ref().unwrap().uuid().clone();
@@ -131,15 +157,6 @@ impl Dispatcher {
                 })
                 .await;
         }
-    }
-
-    async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>, version_notify: &mut Arc<Notify>) {
-        let n1 = new_task_notify.notified();
-        let n2 = version_notify.notified();
-        tokio::select! {
-           _ = n1 => {debug!("new_task_notify")}
-           _ = n2 => {debug!("version_notify")}
-        };
     }
 }
 
