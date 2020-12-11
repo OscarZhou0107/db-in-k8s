@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// The input bytes stream should be encoded in such a way like,
 /// where the first part (unsigned 4 bytes) denotes the length of data in big endian.
-/// ```
+/// ```text
 /// // +---- len: u32 ----+---- data ----+
 /// // | \x00\x00\x00\x0b |  hello world |
 /// // +------------------+--------------+
