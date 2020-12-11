@@ -1,19 +1,16 @@
 use crate::comm::MsqlResponse;
-use crate::core::DbVN;
-use crate::core::{DbVNReleaseRequest, EarlyReleaseTables, TxTableVN};
-use crate::core::{Msql, MsqlEndTxMode, RequestMeta, TxVN};
+use crate::core::*;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::SimpleQueryMessage;
 use tracing::debug;
-use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct QueueMessage {
@@ -22,46 +19,25 @@ pub struct QueueMessage {
     pub operation_type: Task,
     pub msql: Msql,
     pub versions: Option<TxVN>,
-    pub early_release: Option<EarlyReleaseTables>,
 }
 
 impl QueueMessage {
     pub fn new(identifier: RequestMeta, msql: Msql, versions: Option<TxVN>) -> Self {
-        let operation_type;
-        let mut early_release = None;
-
-        match &msql {
-            Msql::BeginTx(_) => {
-                operation_type = Task::BEGIN;
-            }
-
-            Msql::Query(op) => {
-                match op.tableops().access_pattern() {
-                    crate::core::AccessPattern::ReadOnly => {
-                        operation_type = Task::READ;
-                        assert!(!op.has_early_release());
-                    }
-                    crate::core::AccessPattern::WriteOnly => {
-                        operation_type = Task::WRITE;
-                    }
-                    _ => {
-                        panic!("Illegal access pattern");
-                    }
+        let operation_type = match &msql {
+            Msql::BeginTx(_) => Task::BEGIN,
+            Msql::Query(op) => match op.tableops().access_pattern() {
+                AccessPattern::ReadOnly => {
+                    assert!(!op.has_early_release());
+                    Task::READ
                 }
-                if op.has_early_release() {
-                    early_release = Some(op.early_release_tables().clone());
-                }
-            }
-
-            Msql::EndTx(op) => match op.mode() {
-                MsqlEndTxMode::Commit => {
-                    operation_type = Task::COMMIT;
-                }
-                MsqlEndTxMode::Rollback => {
-                    operation_type = Task::ABORT;
-                }
+                AccessPattern::WriteOnly => Task::WRITE,
+                _ => panic!("Illegal access pattern"),
             },
-        }
+            Msql::EndTx(op) => match op.mode() {
+                MsqlEndTxMode::Commit => Task::COMMIT,
+                MsqlEndTxMode::Rollback => Task::ABORT,
+            },
+        };
 
         Self {
             arriving_timestamp: Utc::now(),
@@ -69,7 +45,6 @@ impl QueueMessage {
             operation_type,
             msql,
             versions,
-            early_release,
         }
     }
 
@@ -102,7 +77,13 @@ impl QueueMessage {
             result_type,
             succeed,
             contained_newer_versions: self.versions.unwrap(),
-            contained_early_release_version: self.early_release,
+            contained_early_release_version: self.msql.try_get_query().ok().and_then(|q| {
+                if q.has_early_release() {
+                    Some(q.early_release_tables().clone())
+                } else {
+                    None
+                }
+            }),
         }
     }
 }
@@ -176,7 +157,6 @@ impl PendingQueue {
 
 pub struct DbVersion {
     pub db_version: DbVN,
-    pub next_op_in_transactions: HashMap<Uuid, usize>,
     notify: Arc<Notify>,
 }
 
@@ -185,7 +165,6 @@ impl DbVersion {
         Self {
             db_version: db_versions,
             notify: Arc::new(Notify::new()),
-            next_op_in_transactions: HashMap::new(),
         }
     }
 
@@ -452,7 +431,6 @@ pub enum Task {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::*;
     use bb8::Pool;
     use bb8_postgres::PostgresConnectionManager;
     use tokio_postgres::NoTls;
