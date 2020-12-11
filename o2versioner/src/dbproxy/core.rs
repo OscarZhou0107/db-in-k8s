@@ -8,6 +8,7 @@ use bb8_postgres::PostgresConnectionManager;
 use csv::Writer;
 use futures::prelude::*;
 //use itertools::Itertools;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
@@ -36,6 +37,7 @@ impl PostgresSqlConnPool {
 
 #[derive(Debug, Clone)]
 pub struct QueueMessage {
+    pub arriving_timestamp: DateTime<Utc>,
     pub identifier: RequestMeta,
     pub operation_type: Task,
     pub msql: Msql,
@@ -82,6 +84,7 @@ impl QueueMessage {
         }
 
         Self {
+            arriving_timestamp: Utc::now(),
             identifier,
             operation_type,
             msql,
