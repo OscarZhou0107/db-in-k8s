@@ -651,6 +651,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn pending_queue_task_order_test_2() {
         let dbversion = Arc::new(Mutex::new(DbVersion::new(Default::default())));
         let mut queue = PendingQueue::new();
