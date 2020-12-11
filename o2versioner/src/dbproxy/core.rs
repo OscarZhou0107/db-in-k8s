@@ -3,8 +3,6 @@ use crate::core::DbVN;
 use crate::core::{DbVNReleaseRequest, EarlyReleaseTables, TxTableVN};
 use crate::core::{Msql, MsqlEndTxMode, RequestMeta, TxVN};
 use async_trait::async_trait;
-use bb8_postgres::bb8::{Pool, PooledConnection};
-use bb8_postgres::PostgresConnectionManager;
 use chrono::{DateTime, Utc};
 use csv::Writer;
 use futures::prelude::*;
@@ -13,27 +11,9 @@ use std::collections::HashSet;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
-use tokio_postgres::{Config, NoTls, SimpleQueryMessage};
+use tokio_postgres::SimpleQueryMessage;
 use tracing::debug;
 use uuid::Uuid;
-
-#[derive(Clone)]
-pub struct PostgresSqlConnPool {
-    pool: Pool<PostgresConnectionManager<NoTls>>,
-}
-
-impl PostgresSqlConnPool {
-    pub async fn new(url: Config, max_conn: u32) -> Self {
-        let manager = PostgresConnectionManager::new(url, NoTls);
-        let pool = Pool::builder().max_size(max_conn).build(manager).await.unwrap();
-
-        Self { pool: pool }
-    }
-
-    pub async fn get_conn(&self) -> PooledConnection<'_, PostgresConnectionManager<NoTls>> {
-        self.pool.get().await.unwrap()
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct QueueMessage {
@@ -473,6 +453,9 @@ pub enum Task {
 mod tests {
     use super::*;
     use crate::core::*;
+    use bb8::Pool;
+    use bb8_postgres::PostgresConnectionManager;
+    use tokio_postgres::NoTls;
 
     #[test]
     #[ignore]
