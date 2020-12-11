@@ -1,11 +1,11 @@
 import argparse
 import csv
-import itertools
-import os
-from datetime import datetime, timedelta
-import statistics
-import math
 import gzip
+import itertools
+import math
+import os
+import statistics
+from datetime import datetime, timedelta
 
 try:
     from dateutil import parser as dateutil_parser
@@ -13,8 +13,39 @@ except:
     print('Error:', 'pip install python-dateutil')
 
 
+__help__ = 'Parsing for a single run'
+
+
 def geomean(data):
     return math.exp(math.fsum(math.log(x) for x in data) / len(data))
+
+
+def construct_filter(request_type, request_result):
+    def request_filter(row):
+        if request_type is None:
+            if request_result is None:
+                None
+            else:
+                return row['request_result'] == request_result
+        else:
+            if request_result is None:
+                return row['request_type'] == request_type
+            else:
+                return row['request_result'] == request_result and row['request_type'] == request_type
+    return request_filter
+
+
+def get_request_type_list():
+    return ['BeginTx', 'Commit', 'Rollback', 'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease', 'SingleReadOnly', 'SingleWriteOnly', None]
+
+
+def get_request_result_list():
+    return ['Ok', 'Err', None]
+
+
+def successful_request_filter(row):
+    return row['request_result'] == 'Ok'
+
 
 class DBRow(dict):
     def __init___(self, row):
@@ -57,8 +88,6 @@ class DB(list):
         for row in self:
             DBRow(row).pretty_print_row()
 
-def successful_request_filter(row):
-    return row['request_result'] == 'Ok'
 
 class PerfDB(DB):
     def __init__(self, perf_csv_path=None, data=None):
@@ -173,26 +202,34 @@ class DbproxyStatsDB(DB):
             print('Info:', *row.values())
 
 
+def print_perfdb_latency_stats(perfdb):
+    '''
+    Expecting an unfiltered perfdb
+    '''
+    # For each request    
+    print('Info:', 'Request Latency Stats - Sec / Request')
+    for request_type in get_request_type_list():
+        for request_result in get_request_result_list():
+            res = perfdb.get_latency_stats(filter_func=construct_filter(request_type, request_result))
+            if res is not None:
+                mean, stddev, geomean, median = res
+
+                request_type = 'All' if request_type is None else request_type
+                request_result = 'All' if request_result is None else request_result
+                print('Info:', '{:<27} {:<6} [Mean: {:>4.2f}] [SD: {:>4.2f}] [Geomean: {:>4.2f}] [Median: {:>4.2f}]'.format(request_type, request_result, mean, stddev, geomean, median))
+
+
 def print_perfdb_success_ratio_stats(perfdb):
     '''
     Expecting an unfiltered perfdb
     '''
-    # For each request
-    request_type_list = ['BeginTx', 'Commit', 'Rollback', 'ReadOnly', 'WriteOnly', 'ReadOnlyEarlyRelease', 'WriteOnlyEarlyRelease', 'SingleReadOnly', 'SingleWriteOnly', None]
-    
-    def construct_filter(request_type, request_result):
-        def request_filter(row):
-            if request_type is None:
-                return row['request_result'] == request_result
-            else:
-                return row['request_result'] == request_result and row['request_type'] == request_type
-        return request_filter
-
+    # For each request    
     print('Info:', 'Request Result Stats')
-    for request_type in request_type_list:
+    for request_type in get_request_type_list():
         num_ok = len(perfdb.get_filtered(filter_func=construct_filter(request_type, 'Ok')))
         num_err = len(perfdb.get_filtered(filter_func=construct_filter(request_type, 'Err')))
-        print('Info:', '{:<27} {:>7} Ok {:>7} Err {:>7.2f} Ratio'.format(str(request_type), num_ok, num_err, num_ok/(num_err+num_ok) if num_ok+num_err > 0 else 1))
+        request_type = 'All' if request_type is None else request_type
+        print('Info:', '{:<27} {:>7} Ok {:>7} Err {:>9.2f} %'.format(request_type, num_ok, num_err, (num_ok/(num_err+num_ok) if num_ok+num_err > 0 else 1) * 100.0))
 
 
 def init(parser):
@@ -213,20 +250,22 @@ def main(args):
     # sr_throughput.print_detailed_trajectory()
     # sr_throughput.print_trajectory()
     print('Info:')
-    print('Info:', 'Successful Request Throughput:', len(sr_perfdb))
-
+    print('Info:', 'Successful Request:', len(sr_perfdb))
     print('Info:')
-    print('Info:', 'Throughput')
+    print('Info:', 'Throughput - Request Completed / Sec')
     print('Info:', '(peak, mean, stddev, geomean, median)')
     print('Info:', sr_throughput.get_stats())
     print('Info:')
-    print('Info:', 'Latency')
+    print('Info:', 'Latency - Sec / Request')
     print('Info:', '(mean, stddev, geomean, median)')
     print('Info:', sr_perfdb.get_latency_stats())
 
     print('Info:')
     print('Info:', 'num_clients', sr_perfdb.get_num_clients())
     print('Info:', 'num_dbproxy_db', dbproxy_stats_db.get_num_dbproxy())
+
+    print('Info:')
+    print_perfdb_latency_stats(perfdb)
 
     print('Info:')
     print_perfdb_success_ratio_stats(perfdb)

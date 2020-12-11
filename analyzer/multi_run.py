@@ -1,15 +1,19 @@
 import argparse
+import datetime
+import multiprocessing
 import os
 import time
-import multiprocessing
-import single_run
-import datetime
 from collections import defaultdict
+
+from analyzer import single_run
 
 try:
     import matplotlib.pyplot as plt
 except:
     print('Error:', 'pip install matplotlib')
+
+
+__help__ = 'Parsing for multi run'
 
 
 def float_fmt(num):
