@@ -7,6 +7,7 @@ use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
 use crate::util::config::*;
+use crate::util::executor::Executor;
 use crate::util::tcp;
 use bb8::Pool;
 use futures::prelude::*;
@@ -70,12 +71,12 @@ pub async fn main(conf: Config) {
     // Launch transceiver as a new task
     let transceiver_handle = tokio::spawn(
         stream::iter(transceivers)
-            .for_each_concurrent(None, |transceiver| transceiver.run())
+            .for_each_concurrent(None, |transceiver| Box::new(transceiver).run())
             .in_current_span(),
     );
 
     // Launch dispatcher as a new task
-    let dispatcher_handle = tokio::spawn(dispatcher.run().in_current_span());
+    let dispatcher_handle = tokio::spawn(Box::new(dispatcher).run().in_current_span());
 
     // Create a stop_signal channel if admin mode is turned on
     let (stop_tx, stop_rx) = if conf.scheduler.admin_addr.is_some() {

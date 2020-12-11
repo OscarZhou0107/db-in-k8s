@@ -3,7 +3,9 @@ use super::transceiver::*;
 use crate::comm::scheduler_dbproxy::*;
 use crate::comm::MsqlResponse;
 use crate::core::*;
+use crate::util::executor::Executor;
 use crate::util::executor_addr::*;
+use async_trait::async_trait;
 use futures::prelude::*;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -310,13 +312,16 @@ impl Dispatcher {
         let (addr, request_rx) = DispatcherAddr::new(queue_size);
         (addr, Dispatcher { state, request_rx })
     }
+}
 
+#[async_trait]
+impl Executor for Dispatcher {
     #[instrument(name="dispatch", skip(self), fields(dbvn=field::Empty))]
-    pub async fn run(self) {
+    async fn run(mut self: Box<Self>) {
         let num_dbvn_manager = self.state.dbvn_manager.read().await.inner().len();
         Span::current().record("dbvn", &num_dbvn_manager);
 
-        let Dispatcher { state, request_rx } = self;
+        let Self { state, request_rx } = *self;
 
         // Handle each DispatcherRequest concurrently
         request_rx

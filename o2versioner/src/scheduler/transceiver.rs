@@ -1,5 +1,7 @@
 use crate::comm::scheduler_dbproxy::*;
+use crate::util::executor::Executor;
 use crate::util::executor_addr::*;
+use async_trait::async_trait;
 use futures::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -47,15 +49,18 @@ impl Transceiver {
             },
         )
     }
+}
 
+#[async_trait]
+impl Executor for Transceiver {
     #[instrument(name="transceive", skip(self), fields(message=field::Empty))]
-    pub async fn run(self) {
+    async fn run(mut self: Box<Self>) {
         Span::current().record("message", &&self.dbproxy_addr.to_string()[..]);
 
         let Transceiver {
             dbproxy_addr,
             mut request_rx,
-        } = self;
+        } = *self;
 
         let socket = TcpStream::connect(dbproxy_addr)
             .await
