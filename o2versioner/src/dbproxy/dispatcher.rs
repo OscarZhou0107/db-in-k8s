@@ -54,34 +54,25 @@ impl Dispatcher {
             )
         };
 
-        let mut empty_spinning_count = 0;
+        let mut previously_has_operation = false;
         loop {
-            Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
+            if !previously_has_operation {
+                Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
 
-            debug!("Dispatcher get a notification");
-            debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
-            debug!("version is: {:?}", version.lock().await.db_version);
+                debug!("Dispatcher get a notification");
+                debug!("Pending queue size is {}", pending_queue.lock().await.queue.len());
+                debug!("Current Db Version is: {:?}", version.lock().await.db_version);
+            }
+
             let operations = pending_queue
                 .lock()
                 .await
                 .get_all_version_ready_task(version.clone())
                 .await;
+                
+            previously_has_operation = !operations.is_empty();
             debug!("Operation batch size is {}", operations.len());
             trace!("Ready tasks are {:?}", operations);
-
-            // DEBUG. PANIC WHEN POTENTIAL BLOCKING
-            if operations.is_empty() {
-                empty_spinning_count += 1;
-                if empty_spinning_count >= 100 {
-                    info!(
-                        "I died with this pending queue : {:?}",
-                        pending_queue.lock().await.queue
-                    );
-                    panic!("Probably blocked due to version conflicts");
-                }
-            } else {
-                empty_spinning_count = 0;
-            }
 
             stream::iter(operations.clone())
                 .for_each(|op| {
