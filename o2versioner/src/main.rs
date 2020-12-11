@@ -1,9 +1,8 @@
 use std::env;
 
 use clap::{App, Arg, ArgGroup, ArgMatches};
-use o2versioner::dbproxy;
 use o2versioner::util::config::Config;
-use o2versioner::{scheduler_main, sequencer_main};
+use o2versioner::{dbproxy_main, scheduler_main, sequencer_main};
 use tracing::info;
 
 pub fn init_logger() {}
@@ -36,7 +35,7 @@ async fn main() {
     // Launch binary
     if matches.is_present("dbproxy") {
         let index: usize = matches.value_of("dbindex").unwrap().to_string().parse().unwrap();
-        dbproxy::main(conf.dbproxy.get(index).unwrap().clone()).await
+        dbproxy_main(conf.dbproxy.get(index).unwrap().clone()).await
     } else if matches.is_present("scheduler") {
         scheduler_main(conf).await
     } else if matches.is_present("sequencer") {

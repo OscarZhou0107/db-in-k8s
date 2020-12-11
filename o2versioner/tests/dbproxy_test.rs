@@ -2,7 +2,7 @@ use futures::prelude::*;
 use o2versioner::comm::scheduler_dbproxy::Message;
 use o2versioner::comm::MsqlResponse;
 use o2versioner::core::*;
-use o2versioner::dbproxy;
+use o2versioner::dbproxy_main;
 use o2versioner::util::config::DbProxyConfig;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -16,7 +16,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 async fn test_dbproxy_end_to_end() {
     let details = "127.0.0.1:2347";
     let addr: SocketAddr = details.parse().expect("Unable to parse socket address");
-    helper_spawn_proxy(addr.clone());
+    let _proxy_handle = tokio::spawn(helper_spawn_proxy(addr.clone()));
 
     let mut messages = Vec::new();
     let _mock_table_vs = vec![
@@ -103,7 +103,7 @@ async fn test_dbproxy_end_to_end() {
         SymmetricalJson::<Message>::default(),
     );
 
-    helper_spawn_client_sender(tcp_write, messages);
+    let _client_handle = tokio::spawn(helper_spawn_client_sender(tcp_write, messages));
 
     let mut begin_count: u32 = 0;
     let mut query_count: u32 = 0;
@@ -140,7 +140,7 @@ async fn test_dbproxy_end_to_end() {
 async fn test_dbproxy_end_to_end_2() {
     let details = "127.0.0.1:2348";
     let addr: SocketAddr = details.parse().expect("Unable to parse socket address");
-    helper_spawn_proxy(addr.clone());
+    let _proxy_handle = tokio::spawn(helper_spawn_proxy(addr.clone()));
 
     let mut messages = Vec::new();
     let _mock_table_vs = vec![
@@ -227,7 +227,7 @@ async fn test_dbproxy_end_to_end_2() {
         SymmetricalJson::<Message>::default(),
     );
 
-    helper_spawn_client_sender(tcp_write, messages);
+    let _client_handle = tokio::spawn(helper_spawn_client_sender(tcp_write, messages));
 
     let mut begin_count: u32 = 0;
     let mut query_count: u32 = 0;
@@ -259,26 +259,22 @@ async fn test_dbproxy_end_to_end_2() {
     assert!(true);
 }
 
-fn helper_spawn_client_sender(tcp_write: OwnedWriteHalf, mut messages: Vec<Message>) {
-    tokio::spawn(async move {
-        let mut serializer = SymmetricallyFramed::new(
-            FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
-            SymmetricalJson::<Message>::default(),
-        );
+async fn helper_spawn_client_sender(tcp_write: OwnedWriteHalf, mut messages: Vec<Message>) {
+    let mut serializer = SymmetricallyFramed::new(
+        FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
+        SymmetricalJson::<Message>::default(),
+    );
 
-        while !messages.is_empty() {
-            serializer.send(messages.pop().unwrap()).await.unwrap();
-        }
-    });
+    while !messages.is_empty() {
+        serializer.send(messages.pop().unwrap()).await.unwrap();
+    }
 }
 
-fn helper_spawn_proxy(addr: SocketAddr) {
-    tokio::spawn(async move {
-        let config = DbProxyConfig {
-            addr: addr.to_string(),
-            sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
-        };
+async fn helper_spawn_proxy(addr: SocketAddr) {
+    let config = DbProxyConfig {
+        addr: addr.to_string(),
+        sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
+    };
 
-        dbproxy::main(config).await;
-    });
+    dbproxy_main(config).await;
 }
