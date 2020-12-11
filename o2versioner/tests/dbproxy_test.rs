@@ -276,8 +276,7 @@ fn helper_spawn_proxy(addr: SocketAddr) {
     tokio::spawn(async move {
         let config = DbProxyConfig {
             addr: addr.to_string(),
-            sql_conf: "host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string(),
-            use_mock_db: false,
+            sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
         };
 
         dbproxy::main(config).await;

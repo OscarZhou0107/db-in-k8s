@@ -37,21 +37,21 @@ impl Dispatcher {
         let mut task_notify = pending_queue.lock().await.get_notify();
         let mut version_notify = version.lock().await.get_notify();
 
-        let pool_opt = if conf.use_mock_db {
-            info!("Using mocked db");
-            None
-        } else {
-            info!("Connecting to db with: {}", conf.sql_conf);
+        let pool_opt = if let Some(sql_conf) = &conf.sql_conf {
+            info!("Connecting to db with: {}", sql_conf);
             Some(
                 Pool::builder()
                     .max_size(postgres_pool_size)
                     .build(PostgresConnectionManager::new(
-                        tokio_postgres::Config::from_str(&conf.sql_conf).unwrap(),
+                        tokio_postgres::Config::from_str(sql_conf).unwrap(),
                         NoTls,
                     ))
                     .await
                     .unwrap(),
             )
+        } else {
+            info!("Using mocked db");
+            None
         };
 
         let mut previously_has_operation = false;
@@ -69,7 +69,6 @@ impl Dispatcher {
                 .await
                 .get_all_version_ready_task(version.clone())
                 .await;
-                
             previously_has_operation = !operations.is_empty();
             debug!("Operation batch size is {}", operations.len());
             trace!("Ready tasks are {:?}", operations);
