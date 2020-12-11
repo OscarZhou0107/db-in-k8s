@@ -37,7 +37,7 @@ use unicase::UniCase;
 #[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Config) {
     // Create the main state
-    let state = State::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()));
+    let state = State::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()), conf.clone());
 
     // The current task completes as soon as start_tcplistener finishes,
     // which happens when it reaches the max_conn_till_dropped if not None,
@@ -125,7 +125,6 @@ pub async fn main(conf: Config) {
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),
-                conf.clone(),
             )
             .in_current_span(),
         );
@@ -144,30 +143,26 @@ pub async fn main(conf: Config) {
     }
 
     // Dump logging files
-    if let Some(log_dir) = conf.scheduler.performance_logging {
-        state.dump_perf_log(log_dir, false).await
-    }
+    state.dump_perf_log().await;
 
     info!("DIES");
 }
 
-#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state, conf))]
+#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state))]
 async fn admin(
     admin_addr: SocketAddr,
     stop_tx: Option<oneshot::Sender<()>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     state: State,
-    conf: Config,
 ) {
     start_admin_tcplistener(admin_addr, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
         let state = state.clone();
-        let conf = conf.clone();
         async move {
             let cmd_registry: HashMap<_, Vec<_>> = vec![
                 ("block_unblock", vec!["block", "unblock"]),
                 ("kill", vec!["kill", "exit", "quit"]),
-                ("dump_perf", vec!["dump_perf"]),
+                ("perf", vec!["perf"]),
             ]
             .into_iter()
             .map(|(k, vs)| (k, vs.into_iter().map(|v| UniCase::new(String::from(v))).collect()))
@@ -208,14 +203,9 @@ async fn admin(
                     .await
                 );
                 (reply, false)
-            } else if cmd_registry.get("dump_perf").unwrap().contains(&command) {
-                state
-                    .dump_perf_log(
-                        conf.scheduler.performance_logging.unwrap_or(String::from("debug")),
-                        true,
-                    )
-                    .await;
-                (format!("Perf logging dumped. Check scheduler terminal"), true)
+            } else if cmd_registry.get("perf").unwrap().contains(&command) {
+                let location_dumped = state.dump_perf_log().await;
+                (format!("Perf logging dumped to {:?}", location_dumped), true)
             } else {
                 (
                     format!("Unknown command: {}. Available commands: {:?}", command, cmd_registry),

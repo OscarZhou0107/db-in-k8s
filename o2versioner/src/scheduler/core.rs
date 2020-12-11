@@ -2,6 +2,7 @@ use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
 use crate::util::common::create_zip_csv_writer;
+use crate::util::config::*;
 use chrono::Utc;
 use futures::prelude::*;
 use itertools::Itertools;
@@ -19,13 +20,15 @@ use tracing::{info, warn};
 pub struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     client_records: Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>>,
+    conf: Arc<Config>,
 }
 
 impl State {
-    pub fn new(dbvn_manager: DbVNManager) -> Self {
+    pub fn new(dbvn_manager: DbVNManager, conf: Config) -> Self {
         Self {
             dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
             client_records: Arc::new(Mutex::new(HashMap::new())),
+            conf: Arc::new(conf),
         }
     }
 
@@ -38,7 +41,12 @@ impl State {
             .lock()
             .await
             .entry(client.clone())
-            .or_insert_with(|| Arc::new(RwLock::new(ClientRecord::new(client))))
+            .or_insert_with(|| {
+                Arc::new(RwLock::new(ClientRecord::new(
+                    client,
+                    self.conf.scheduler.detailed_logging.is_some(),
+                )))
+            })
             .clone()
     }
 
@@ -56,51 +64,54 @@ impl State {
             .await
     }
 
-    /// Dump the performance logging
-    pub async fn dump_perf_log<S: Into<String>>(&self, log_dir: S, debug: bool) {
-        // Prepare the logging directory
-        let mut path_builder = PathBuf::from(log_dir.into());
-        let log_dir_name = if debug {
-            format!("{}_debug", Utc::now().format("%y%m%d_%H%M%S").to_string())
+    /// Dump the performance logging, returns the path of logging dumps if dumped
+    pub async fn dump_perf_log(&self) -> Option<String> {
+        if let Some(perf_log_path) = self.conf.scheduler.performance_logging.as_ref() {
+            // Prepare the logging directory
+            let mut path_builder = PathBuf::from(perf_log_path);
+            let log_dir_name = Utc::now().format("%y%m%d_%H%M%S").to_string();
+
+            path_builder.push(log_dir_name);
+            let cur_log_dir = path_builder.as_path();
+            info!("Preparing {} for performance logging", cur_log_dir.display());
+            tokio::fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
+
+            // Performance logging
+            let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
+            perf_csv_path_builder.push("perf.csv.gz");
+            let perf_csv_path = perf_csv_path_builder.as_path();
+            let mut wrt = create_zip_csv_writer(perf_csv_path).unwrap();
+            self.collect_client_records()
+                .await
+                .into_iter()
+                .map(|(_, reqrecord)| reqrecord.performance_records().to_vec())
+                .flatten()
+                .for_each(|r| wrt.serialize(r).unwrap());
+            info!("Dumped performance logging to {}", perf_csv_path.display());
+
+            // Dbvn logging
+            let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
+            dbproxy_stats_path_builder.push("dbproxy_stats.csv.gz");
+            let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
+            let mut wrt = create_zip_csv_writer(dbproxy_stats_csv_path).unwrap();
+            wrt.write_record(&["dbproxy_addr", "dbproxy_vn_sum"]).unwrap();
+            self.dbvn_manager
+                .read()
+                .await
+                .inner()
+                .iter()
+                .map(|(dbproxy_addr, vndb)| {
+                    info!("{} {:?}", dbproxy_addr, vndb);
+                    (dbproxy_addr, vndb)
+                })
+                .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
+                .for_each(|d| wrt.serialize(d).unwrap());
+            info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
+            Some(dbproxy_stats_csv_path.to_string_lossy().to_string())
         } else {
-            Utc::now().format("%y%m%d_%H%M%S").to_string()
-        };
-        path_builder.push(log_dir_name);
-        let cur_log_dir = path_builder.as_path();
-        info!("Preparing {} for performance logging", cur_log_dir.display());
-        tokio::fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
-
-        // Performance logging
-        let mut perf_csv_path_builder = PathBuf::from(cur_log_dir);
-        perf_csv_path_builder.push("perf.csv.gz");
-        let perf_csv_path = perf_csv_path_builder.as_path();
-        let mut wrt = create_zip_csv_writer(perf_csv_path).unwrap();
-        self.collect_client_records()
-            .await
-            .into_iter()
-            .map(|(_, reqrecord)| reqrecord.get_performance_records())
-            .flatten()
-            .for_each(|r| wrt.serialize(r).unwrap());
-        info!("Dumped performance logging to {}", perf_csv_path.display());
-
-        // Dbvn logging
-        let mut dbproxy_stats_path_builder = PathBuf::from(cur_log_dir);
-        dbproxy_stats_path_builder.push("dbproxy_stats.csv.gz");
-        let dbproxy_stats_csv_path = dbproxy_stats_path_builder.as_path();
-        let mut wrt = create_zip_csv_writer(dbproxy_stats_csv_path).unwrap();
-        wrt.write_record(&["dbproxy_addr", "dbproxy_vn_sum"]).unwrap();
-        self.dbvn_manager
-            .read()
-            .await
-            .inner()
-            .iter()
-            .map(|(dbproxy_addr, vndb)| {
-                info!("{} {:?}", dbproxy_addr, vndb);
-                (dbproxy_addr, vndb)
-            })
-            .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
-            .for_each(|d| wrt.serialize(d).unwrap());
-        info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
+            info!("Due to the conf setting, performance loggings are not dumped");
+            None
+        }
     }
 }
 
@@ -142,7 +153,7 @@ impl ConnectionState {
     }
 
     pub async fn current_request_id(&self) -> usize {
-        self.client_record.read().await.records().len()
+        self.client_record.read().await.len()
     }
 
     pub async fn push_request_record(&self, request_record: RequestRecord) {
@@ -248,7 +259,7 @@ mod tests_connection_state {
         let client_addr: SocketAddr = "127.0.0.1:6666".parse().unwrap();
         let mut conn_state = ConnectionState::new(
             client_addr.clone(),
-            Arc::new(RwLock::new(ClientRecord::new(client_addr))),
+            Arc::new(RwLock::new(ClientRecord::new(client_addr, false))),
         );
         assert_eq!(*conn_state.current_txvn(), None);
 

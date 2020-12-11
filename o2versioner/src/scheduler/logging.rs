@@ -97,14 +97,18 @@ impl RequestRecord {
 #[derive(Debug, Clone)]
 pub struct ClientRecord {
     client_addr: SocketAddr,
-    records: Vec<RequestRecord>,
+    detailed_records: Option<Vec<RequestRecord>>,
+    perf_records: Vec<PerformanceRequestRecord>,
 }
 
 impl ClientRecord {
-    pub fn new(client_addr: SocketAddr) -> Self {
+    /// `detailed_record` controls whether detailed records are kept,
+    /// whereas performance records are always recorded
+    pub fn new(client_addr: SocketAddr, detailed_record: bool) -> Self {
         Self {
             client_addr,
-            records: Vec::new(),
+            detailed_records: if detailed_record { Some(Vec::new()) } else { None },
+            perf_records: Vec::new(),
         }
     }
 
@@ -113,31 +117,34 @@ impl ClientRecord {
         self.client_addr.clone()
     }
 
-    /// Get the slices for all `RequestRecord`
-    pub fn records(&self) -> &[RequestRecord] {
-        &self.records
+    /// Get all possible `RequestRecord`
+    pub fn detailed_records(&self) -> &Option<Vec<RequestRecord>> {
+        &self.detailed_records
     }
 
-    /// Append a new `RequestRecord` to the end of the list
+    /// Get all `PerformanceRequestRecord`
+    pub fn performance_records(&self) -> &[PerformanceRequestRecord] {
+        &self.perf_records
+    }
+
+    /// Append a new `PerformanceRequestRecord` and `RequestRecord` (if `detailed_record`
+    /// is true) to the end of the list
     pub fn push(&mut self, req_record: RequestRecord) {
-        self.records.push(req_record)
+        if let Some(v) = self.detailed_records.as_mut() {
+            v.push(req_record.clone());
+        }
+        self.perf_records
+            .push(PerformanceRequestRecord::from(req_record).set_client_addr(Some(self.client_addr().clone())));
     }
 
-    /// Returns a `Vec<PerformanceRequestRecord>` that is converted from
-    /// all `RequestRecord` of the current `client_addr`
-    pub fn get_performance_records(&self) -> Vec<PerformanceRequestRecord> {
-        self.records
-            .iter()
-            .cloned()
-            .map(|reqrecord| {
-                PerformanceRequestRecord::from(reqrecord).set_client_addr(Some(self.client_addr().clone()))
-            })
-            .collect()
+    /// Length of the current record list
+    pub fn len(&self) -> usize {
+        self.perf_records.len()
     }
 }
 
 /// For performance benchmarking, converted from `RequestRecord`
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PerformanceRequestRecord {
     client_addr: Option<SocketAddr>,
     request_type: String,

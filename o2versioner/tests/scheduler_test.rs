@@ -22,6 +22,7 @@ async fn test_scheduler() {
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
             performance_logging: None,
+            detailed_logging: None,
             disable_early_release: false,
         },
         sequencer: SequencerConfig {
@@ -93,6 +94,7 @@ async fn test_scheduler_with_admin() {
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
             performance_logging: None,
+            detailed_logging: None,
             disable_early_release: false,
         },
         sequencer: SequencerConfig {
@@ -189,6 +191,7 @@ async fn test_scheduler_with_request_crash() {
             dispatcher_queue_size: 1,
             transceiver_queue_size: 1,
             performance_logging: None,
+            detailed_logging: None,
             disable_early_release: false,
         },
         sequencer: SequencerConfig {

@@ -42,6 +42,7 @@ pub struct SchedulerConfig {
     pub dispatcher_queue_size: usize,
     pub transceiver_queue_size: usize,
     pub performance_logging: Option<String>,
+    pub detailed_logging: Option<String>,
     pub disable_early_release: bool,
 }
 
@@ -54,7 +55,8 @@ impl Default for SchedulerConfig {
             sequencer_pool_size: 10,
             dispatcher_queue_size: 500,
             transceiver_queue_size: 500,
-            performance_logging: None,
+            performance_logging: Some("./perf".to_string()),
+            detailed_logging: None,
             disable_early_release: false,
         }
     }
@@ -121,7 +123,8 @@ mod tests_config {
                     sequencer_pool_size: 20,
                     dispatcher_queue_size: 500,
                     transceiver_queue_size: 500,
-                    performance_logging: None,
+                    performance_logging: Some("./perf".to_owned()),
+                    detailed_logging: None,
                     disable_early_release: false
                 },
                 sequencer: SequencerConfig {
