@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tracing::info;
 
-// Main entrance for the DbProxy
+/// Main entrance for the DbProxy
 pub async fn main(conf: DbProxyConfig) {
     info!("Starting dbproxy...");
 
