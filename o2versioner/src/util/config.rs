@@ -44,6 +44,7 @@ pub struct SchedulerConfig {
     pub performance_logging: Option<String>,
     pub detailed_logging: Option<String>,
     pub disable_early_release: bool,
+    pub disable_single_read_optimization: bool,
 }
 
 impl Default for SchedulerConfig {
@@ -58,6 +59,7 @@ impl Default for SchedulerConfig {
             performance_logging: Some("./perf".to_string()),
             detailed_logging: None,
             disable_early_release: false,
+            disable_single_read_optimization: false,
         }
     }
 }
@@ -125,7 +127,8 @@ mod tests_config {
                     transceiver_queue_size: 500,
                     performance_logging: Some("./perf".to_owned()),
                     detailed_logging: None,
-                    disable_early_release: false
+                    disable_early_release: false,
+                    disable_single_read_optimization: false,
                 },
                 sequencer: SequencerConfig {
                     addr: String::from("127.0.0.1:9876"),

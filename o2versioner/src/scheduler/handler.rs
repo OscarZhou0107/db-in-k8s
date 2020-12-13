@@ -374,10 +374,15 @@ async fn process_msql(
                 }
             }
 
-            //if conn_state.current_txvn().is_none() {
-            // Replace with the following line once single read query is supported
-            if conn_state.current_txvn().is_none() && query.access_pattern().is_write_only() {
-                info!("Single Write query");
+            if conn_state.current_txvn().is_none()
+                && (query.access_pattern().is_write_only() || conf.disable_single_read_optimization)
+            {
+                if query.access_pattern().is_read_only() {
+                    info!("Unoptimized Single Read query");
+                } else {
+                    info!("Single Write query");
+                }
+
                 // Construct a new MsqlBeginTx
                 let msqlbegintx = MsqlBeginTx::from(query.tableops().clone());
                 process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await;
@@ -464,7 +469,7 @@ async fn process_query(
 
     if conn_state.current_txvn().is_none() {
         if msql.try_get_query().unwrap().access_pattern().is_read_only() {
-            info!("Single Read query");
+            info!("Optimized Single Read query");
         } else {
             panic!("TxVN should not be None here");
         }
