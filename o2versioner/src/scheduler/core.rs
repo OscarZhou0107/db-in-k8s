@@ -195,6 +195,26 @@ impl DbVNManager {
             .collect()
     }
 
+    /// Uses the sum of VNs of interest to determine the most updated
+    pub fn get_most_updated_version_for_read_query(&self, tableops: &TableOps) -> (SocketAddr, Vec<DbTableVN>) {
+        assert_eq!(
+            tableops.access_pattern(),
+            AccessPattern::ReadOnly,
+            "Expecting ReadOnly access pattern for the query"
+        );
+
+        self.0
+            .iter()
+            .max_by_key(|(_, dbvn)| {
+                dbvn.get_from_tableops(tableops)
+                    .iter()
+                    .map(|dbtablevn| dbtablevn.vn)
+                    .sum::<VN>()
+            })
+            .map(|(addr, dbvn)| (addr.clone(), dbvn.get_from_tableops(tableops)))
+            .unwrap()
+    }
+
     pub fn release_version(&mut self, dbproxy_addr: &SocketAddr, release_request: DbVNReleaseRequest) {
         if !self.0.contains_key(dbproxy_addr) {
             warn!(
@@ -355,6 +375,67 @@ mod tests_dbvnmanager {
                 ])
             ),
             vec![]
+        );
+    }
+
+    #[test]
+    fn test_get_most_updated_version_for_read_query() {
+        let mut dbvnmanager = DbVNManager::from_iter(vec![
+            "127.0.0.1:10000".parse().unwrap(),
+            "127.0.0.1:10001".parse().unwrap(),
+            "127.0.0.1:10002".parse().unwrap(),
+        ]);
+
+        dbvnmanager.release_version(
+            &"127.0.0.1:10002".parse().unwrap(),
+            TxVN::new()
+                .set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::R),
+                    TxTableVN::new("t1", 0, RWOperation::R),
+                ])
+                .into_dbvn_release_request(),
+        );
+
+        dbvnmanager.release_version(
+            &"127.0.0.1:10001".parse().unwrap(),
+            TxVN::new()
+                .set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::W),
+                    TxTableVN::new("t2", 0, RWOperation::W),
+                ])
+                .into_dbvn_release_request(),
+        );
+
+        assert_eq!(
+            dbvnmanager.get_most_updated_version_for_read_query(&TableOps::from_iter(vec![
+                TableOp::new("t0", RWOperation::R),
+                TableOp::new("t1", RWOperation::R)
+            ])),
+            (
+                "127.0.0.1:10002".parse().unwrap(),
+                vec![DbTableVN::new("t0", 1), DbTableVN::new("t1", 1)]
+            )
+        );
+
+        dbvnmanager.release_version(
+            &"127.0.0.1:10001".parse().unwrap(),
+            TxVN::new()
+                .set_txtablevns(vec![
+                    TxTableVN::new("t0", 0, RWOperation::W),
+                    TxTableVN::new("t1", 0, RWOperation::W),
+                ])
+                .into_dbvn_release_request(),
+        );
+
+        assert_eq!(
+            dbvnmanager.get_most_updated_version_for_read_query(&TableOps::from_iter(vec![
+                TableOp::new("t0", RWOperation::R),
+                TableOp::new("t1", RWOperation::R)
+            ])),
+            (
+                "127.0.0.1:10001".parse().unwrap(),
+                vec![DbTableVN::new("t0", 2), DbTableVN::new("t1", 1)]
+            )
         );
     }
 
