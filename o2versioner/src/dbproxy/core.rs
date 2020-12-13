@@ -1,7 +1,6 @@
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -49,9 +48,6 @@ impl QueueMessage {
         let result_type = match self.operation_type {
             Task::READ | Task::SINGLEREAD | Task::WRITE => QueryResultType::QUERY,
             Task::COMMIT | Task::ABORT => QueryResultType::END,
-            _ => {
-                panic!("Illegal operation");
-            }
         };
 
         QueryResult {
@@ -88,6 +84,7 @@ impl PendingQueue {
 
     pub fn emplace(&mut self, identifier : RequestMeta, msql: Msql, versions_op: Option<TxVN>) {
 
+        let mut update_queue_versions = true;
         let mut operation_type = match &msql {
             Msql::Query(op) => match op.tableops().access_pattern() {
                 AccessPattern::ReadOnly => {
@@ -104,8 +101,6 @@ impl PendingQueue {
             _ => {panic!("Not defined operation")}
         };
 
-       
-        
         let versions = if let Some(transaction_versions) = versions_op {
             transaction_versions
         } else {
@@ -119,7 +114,8 @@ impl PendingQueue {
                         op.tableops().get().iter().for_each(|table_op| {
                            versions_vec.push(TxTableVN::new(table_op.table(), self.get_highest_version_for_table(table_op.table()), RWOperation::R)); 
                         });
-                      
+                        
+                        update_queue_versions = false;
                         operation_type = Task::SINGLEREAD;
                     },
                     _ => {panic!("Only ReadOnly task can have no pre-defined transaction versions");}
@@ -130,15 +126,20 @@ impl PendingQueue {
             TxVN::new().set_tx(Some("Single_Read")).set_txtablevns(versions_vec)
         };
 
-        self.push(QueueMessage::new(identifier,
+        let op = QueueMessage::new(identifier,
             operation_type,
             msql,
-            versions));
+            versions);
+
+        if update_queue_versions {
+            self.update_highest_version(&op);
+        }
+
+        self.push(op);
     }
 
     pub fn push(&mut self, op: QueueMessage) {
         debug!("PendingQueue pushed {:?} and notify all tasks waiting", op);
-        self.update_highest_version(&op);
         self.queue.push(op);
         self.notify.notify_one();
     }
@@ -161,7 +162,7 @@ impl PendingQueue {
 
     pub fn get_highest_version_for_table(& self, table : &str) -> u64 {
         if let Some(version) = self.highest_contained_version.get(table) {
-            return version.clone();
+            return version.clone() + 1;
         } else {
             return 0;
         }
@@ -588,6 +589,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -596,7 +598,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            None,
+            TxVN::new(),
         );
 
         let message3 = QueueMessage::new(
@@ -605,6 +607,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -613,7 +616,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            Some(TxVN::new()),
+            TxVN::new(),
         );
 
         let message2 = QueueMessage::new(
@@ -622,6 +625,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -630,7 +634,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            Some(TxVN::new()),
+            TxVN::new(),
         );
 
         let message1 = QueueMessage::new(
@@ -639,6 +643,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -647,7 +652,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            None,
+            TxVN::new(),
         );
 
         queue.push(message1);
@@ -678,6 +683,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -686,7 +692,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            None,
+            TxVN::new(),
         );
 
         let message3 = QueueMessage::new(
@@ -695,6 +701,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -703,7 +710,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            None,
+            TxVN::new(),
         );
 
         let message2 = QueueMessage::new(
@@ -712,6 +719,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -720,7 +728,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            None,
+            TxVN::new(),
         );
 
         let message1 = QueueMessage::new(
@@ -729,6 +737,7 @@ mod tests {
                 cur_txid: 0,
                 request_id: 0,
             },
+            Task::READ,
             Msql::Query(
                 MsqlQuery::new(
                     "select * from tbltest",
@@ -737,7 +746,7 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            None,
+            TxVN::new(),
         );
 
         queue.push(message1);

@@ -292,8 +292,10 @@ impl SingleReadExecutor {
 
 #[async_trait]
 impl Executor for SingleReadExecutor {
+    #[instrument(name = "trans_exec_single_read", skip(self), fields(message=field::Empty))]
     async fn run(mut self: Box<Self>) {
-        let mut conn = self.pool.get().await.unwrap();
+        Span::current().record("message", &&self.client_meta.to_string()[..]);
+        let conn = self.pool.get().await.unwrap();
         info!("Deploying {}", self.transaction_uuid);
 
         let raw = conn
@@ -333,7 +335,9 @@ impl MockSingleReadExecutor {
 
 #[async_trait]
 impl Executor for MockSingleReadExecutor {
+    #[instrument(name = "trans_exec_single_read", skip(self), fields(message=field::Empty))]
     async fn run(mut self: Box<Self>) {
+        Span::current().record("message", &&self.client_meta.to_string()[..]);
         info!("Deploying {}", self.transaction_uuid);
         self.responder_sender
             .send(self.operation.into_sqlresponse(Ok(Vec::new())))
