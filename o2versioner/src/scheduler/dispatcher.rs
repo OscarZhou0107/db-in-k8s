@@ -128,7 +128,7 @@ impl State {
                 trace!("-> {:?}", msg);
                 async move {
                     transceiver_addr
-                        .request_nowait(TransceiverRequest {
+                        .request_nowait(TransceiverRequest::DbproxyMsg {
                             dbproxy_addr: dbproxy_addr.clone(),
                             dbproxy_msg: msg,
                         })
@@ -160,9 +160,12 @@ impl State {
                     let is_endtx = command_cloned.is_endtx();
                     let msqlresponse = transceiver_receipt
                         .wait_request()
-                        .and_then(|res| match res.msg {
-                            Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
-                            _ => future::err(String::from("Invalid response from Dbproxy")),
+                        .and_then(|res| match res {
+                            TransceiverReply::DbproxyMsg(msg) => match msg {
+                                Message::MsqlResponse(_, msqlresponse) => future::ok(msqlresponse),
+                                _ => future::err(String::from("Invalid response from Dbproxy")),
+                            },
+                            _ => panic!("Invalid TransceiverReply message"),
                         })
                         .unwrap_or_else(|e| {
                             if is_endtx {
@@ -256,13 +259,33 @@ impl State {
                 }
             }
 
-            // TODO: choose the dbproxy with least load
-            // For now, pick the first dbproxy from all available
-            let selected_dbproxy = &avail_dbproxy[0];
+            // Choose the dbproxy with least load
+            let avail_dbproxy_load: Vec<_> =
+                stream::iter(avail_dbproxy.into_iter().map(|(dbproxy_addr, dbtablevns)| {
+                    (
+                        dbproxy_addr.clone(),
+                        self.dbproxy_manager.get(&dbproxy_addr),
+                        dbtablevns,
+                    )
+                }))
+                .then(|(dbproxy_addr, transceiver_addr, dbtablevns)| async move {
+                    match transceiver_addr.request(TransceiverRequest::DbproxyLoad).await.unwrap() {
+                        TransceiverReply::DbproxyLoad(load) => (dbproxy_addr, load, dbtablevns),
+                        _ => panic!("Unexpected TransceiverReply"),
+                    }
+                })
+                .collect()
+                .await;
+
+            let selected_dbproxy = avail_dbproxy_load
+                .into_iter()
+                .min_by_key(|(_dbproxy_addr, load, _dbtablevns)| load.clone())
+                .unwrap();
             trace!(
-                "Found dbproxy {} for executing the ReadOnly query: {:?}",
+                "Found dbproxy {} with load {} for executing the ReadOnly query: {:?}",
                 selected_dbproxy.0,
-                selected_dbproxy.1
+                selected_dbproxy.1,
+                selected_dbproxy.2,
             );
             (
                 selected_dbproxy.0.clone(),

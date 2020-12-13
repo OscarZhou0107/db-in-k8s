@@ -16,14 +16,30 @@ use tracing::{field, info, info_span, instrument, trace, warn, Instrument, Span}
 
 /// Request sent from dispatcher direction
 #[derive(Debug)]
-pub struct TransceiverRequest {
-    pub dbproxy_addr: SocketAddr,
-    pub dbproxy_msg: Message,
+pub enum TransceiverRequest {
+    DbproxyMsg {
+        dbproxy_addr: SocketAddr,
+        dbproxy_msg: Message,
+    },
+    DbproxyLoad,
+}
+
+impl TransceiverRequest {
+    fn try_get_dbproxy_msg_inner(&self) -> Result<(&SocketAddr, &Message), ()> {
+        match self {
+            Self::DbproxyMsg {
+                dbproxy_addr,
+                dbproxy_msg,
+            } => Ok((dbproxy_addr, dbproxy_msg)),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug)]
-pub struct TransceiverReply {
-    pub msg: Message,
+pub enum TransceiverReply {
+    DbproxyMsg(Message),
+    DbproxyLoad(usize),
 }
 
 impl ExecutorRequest for TransceiverRequest {
@@ -89,7 +105,13 @@ impl Executor for Transceiver {
                             let queue_idx = queue
                                 .iter()
                                 .position(|req_wrapper| {
-                                    req_wrapper.request().dbproxy_msg.try_get_request_meta().unwrap()
+                                    req_wrapper
+                                        .request()
+                                        .try_get_dbproxy_msg_inner()
+                                        .unwrap()
+                                        .1
+                                        .try_get_request_meta()
+                                        .unwrap()
                                         == arrived_request_meta
                                 })
                                 .expect("No record in outstanding_req (position)");
@@ -106,12 +128,19 @@ impl Executor for Transceiver {
                             } else {
                                 trace!("conn fifo has {} after Pop", queue.len());
                             }
-                            let popped_request_meta = popped_request.dbproxy_msg.try_get_request_meta().unwrap();
 
-                            assert_eq!(popped_request_meta, arrived_request_meta);
+                            assert_eq!(
+                                popped_request
+                                    .try_get_dbproxy_msg_inner()
+                                    .unwrap()
+                                    .1
+                                    .try_get_request_meta()
+                                    .unwrap(),
+                                arrived_request_meta
+                            );
 
                             trace!("-> {:?}", msg);
-                            reply_ch.unwrap().send(TransceiverReply { msg }).unwrap();
+                            reply_ch.unwrap().send(TransceiverReply::DbproxyMsg(msg)).unwrap();
                         }
                         other => warn!("Unsupported {:?}", other),
                     };
@@ -126,24 +155,42 @@ impl Executor for Transceiver {
         let request_rx_task = async move {
             while let Some(request) = request_rx.next().await {
                 let task = async {
-                    let dbproxy_msg = request.request().dbproxy_msg.clone();
-                    let meta = dbproxy_msg.try_get_request_meta().unwrap();
-                    let client_addr = meta.client_addr.clone();
-                    Span::current().record("message", &&meta.to_string()[..]);
+                    match request.request() {
+                        TransceiverRequest::DbproxyMsg {
+                            dbproxy_addr: _dbproxy_addr,
+                            dbproxy_msg,
+                        } => {
+                            let dbproxy_msg = dbproxy_msg.clone();
+                            let meta = dbproxy_msg.try_get_request_meta().unwrap();
+                            let client_addr = meta.client_addr.clone();
+                            Span::current().record("message", &&meta.to_string()[..]);
 
-                    trace!("-> {:?}", dbproxy_msg);
-                    let mut guard = outstanding_req.lock().await;
-                    let queue = guard.entry(client_addr.clone()).or_default();
-                    if queue.len() > 0 {
-                        info!("conn fifo has {} before Push", queue.len());
-                    } else {
-                        trace!("conn fifo has {} before Push", queue.len());
+                            trace!("-> {:?}", dbproxy_msg);
+                            let mut guard = outstanding_req.lock().await;
+                            let queue = guard.entry(client_addr.clone()).or_default();
+                            if queue.len() > 0 {
+                                info!("conn fifo has {} before Push", queue.len());
+                            } else {
+                                trace!("conn fifo has {} before Push", queue.len());
+                            }
+                            queue.push_back(request);
+                            let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
+                            let mut serded_write =
+                                SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
+                            serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
+                        }
+                        TransceiverRequest::DbproxyLoad => {
+                            Span::current().record("message", &"Load");
+                            let load: usize = outstanding_req.lock().await.values().map(|queue| queue.len()).sum();
+                            trace!("{}", load);
+                            request
+                                .unwrap()
+                                .1
+                                .unwrap()
+                                .send(TransceiverReply::DbproxyLoad(load))
+                                .unwrap();
+                        }
                     }
-                    queue.push_back(request);
-                    let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
-                    let mut serded_write =
-                        SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
-                    serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
                 };
                 task.instrument(info_span!("->dbproxy", message = field::Empty)).await;
             }
