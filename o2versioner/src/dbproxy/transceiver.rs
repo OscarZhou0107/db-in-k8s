@@ -1,10 +1,11 @@
-use super::core::{DbVersion, QueryResult, QueryResultType};
 use super::core::PendingQueue;
+use super::core::{DbVersion, QueryResult, QueryResultType};
 use crate::comm::scheduler_dbproxy::Message;
 use crate::util::executor::Executor;
 use async_trait::async_trait;
 use futures::prelude::*;
 use futures::SinkExt;
+use std::net::Shutdown;
 use std::sync::Arc;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -13,7 +14,7 @@ use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
-use tracing::{debug, field, info, info_span, Instrument, Span};
+use tracing::{debug, field, info, info_span, instrument, Instrument, Span};
 
 pub async fn connection<A>(
     addr: A,
@@ -25,9 +26,9 @@ where
     A: ToSocketAddrs,
 {
     let listener = TcpListener::bind(addr).await.unwrap();
-    info!("Binding to tcp listener...");
+    info!("Binded to port");
     let (tcp_stream, _) = listener.accept().await.unwrap();
-    info!("Connection established...");
+    info!("Connection established with scheduler...");
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
     let receiver = Receiver::new(pending_queue.clone(), tcp_read);
@@ -51,6 +52,7 @@ impl Receiver {
 
 #[async_trait]
 impl Executor for Receiver {
+    #[instrument(name = "receiver", skip(self))]
     async fn run(mut self: Box<Self>) {
         let Self {
             pending_queue,
@@ -62,7 +64,7 @@ impl Executor for Receiver {
             SymmetricalJson::<Message>::default(),
         );
 
-        info!("Receiver started");
+        info!("started");
 
         while let Some(msg) = deserializer.try_next().await.unwrap() {
             debug!("Receiver received a new request from scheduler");
@@ -74,10 +76,7 @@ impl Executor for Receiver {
                         Span::current().record("type", &request.as_ref());
                         debug!("Txvn: {:?}", versions.clone());
                         debug!("Request content is: {:?}", request.clone());
-                        pending_queue
-                            .lock()
-                            .await
-                            .emplace(meta, request, versions);
+                        pending_queue.lock().await.emplace(meta, request, versions);
                     }
                     _ => debug!("nope"),
                 }
@@ -85,7 +84,16 @@ impl Executor for Receiver {
             .instrument(info_span!("receiver", message = field::Empty, "type" = field::Empty))
             .await;
         }
-        debug!("Receiver finished its jobs");
+
+        // When the tcp receiver is disconnected, shutdown the entire tcp socket
+        deserializer
+            .into_inner()
+            .into_inner()
+            .as_ref()
+            .shutdown(Shutdown::Both)
+            .unwrap();
+
+        info!("Receiver finished its jobs");
     }
 }
 
@@ -95,7 +103,6 @@ pub struct Responder {
     tcp_write: OwnedWriteHalf,
 }
 
-// Box<SymmetricallyFramed<FramedWrite<OwnedWriteHalf, LengthDelimitedCodec>,Message,SymmetricalJson<Message>>>
 impl Responder {
     pub fn new(
         receiver: mpsc::Receiver<QueryResult>,
@@ -112,6 +119,7 @@ impl Responder {
 
 #[async_trait]
 impl Executor for Responder {
+    #[instrument(name = "responder", skip(self))]
     async fn run(mut self: Box<Self>) {
         let Self {
             mut receiver,
@@ -119,7 +127,7 @@ impl Executor for Responder {
             tcp_write,
         } = *self;
 
-        info!("Responder started");
+        info!("started");
         let mut serializer = SymmetricallyFramed::new(
             FramedWrite::new(tcp_write, LengthDelimitedCodec::new()),
             SymmetricalJson::<Message>::default(),

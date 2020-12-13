@@ -10,10 +10,11 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio_postgres::NoTls;
-use tracing::{debug, field, info, instrument, trace, Span};
+use tracing::{debug, field, info, instrument, trace, Instrument, Span};
 use uuid::Uuid;
 
 pub struct Dispatcher {
@@ -22,6 +23,7 @@ pub struct Dispatcher {
     conf: DbProxyConfig,
     version: Arc<Mutex<DbVersion>>,
     transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
+    stop_receiver: Option<oneshot::Receiver<()>>,
 }
 
 impl Dispatcher {
@@ -31,23 +33,29 @@ impl Dispatcher {
         conf: DbProxyConfig,
         version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
-    ) -> Self {
-        Self {
-            pending_queue,
-            responder_sender,
-            conf,
-            version,
-            transactions,
-        }
+    ) -> (oneshot::Sender<()>, Self) {
+        let (sender, receiver) = oneshot::channel();
+
+        (
+            sender,
+            Self {
+                pending_queue,
+                responder_sender,
+                conf,
+                version,
+                transactions,
+                stop_receiver: Some(receiver),
+            },
+        )
     }
 
     async fn wait_for_new_task_or_version_release(new_task_notify: &mut Arc<Notify>, version_notify: &mut Arc<Notify>) {
         let n1 = new_task_notify.notified();
         let n2 = version_notify.notified();
         tokio::select! {
-           _ = n1 => {debug!("new_task_notify")}
-           _ = n2 => {debug!("version_notify")}
-        };
+           _ = n1 => {debug!("new_task_notify");}
+           _ = n2 => {debug!("version_notify");}
+        }
     }
 }
 
@@ -57,7 +65,7 @@ impl Executor for Dispatcher {
     async fn run(mut self: Box<Self>) {
         let postgres_pool_size = 80;
         let transaction_channel_queue_size = 100;
-        info!("Dispatcher Started");
+        info!("started");
 
         let mut task_notify = self.pending_queue.lock().await.get_notify();
         let mut version_notify = self.version.lock().await.get_notify();
@@ -80,9 +88,15 @@ impl Executor for Dispatcher {
         };
 
         let mut previously_has_operation = false;
+        let mut stop_receiver = self.stop_receiver.take().unwrap();
         loop {
             if !previously_has_operation {
-                Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify).await;
+                let new_task_or_version_release =
+                    Self::wait_for_new_task_or_version_release(&mut task_notify, &mut version_notify);
+                tokio::select! {
+                    _ = new_task_or_version_release => {},
+                    _ = &mut stop_receiver => {info!("Dispatcher main loop terminated"); break;}
+                }
 
                 debug!("Dispatcher get a notification");
                 debug!("Pending queue size is {}", self.pending_queue.lock().await.queue.len());
@@ -125,9 +139,7 @@ impl Executor for Dispatcher {
                                         responder_sender_cloned,
                                     ))
                                 };
-                                tokio::spawn(async move {
-                                    singleread_executor.run().await;
-                                });
+                                tokio::spawn(singleread_executor.run().in_current_span());
                             }
                             _ => {
                                 let transaction_uuid = op.versions.uuid().clone();
@@ -159,11 +171,14 @@ impl Executor for Dispatcher {
                                                 (transaction_tx, Box::new(transaction_executor))
                                             };
                                         let transactions = transactions_cloned.clone();
-                                        tokio::spawn(async move {
-                                            transaction_executor.run().await;
-                                            // Pop the transaction_tx of the finished running transaction executor from the transactions list
-                                            transactions.lock().await.remove(&transaction_uuid).unwrap();
-                                        });
+                                        tokio::spawn(
+                                            async move {
+                                                transaction_executor.run().await;
+                                                // Pop the transaction_tx of the finished running transaction executor from the transactions list
+                                                transactions.lock().await.remove(&transaction_uuid).unwrap();
+                                            }
+                                            .in_current_span(),
+                                        );
                                         // Insert the transaction_tx of the newly spanwed transaction executor into the transactions list
                                         transaction_tx
                                     });

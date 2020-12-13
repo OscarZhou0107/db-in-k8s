@@ -47,6 +47,7 @@ pub async fn main(conf: Config) {
     // Prepare sequencer pool
     let sequencer_socket_pool = Pool::builder()
         .max_size(conf.scheduler.sequencer_pool_size)
+        .min_idle(Some(1))
         .build(tcp::TcpStreamConnectionManager::new(conf.sequencer.to_addr()).await)
         .await
         .unwrap();

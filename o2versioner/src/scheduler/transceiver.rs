@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use futures::prelude::*;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::net::Shutdown;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -148,6 +149,16 @@ impl Executor for Transceiver {
                 .instrument(info_span!("<-dbproxy", message = field::Empty))
                 .await;
             }
+
+            // When the tcp receiver socket is disconnected, shutdown the entire tcp socket
+            serded_read
+                .into_inner()
+                .into_inner()
+                .as_ref()
+                .shutdown(Shutdown::Both)
+                .unwrap();
+
+            info!("Tcp receiver service terminated");
         };
         let reader_handle = tokio::spawn(reader_task.in_current_span());
 
@@ -194,6 +205,10 @@ impl Executor for Transceiver {
                 };
                 task.instrument(info_span!("->dbproxy", message = field::Empty)).await;
             }
+
+            // When the request_rx channel is disconnected, shutdown the tcp socket
+            writer.as_ref().shutdown(Shutdown::Both).unwrap();
+            info!("Request rx service terminated");
         };
         let request_rx_handle = tokio::spawn(request_rx_task.in_current_span());
 
