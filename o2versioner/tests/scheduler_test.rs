@@ -40,7 +40,7 @@ async fn test_scheduler() {
             .instrument(info_span!("sequencer(mock)")),
     );
 
-    sleep(Duration::from_millis(300)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
@@ -119,7 +119,7 @@ async fn test_scheduler_with_admin() {
         println!("sequencer_handle DONE");
     });
 
-    sleep(Duration::from_millis(300)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![
