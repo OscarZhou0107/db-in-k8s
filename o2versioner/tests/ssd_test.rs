@@ -10,7 +10,6 @@ use tracing::{info_span, Instrument};
 mod common;
 
 #[tokio::test]
-#[ignore]
 async fn test_ssd_constrained() {
     let _guard = tests_helper::init_fast_logger();
 
@@ -71,7 +70,7 @@ async fn test_ssd_constrained() {
             .await;
     });
 
-    sleep(Duration::from_millis(300)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let transaction_samples = common::sql_transaction_samples();
     let tx_sets = [
