@@ -1,5 +1,5 @@
 use super::core::{DbVersion, QueryResult, QueryResultType};
-use super::core::{PendingQueue, QueueMessage};
+use super::core::PendingQueue;
 use crate::comm::scheduler_dbproxy::Message;
 use crate::util::executor::Executor;
 use async_trait::async_trait;
