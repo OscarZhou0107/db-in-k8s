@@ -45,7 +45,7 @@ async fn test_double_s() {
     let scheduler_handle = tokio::spawn(scheduler_main(conf.clone()));
     let sequencer_handle = tokio::spawn(sequencer_main(conf.sequencer.clone()));
 
-    sleep(Duration::from_millis(300)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let transaction_samples = common::sql_transaction_samples();
 
