@@ -145,7 +145,7 @@ class PerfDB(DB):
         if filter_func is not None:
             db = list(filter(filter_func, db))
 
-        if len(db) == 0:
+        if len(db) < 2:
             return
 
         latency = list(map(lambda row: row['latency'], db))
