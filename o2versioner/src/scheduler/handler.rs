@@ -374,9 +374,9 @@ async fn process_msql(
                 }
             }
 
-            if conn_state.current_txvn().is_none() {
-                // Replace with the following line once single read query is supported
-                // if conn_state.current_txvn().is_none() && query.access_pattern().is_write_only() {
+            //if conn_state.current_txvn().is_none() {
+            // Replace with the following line once single read query is supported
+            if conn_state.current_txvn().is_none() && query.access_pattern().is_write_only() {
                 info!("Single Write query");
                 // Construct a new MsqlBeginTx
                 let msqlbegintx = MsqlBeginTx::from(query.tableops().clone());
