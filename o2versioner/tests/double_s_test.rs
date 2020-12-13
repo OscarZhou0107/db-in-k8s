@@ -229,6 +229,7 @@ async fn run_double_s_limited() {
             performance_logging: Some("./perf".to_owned()),
             detailed_logging: None,
             disable_early_release: false,
+            disable_single_read_optimization: false,
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:24212"),
@@ -319,6 +320,7 @@ async fn run_double_s_unlimited() {
             performance_logging: Some("./logging".to_owned()),
             detailed_logging: None,
             disable_early_release: false,
+            disable_single_read_optimization: false,
         },
         sequencer: SequencerConfig {
             addr: String::from("127.0.0.1:20001"),
