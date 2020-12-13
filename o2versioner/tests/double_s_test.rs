@@ -15,149 +15,7 @@ use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{info, info_span, instrument, trace, Instrument};
-
-fn transaction_samples() -> Vec<Vec<Message>> {
-    vec![
-        vec![
-            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 WRITE w1 w2")),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some("w1"),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w2 set name=\"ray\" where id = 22;",
-                "write w2",
-                Some("w2"),
-            )),
-            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-        ],
-        vec![
-            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ r0 r1 WRITE w1 w2 w3")),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some("r0"))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w2 set name=\"ray\" where id = 20;",
-                "write w2",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some("r1"))),
-            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w3 set name=\"ray\" where id = 22;",
-                "write w3",
-                Some("w3"),
-            )),
-            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-        ],
-        vec![
-            Message::RequestMsqlText(MsqlText::begintx(Option::<String>::None, "READ w2 WRITE w1 r0 r1")),
-            Message::RequestMsqlText(MsqlText::query("select * from w1;", "read w1", Some("w1"))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query(
-                "update w1 set name=\"ray\" where id = 20;",
-                "write w1",
-                Some(""),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from r0;", "read r0", Some(""))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update r0 set name=\"ray\" where id = 20;",
-                "write r0",
-                Some("r0"),
-            )),
-            Message::RequestMsqlText(MsqlText::query("select * from r1;", "read r1", Some(""))),
-            Message::RequestMsqlText(MsqlText::query("select * from w2;", "read w2", Some("w2"))),
-            Message::RequestMsqlText(MsqlText::query(
-                "update r1 set name=\"ray\" where id = 22;",
-                "write r1",
-                Some("r1"),
-            )),
-            Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
-        ],
-        vec![Message::RequestMsqlText(MsqlText::query(
-            "select * from w1;",
-            "read w1",
-            Some(""),
-        ))],
-        vec![Message::RequestMsqlText(MsqlText::query(
-            "update w3 set name=\"ray\" where id = 22;",
-            "write w3",
-            Some(""),
-        ))],
-    ]
-}
+mod common;
 
 #[tokio::test]
 async fn test_double_s() {
@@ -190,7 +48,7 @@ async fn test_double_s() {
 
     sleep(Duration::from_millis(300)).await;
 
-    let transaction_samples = transaction_samples();
+    let transaction_samples = common::sql_transaction_samples();
 
     let tester0_reqs = transaction_samples[0].clone();
     let tester_handle_0 = tokio::spawn(async move {
@@ -255,7 +113,7 @@ async fn run_double_s_limited() {
 
     sleep(Duration::from_millis(300)).await;
 
-    let transaction_samples = transaction_samples();
+    let transaction_samples = common::sql_transaction_samples();
 
     let msgs0 = [
         transaction_samples[3].clone(),
@@ -346,7 +204,7 @@ async fn run_double_s_unlimited() {
 
     sleep(Duration::from_millis(300)).await;
 
-    let transaction_samples = transaction_samples();
+    let transaction_samples = common::sql_transaction_samples();
     let tx_sets = [
         transaction_samples[3].clone(),
         transaction_samples[4].clone(),
