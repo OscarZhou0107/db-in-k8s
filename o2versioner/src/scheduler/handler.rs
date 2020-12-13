@@ -463,7 +463,7 @@ async fn process_query(
     }
 
     if conn_state.current_txvn().is_none() {
-        if msql.try_get_query().unwrap().access_pattern().is_write_only() {
+        if msql.try_get_query().unwrap().access_pattern().is_read_only() {
             info!("Single Read query");
         } else {
             panic!("TxVN should not be None here");
