@@ -6,6 +6,7 @@ use csv::Writer;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
@@ -14,37 +15,19 @@ use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct QueueMessage {
-    pub arriving_timestamp: DateTime<Utc>,
     pub identifier: RequestMeta,
     pub operation_type: Task,
     pub msql: Msql,
-    pub versions: Option<TxVN>,
+    pub versions: TxVN,
 }
 
 impl QueueMessage {
-    pub fn new(identifier: RequestMeta, msql: Msql, versions: Option<TxVN>) -> Self {
-        let operation_type = match &msql {
-            Msql::BeginTx(_) => Task::BEGIN,
-            Msql::Query(op) => match op.tableops().access_pattern() {
-                AccessPattern::ReadOnly => {
-                    assert!(!op.has_early_release());
-                    Task::READ
-                }
-                AccessPattern::WriteOnly => Task::WRITE,
-                _ => panic!("Illegal access pattern"),
-            },
-            Msql::EndTx(op) => match op.mode() {
-                MsqlEndTxMode::Commit => Task::COMMIT,
-                MsqlEndTxMode::Rollback => Task::ABORT,
-            },
-        };
-
+    pub fn new(identifier: RequestMeta, operation_type : Task, msql: Msql, versions: TxVN) -> Self {
         Self {
-            arriving_timestamp: Utc::now(),
-            identifier,
-            operation_type,
-            msql,
-            versions,
+            identifier : identifier,
+            operation_type : operation_type,
+            msql : msql,
+            versions : versions
         }
     }
 
@@ -64,7 +47,7 @@ impl QueueMessage {
         }
 
         let result_type = match self.operation_type {
-            Task::READ | Task::WRITE => QueryResultType::QUERY,
+            Task::READ | Task::SINGLEREAD | Task::WRITE => QueryResultType::QUERY,
             Task::COMMIT | Task::ABORT => QueryResultType::END,
             _ => {
                 panic!("Illegal operation");
@@ -76,7 +59,7 @@ impl QueueMessage {
             result,
             result_type,
             succeed,
-            contained_newer_versions: self.versions.unwrap(),
+            contained_newer_versions: self.versions,
             contained_early_release_version: self.msql.try_get_query().ok().and_then(|q| {
                 if q.has_early_release() {
                     Some(q.early_release_tables().clone())
@@ -90,6 +73,7 @@ impl QueueMessage {
 
 pub struct PendingQueue {
     pub queue: Vec<QueueMessage>,
+    pub highest_contained_version: HashMap<String, u64>, 
     pub notify: Arc<Notify>,
 }
 
@@ -98,13 +82,89 @@ impl PendingQueue {
         Self {
             queue: Vec::new(),
             notify: Arc::new(Notify::new()),
+            highest_contained_version: HashMap::new(),
         }
+    }
+
+    pub fn emplace(&mut self, identifier : RequestMeta, msql: Msql, versions_op: Option<TxVN>) {
+
+        let mut operation_type = match &msql {
+            Msql::Query(op) => match op.tableops().access_pattern() {
+                AccessPattern::ReadOnly => {
+                    assert!(!op.has_early_release());
+                    Task::READ
+                }
+                AccessPattern::WriteOnly => Task::WRITE,
+                _ => panic!("Illegal access pattern"),
+            },
+            Msql::EndTx(op) => match op.mode() {
+                MsqlEndTxMode::Commit => Task::COMMIT,
+                MsqlEndTxMode::Rollback => Task::ABORT,
+            },
+            _ => {panic!("Not defined operation")}
+        };
+
+       
+        
+        let versions = if let Some(transaction_versions) = versions_op {
+            transaction_versions
+        } else {
+            let mut versions_vec : Vec<TxTableVN> = Vec::new();
+
+            match &msql {
+
+                Msql::Query(op) => match op.tableops().access_pattern() {
+                    AccessPattern::ReadOnly => {
+                        
+                        op.tableops().get().iter().for_each(|table_op| {
+                           versions_vec.push(TxTableVN::new(table_op.table(), self.get_highest_version_for_table(table_op.table()), RWOperation::R)); 
+                        });
+                      
+                        operation_type = Task::SINGLEREAD;
+                    },
+                    _ => {panic!("Only ReadOnly task can have no pre-defined transaction versions");}
+                },
+                _ => {panic!("Only ReadOnly task can have no pre-defined transaction versions");} 
+            }
+
+            TxVN::new().set_tx(Some("Single_Read")).set_txtablevns(versions_vec)
+        };
+
+        self.push(QueueMessage::new(identifier,
+            operation_type,
+            msql,
+            versions));
     }
 
     pub fn push(&mut self, op: QueueMessage) {
         debug!("PendingQueue pushed {:?} and notify all tasks waiting", op);
+        self.update_highest_version(&op);
         self.queue.push(op);
         self.notify.notify_one();
+    }
+
+    pub fn update_highest_version(&mut self, message : &QueueMessage) {
+        message.versions
+        .txtablevns()
+        .iter()
+        .for_each(| version | {
+            if self.highest_contained_version.contains_key(&version.table) {
+                let highest = self.highest_contained_version.get_mut(&version.table).unwrap();
+                if *highest < version.vn {
+                    *highest = version.vn;
+                }
+            } else {
+                let _ = self.highest_contained_version.insert(version.table.clone(), version.vn);
+            }
+        });
+    }
+
+    pub fn get_highest_version_for_table(& self, table : &str) -> u64 {
+        if let Some(version) = self.highest_contained_version.get(table) {
+            return version.clone();
+        } else {
+            return 0;
+        }
     }
 
     pub fn get_notify(&self) -> Arc<Notify> {
@@ -116,9 +176,9 @@ impl PendingQueue {
         let mut unready_queue = Vec::new();
         let mut tx_set = HashSet::new();
         for operation in self.queue.drain(..) {
-            let uuid = operation.versions.as_ref().unwrap().uuid().clone();
+            let uuid = operation.versions.uuid().clone();
             if tx_set.insert(uuid) {
-                let violate_version = if let Some(txvn) = &operation.versions {
+                let violate_version =
                     match &operation.msql {
                         Msql::Query(query) => {
                             version
@@ -126,18 +186,14 @@ impl PendingQueue {
                                 .map(|version| {
                                     let tbops = query.tableops();
                                     let ertables = query.early_release_tables();
-                                    version.violate_version(&txvn.get_from_tableops(tbops).unwrap())
-                                        || version.violate_version(&txvn.get_from_ertables(ertables).unwrap())
+                                    version.violate_version(&operation.versions.get_from_tableops(tbops).unwrap())
+                                        || version.violate_version(&operation.versions.get_from_ertables(ertables).unwrap())
                                 })
                                 .await
                         }
-                        Msql::EndTx(_) => version.lock().await.violate_version(txvn.txtablevns()),
+                        Msql::EndTx(_) => version.lock().await.violate_version(operation.versions.txtablevns()),
                         _ => false,
-                    }
-                } else {
-                    // If no txvn, then not going to be blocked for version
-                    false
-                };
+                    };
 
                 if violate_version {
                     unready_queue.push(operation);
@@ -249,8 +305,7 @@ impl PostgreToCsvWriter {
 
     pub fn to_csv(self, message: Vec<tokio_postgres::SimpleQueryMessage>) -> String {
         match self.mode {
-            Task::BEGIN => return "".to_string(),
-            Task::READ => return self.convert_result_to_csv_string(message),
+            Task::READ | Task::SINGLEREAD => return self.convert_result_to_csv_string(message),
             Task::WRITE => return self.generate_csv_string_with_header(message, "Affected rows".to_string()),
             Task::COMMIT => return self.generate_csv_string_with_header(message, "Status".to_string()),
             Task::ABORT => return self.generate_csv_string_with_header(message, "Status".to_string()),
@@ -350,8 +405,8 @@ impl QueryResult {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Task {
-    BEGIN,
     READ,
+    SINGLEREAD,
     WRITE,
     ABORT,
     COMMIT,

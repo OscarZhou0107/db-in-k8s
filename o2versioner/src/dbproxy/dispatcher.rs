@@ -104,58 +104,72 @@ impl Executor for Dispatcher {
                     let pool_opt_cloned = pool_opt.clone();
                     let responder_sender_cloned = self.responder_sender.clone();
                     let transactions_cloned = self.transactions.clone();
-
                     async move {
-                        let transaction_uuid = op.versions.as_ref().unwrap().uuid().clone();
-                        let mut transactions_lock = transactions_cloned.lock().await;
-
-                        let transaction_sender =
-                            transactions_lock.entry(transaction_uuid.clone()).or_insert_with(|| {
-                                // Start a new transaction if not existed yet
-                                // Save this newly opened transaction, associates an tx with the transaction, so
-                                // upcoming requests can go to the transaction via tx
-                                debug!("Opening a new transaction for ({})", transaction_uuid);
-
-                                let (transaction_tx, transaction_executor): (_, Box<dyn Executor>) =
-                                    if let Some(pool) = pool_opt_cloned {
-                                        let (transaction_tx, transaction_executor) = TransactionExecutor::new(
-                                            transaction_uuid.clone(),
-                                            op.identifier.to_client_meta(),
-                                            transaction_channel_queue_size,
-                                            pool,
-                                            responder_sender_cloned,
-                                        );
-                                        (transaction_tx, Box::new(transaction_executor))
-                                    } else {
-                                        let (transaction_tx, transaction_executor) = MockTransactionExecutor::new(
-                                            transaction_uuid.clone(),
-                                            op.identifier.to_client_meta(),
-                                            transaction_channel_queue_size,
-                                            responder_sender_cloned,
-                                        );
-                                        (transaction_tx, Box::new(transaction_executor))
-                                    };
-
-                                let transactions = transactions_cloned.clone();
+                    match op.operation_type {
+                        Task::SINGLEREAD => {
+                                let transaction_uuid = op.versions.uuid().clone();
+                                let singleread_executor : Box<dyn Executor> = if let Some(pool) = pool_opt_cloned {
+                                    Box::new(SingleReadExecutor::new(transaction_uuid, op.identifier.to_client_meta(), pool, op.clone(), responder_sender_cloned))
+                                } else {
+                                    panic!("Not implemented");
+                                };
                                 tokio::spawn(async move {
-                                    transaction_executor.run().await;
-                                    // Pop the transaction_tx of the finished running transaction executor from the transactions list
-                                    transactions.lock().await.remove(&transaction_uuid).unwrap();
+                                    singleread_executor.run().await;
                                 });
-
-                                // Insert the transaction_tx of the newly spanwed transaction executor into the transactions list
-                                transaction_tx
-                            });
-
-                        // Send the request to the existing transaction listener
-                        debug!(
-                            "Sending a new operation to an existing transaction ({})",
-                            op.versions.as_ref().unwrap().uuid()
-                        );
-                        transaction_sender.send(op).await.map_err(|e| e.to_string()).unwrap();
-                    }
-                })
-                .await;
+                        },
+                        _ => {
+                     
+                                let transaction_uuid = op.versions.uuid().clone();
+                                let mut transactions_lock = transactions_cloned.lock().await;
+        
+                                let transaction_sender =
+                                    transactions_lock.entry(transaction_uuid.clone()).or_insert_with(|| {
+                                        // Start a new transaction if not existed yet
+                                        // Save this newly opened transaction, associates an tx with the transaction, so
+                                        // upcoming requests can go to the transaction via tx
+                                        debug!("Opening a new transaction for ({})", transaction_uuid);
+        
+                                        let (transaction_tx, transaction_executor): (_, Box<dyn Executor>) =
+                                            if let Some(pool) = pool_opt_cloned {
+                                                let (transaction_tx, transaction_executor) = TransactionExecutor::new(
+                                                    transaction_uuid.clone(),
+                                                    op.identifier.to_client_meta(),
+                                                    transaction_channel_queue_size,
+                                                    pool,
+                                                    responder_sender_cloned,
+                                                );
+                                                (transaction_tx, Box::new(transaction_executor))
+                                            } else {
+                                                let (transaction_tx, transaction_executor) = MockTransactionExecutor::new(
+                                                    transaction_uuid.clone(),
+                                                    op.identifier.to_client_meta(),
+                                                    transaction_channel_queue_size,
+                                                    responder_sender_cloned,
+                                                );
+                                                (transaction_tx, Box::new(transaction_executor))
+                                            };
+        
+                                        let transactions = transactions_cloned.clone();
+                                        tokio::spawn(async move {
+                                            transaction_executor.run().await;
+                                            // Pop the transaction_tx of the finished running transaction executor from the transactions list
+                                            transactions.lock().await.remove(&transaction_uuid).unwrap();
+                                        });
+        
+                                        // Insert the transaction_tx of the newly spanwed transaction executor into the transactions list
+                                        transaction_tx
+                                    });
+        
+                                // Send the request to the existing transaction listener
+                                debug!(
+                                    "Sending a new operation to an existing transaction ({})",
+                                    op.versions.uuid()
+                                );
+                                transaction_sender.send(op).await.map_err(|e| e.to_string()).unwrap();
+                        }
+                }
+            }})
+            .await;
         }
     }
 }
@@ -206,14 +220,7 @@ impl Executor for TransactionExecutor {
         let mut is_ended_by_rollback = true;
         while let Some(operation) = self.transaction_listener.recv().await {
             let raw = match operation.operation_type {
-                Task::READ => {
-                    transc
-                        .as_ref()
-                        .unwrap()
-                        .simple_query(&MsqlFinalString::from(operation.msql.clone()).into_inner())
-                        .await
-                }
-                Task::WRITE => {
+                Task::READ | Task::WRITE => {
                     transc
                         .as_ref()
                         .unwrap()
@@ -246,6 +253,55 @@ impl Executor for TransactionExecutor {
             "Finishing {} after executing {} commands. {}",
             self.transaction_uuid, total_sql_cmd, ending
         );
+    }
+}
+
+struct SingleReadExecutor {
+    transaction_uuid: Uuid,
+    client_meta: ClientMeta,
+    pool: Pool<PostgresConnectionManager<NoTls>>,
+    operation : QueueMessage,
+    responder_sender: mpsc::Sender<QueryResult>,
+}
+
+impl SingleReadExecutor {
+    pub fn new(
+        transaction_uuid: Uuid,
+        client_meta: ClientMeta,
+        pool: Pool<PostgresConnectionManager<NoTls>>,
+        operation : QueueMessage,
+        responder_sender: mpsc::Sender<QueryResult>,
+    ) -> Self {
+
+        Self {
+            transaction_uuid,
+            client_meta,
+            pool,
+            operation,
+            responder_sender,
+        }
+
+    }
+}
+
+#[async_trait]
+impl Executor for SingleReadExecutor {
+    async fn run(mut self: Box<Self>) {
+        let mut conn = self.pool.get().await.unwrap();
+        info!("Deploying {}", self.transaction_uuid);
+        let transc = Some(conn.transaction().await.expect("Cannot create a new transaction"));
+
+        let raw = transc
+            .as_ref()
+            .unwrap()
+            .simple_query(&MsqlFinalString::from(self.operation.msql.clone()).into_inner())
+            .await;
+
+        self.responder_sender
+            .send(self.operation.into_sqlresponse(raw))
+            .await
+            .map_err(|e| e.to_string())
+            .unwrap();
     }
 }
 
