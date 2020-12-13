@@ -53,8 +53,8 @@ impl Dispatcher {
         let n1 = new_task_notify.notified();
         let n2 = version_notify.notified();
         tokio::select! {
-           _ = n1 => {debug!("new_task_notify");}
-           _ = n2 => {debug!("version_notify");}
+           _ = n1 => {debug!("new_task_notify")}
+           _ = n2 => {debug!("version_notify")}
         }
     }
 }
