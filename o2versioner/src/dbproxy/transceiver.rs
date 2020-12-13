@@ -77,7 +77,7 @@ impl Executor for Receiver {
                         pending_queue
                             .lock()
                             .await
-                            .push(QueueMessage::new(meta, request, versions));
+                            .emplace(meta, request, versions);
                     }
                     _ => debug!("nope"),
                 }
