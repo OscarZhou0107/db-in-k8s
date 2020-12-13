@@ -96,7 +96,9 @@ impl State {
                 Span::current().record("op", &&format!("{:?}", msqlquery.tableops().access_pattern())[..]);
                 match msqlquery.tableops().access_pattern() {
                     AccessPattern::Mixed => panic!("Does not support query with mixed R and W"),
-                    AccessPattern::ReadOnly => vec![self.wait_on_version(msqlquery, &request.txvn).await],
+                    AccessPattern::ReadOnly => {
+                        vec![self.wait_on_version_for_read_only_query(msqlquery, &request.txvn).await]
+                    }
                     AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
                 }
             }
@@ -212,7 +214,11 @@ impl State {
     }
 
     #[instrument(skip(self), fields(msqlquery, txvn))]
-    async fn wait_on_version(&self, msqlquery: &MsqlQuery, txvn: &Option<TxVN>) -> (SocketAddr, TransceiverAddr) {
+    async fn wait_on_version_for_read_only_query(
+        &self,
+        msqlquery: &MsqlQuery,
+        txvn: &Option<TxVN>,
+    ) -> (SocketAddr, TransceiverAddr) {
         assert_eq!(
             msqlquery.tableops().access_pattern(),
             AccessPattern::ReadOnly,
@@ -250,6 +256,7 @@ impl State {
                 }
             }
 
+            // TODO: choose the dbproxy with least load
             // For now, pick the first dbproxy from all available
             let selected_dbproxy = &avail_dbproxy[0];
             trace!(
@@ -266,19 +273,28 @@ impl State {
             // Since a single-read transaction executes only at one replica,
             // there is no need to assign cluster-wide version numbers to such a transaction. Instead,
             // the scheduler forwards the transaction to the chosen replica, without assigning version
-            // numbers.
-            // Because the order of execution for a single-read transaction is ultimately decided
+            // numbers. Because the order of execution for a single-read transaction is ultimately decided
             // by the database proxy, the scheduler does not block such queries.
+            // The scheduler attempts to reduce this wait by selecting a replica that has an up-to-date
+            // version of each table needed by the query. In this case, up-to-date version means that the
+            // table has a version number greater than or equal to the highest version number assigned to
+            // any previous transaction on that table. Such a replica may not necessarily exist.
 
             // Find the replica that has the highest version number for the query
-            unimplemented!()
-
-            // TODO:
-            // The scheduler attempts to reduce this wait by
-            // selecting a replica that has an up-to-date version of each table needed by the query. In
-            // this case, up-to-date version means that the table has a version number greater than or
-            // equal to the highest version number assigned to any previous transaction on that table.
-            // Such a replica may not necessarily exist.
+            let selected_dbproxy = self
+                .dbvn_manager
+                .read()
+                .await
+                .get_most_updated_version_for_read_query(msqlquery.tableops());
+            trace!(
+                "Found dbproxy {} for executing the single ReadOnly query: {:?}",
+                selected_dbproxy.0,
+                selected_dbproxy.1
+            );
+            (
+                selected_dbproxy.0.clone(),
+                self.dbproxy_manager.get(&selected_dbproxy.0),
+            )
         }
     }
 

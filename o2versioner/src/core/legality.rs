@@ -82,7 +82,7 @@ impl Legality {
                 } else {
                     match &query.tableops().access_pattern() {
                         AccessPattern::Mixed => Self::critical("Does not support query with mixed R and W"),
-                        AccessPattern::ReadOnly => Self::panic("Does not support fast single R query"),
+                        AccessPattern::ReadOnly => Self::legal(),
                         AccessPattern::WriteOnly => Self::panic("Query does not have a valid BeginTx"),
                     }
                 }

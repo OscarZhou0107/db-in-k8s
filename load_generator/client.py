@@ -223,20 +223,23 @@ class Client:
             self.logger.debug("=======================================")
             self.logger.critical("Entering webpage {}".format(self.curr))
 
-            # send BEGIN to start the transaction
-            begin = web_to_sql.getBegin(self.curr)
-            self.logger.info("### Sending data: BEGIN")
-            self.logger.debug(begin)
-            self.soc.sendall(jsonToByte(begin))
+            single_read = ["searchReq", "prodDet", "custReg", "adminReq"]
+            # skip sending BEGIN if single read
+            if not self.curr in single_read:
+                # send BEGIN to start the transaction
+                begin = web_to_sql.getBegin(self.curr)
+                self.logger.info("### Sending data: BEGIN")
+                self.logger.debug(begin)
+                self.soc.sendall(jsonToByte(begin))
 
-            # receive response to BEGIN
-            data = byteToJson(self.soc.recv(2**24))
-            self.logger.info("### Receiving data: BEGIN")
-            self.logger.debug(data)
+                # receive response to BEGIN
+                data = byteToJson(self.soc.recv(2**24))
+                self.logger.info("### Receiving data: BEGIN")
+                self.logger.debug(data)
 
-            if OK not in data["reply"]["BeginTx"]:
-                self.logger.error("Begin response contains error, terminating...")
-                return 0
+                if OK not in data["reply"]["BeginTx"]:
+                    self.logger.error("Begin response contains error, terminating...")
+                    return 0
             
             if self.curr == 'adminConf':
                 okay = self.doAdminConf()
@@ -273,20 +276,22 @@ class Client:
                 self.soc.sendall(jsonToByte(crash))
                 return 0
 
-            # send commit to end current transaction
-            commit = web_to_sql.getCommit()
-            self.logger.info("### Sending data: COMMIT")
-            self.logger.debug(commit)
-            self.soc.sendall(jsonToByte(commit))
+            # skip sending COMMIT if single read
+            if not self.curr in single_read:
+                # send commit to end current transaction
+                commit = web_to_sql.getCommit()
+                self.logger.info("### Sending data: COMMIT")
+                self.logger.debug(commit)
+                self.soc.sendall(jsonToByte(commit))
 
-            # receive reponse to commit
-            data = byteToJson(self.soc.recv(2**24))
-            self.logger.info("### Receiving data: COMMIT")
-            self.logger.debug(data)
+                # receive reponse to commit
+                data = byteToJson(self.soc.recv(2**24))
+                self.logger.info("### Receiving data: COMMIT")
+                self.logger.debug(data)
 
-            if OK not in data["reply"]["EndTx"]:
-                self.logger.error("End response contains error, terminating...")
-                return 0
+                if OK not in data["reply"]["EndTx"]:
+                    self.logger.error("End response contains error, terminating...")
+                    return 0
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)

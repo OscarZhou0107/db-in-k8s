@@ -375,7 +375,9 @@ async fn process_msql(
             }
 
             if conn_state.current_txvn().is_none() {
-                info!("Single R/W query");
+                // Replace with the following line once single read query is supported
+                // if conn_state.current_txvn().is_none() && query.access_pattern().is_write_only() {
+                info!("Single Write query");
                 // Construct a new MsqlBeginTx
                 let msqlbegintx = MsqlBeginTx::from(query.tableops().clone());
                 process_begintx(msqlbegintx, conn_state, &sequencer_socket_pool).await;
@@ -460,7 +462,13 @@ async fn process_query(
         return msqlresponse;
     }
 
-    assert!(conn_state.current_txvn().is_some());
+    if conn_state.current_txvn().is_none() {
+        if msql.try_get_query().unwrap().access_pattern().is_write_only() {
+            info!("Single Read query");
+        } else {
+            panic!("TxVN should not be None here");
+        }
+    }
 
     dispatcher_addr
         .request(DispatcherRequest::new(
