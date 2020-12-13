@@ -150,14 +150,6 @@ impl Executor for Transceiver {
                 .await;
             }
 
-            // When the tcp receiver socket is disconnected, shutdown the entire tcp socket
-            serded_read
-                .into_inner()
-                .into_inner()
-                .as_ref()
-                .shutdown(Shutdown::Both)
-                .unwrap();
-
             info!("Tcp receiver service terminated");
         };
         let reader_handle = tokio::spawn(reader_task.in_current_span());

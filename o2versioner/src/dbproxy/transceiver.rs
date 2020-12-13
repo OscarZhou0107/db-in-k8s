@@ -5,7 +5,6 @@ use crate::util::executor::Executor;
 use async_trait::async_trait;
 use futures::prelude::*;
 use futures::SinkExt;
-use std::net::Shutdown;
 use std::sync::Arc;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::{TcpListener, ToSocketAddrs};
@@ -85,14 +84,6 @@ impl Executor for Receiver {
             .await;
         }
 
-        // When the tcp receiver is disconnected, shutdown the entire tcp socket
-        deserializer
-            .into_inner()
-            .into_inner()
-            .as_ref()
-            .shutdown(Shutdown::Both)
-            .unwrap();
-
         info!("Receiver finished its jobs");
     }
 }
@@ -162,6 +153,7 @@ impl Executor for Responder {
                 .await
                 .unwrap();
         }
+
         info!("Responder finishes its job");
     }
 }
