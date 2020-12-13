@@ -157,6 +157,11 @@ impl MsqlQuery {
         }
     }
 
+    /// Get the `AccessPattern` of the current query
+    pub fn access_pattern(&self) -> AccessPattern {
+        self.tableops.access_pattern()
+    }
+
     /// Get a ref to the query
     pub fn query(&self) -> &str {
         &self.query[..]
@@ -679,6 +684,25 @@ mod tests_msqlquery {
             EarlyReleaseTables::default()
         )
         .is_err());
+    }
+
+    #[test]
+    fn test_access_pattern() {
+        let q = MsqlQuery::new(
+            "Update table1 set name=\"ray\" where id = 20;",
+            TableOps::from_iter(vec![TableOp::new("table1", RWOperation::W)]),
+            EarlyReleaseTables::from("t0 t1"),
+        )
+        .unwrap();
+        assert!(q.access_pattern().is_write_only());
+
+        let q2 = MsqlQuery::new(
+            "Select * from table0;",
+            TableOps::from_iter(vec![TableOp::new("table0", RWOperation::R)]),
+            EarlyReleaseTables::from_iter(vec!["t0", "t1"]),
+        )
+        .unwrap();
+        assert!(q2.access_pattern().is_read_only());
     }
 }
 
