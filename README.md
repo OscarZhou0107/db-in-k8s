@@ -91,7 +91,7 @@ find  -name '*.py' | xargs wc -l | sort -nr
 - [x] Query stmt
 - [x] Commit&Abort tx stmt
 - [x] Single write (and unoptimized single read)
-- [ ] Single read
+- [x] Single read
 - [x] Early release
 
 
