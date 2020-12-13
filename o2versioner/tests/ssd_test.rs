@@ -10,6 +10,7 @@ use tracing::{info_span, Instrument};
 mod common;
 
 #[tokio::test]
+#[ignore]
 async fn test_ssd_constrained() {
     let _guard = tests_helper::init_fast_logger();
 

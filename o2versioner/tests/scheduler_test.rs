@@ -155,6 +155,8 @@ async fn test_scheduler_with_admin() {
         println!("tester_handle_1 DONE");
     });
 
+    tokio::try_join!(tester_handle_0, tester_handle_1,).unwrap();
+
     sleep(Duration::from_millis(300)).await;
 
     let admin_client_handle = tokio::spawn(async move {
@@ -166,14 +168,7 @@ async fn test_scheduler_with_admin() {
     });
 
     // Must run, otherwise it won't do the work
-    tokio::try_join!(
-        scheduler_handle,
-        sequencer_handle,
-        tester_handle_0,
-        tester_handle_1,
-        admin_client_handle,
-    )
-    .unwrap();
+    tokio::try_join!(scheduler_handle, sequencer_handle, admin_client_handle,).unwrap();
 }
 
 #[tokio::test]

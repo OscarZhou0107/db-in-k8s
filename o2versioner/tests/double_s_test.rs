@@ -1,5 +1,4 @@
 use futures::prelude::*;
-use o2versioner::comm::scheduler_api::*;
 use o2versioner::comm::scheduler_dbproxy;
 use o2versioner::comm::MsqlResponse;
 use o2versioner::core::*;
