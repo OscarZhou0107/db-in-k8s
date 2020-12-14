@@ -72,16 +72,16 @@ def plot_charts(args, database):
         dataset = sorted(dataset, key=lambda x: x[1])
 
         run_names, nums_clients, sr_throughputs_stats, latencies = list(zip(*dataset))[0:4]
-        peak_throughputs = tuple(zip(*sr_throughputs_stats))[0]
+        median_throughputs = tuple(zip(*sr_throughputs_stats))[4]
         mean_latencies = tuple(zip(*latencies))[3]
         
         print('nums_clients', nums_clients)
-        print('peak_throughputs', peak_throughputs)
+        print('median_throughputs', median_throughputs)
         print('latencies (mean, stddev, geomean, median)', latencies)
         
         # Left y-axis for throughput
-        ax.plot(nums_clients, peak_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='o')  # , picker=True, pickradius=2)
-        ax.set(xlabel='Number of Clients', ylabel='Peak Throughput on Successful Queries (#queries/sec)')
+        ax.plot(nums_clients, median_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='o')  # , picker=True, pickradius=2)
+        ax.set(xlabel='Number of Clients', ylabel='Median Throughput on Successful Queries (#queries/sec)')
         ax.grid(axis='x', linestyle='--')
         ax.grid(axis='y', linestyle='-')
         ax.legend(loc='upper left')
