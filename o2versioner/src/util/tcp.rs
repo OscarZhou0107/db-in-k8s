@@ -14,7 +14,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{field, info, instrument, trace, warn, Instrument, Span};
 
 pub type StopTx = oneshot::Sender<()>;
-type StopRx = oneshot::Receiver<()>;
+pub type StopRx = oneshot::Receiver<()>;
 
 /// Helper function to bind to a `TcpListener` and forward all incomming `TcpStream` to `connection_handler`.
 ///
