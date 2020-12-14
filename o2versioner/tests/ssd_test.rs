@@ -54,7 +54,7 @@ async fn test_ssd_constrained_disable_single_read_opt() {
     let sequencer_max_connection = 1;
     let conf = Config {
         scheduler: SchedulerConfig {
-            addr: String::from("127.0.0.1:45020"),
+            addr: String::from("127.0.0.1:45120"),
             admin_addr: None,
             max_connection: Some(2),
             sequencer_pool_size: sequencer_max_connection,
@@ -66,16 +66,16 @@ async fn test_ssd_constrained_disable_single_read_opt() {
             disable_single_read_optimization: true,
         },
         sequencer: SequencerConfig {
-            addr: String::from("127.0.0.1:45021"),
+            addr: String::from("127.0.0.1:45121"),
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![
             DbProxyConfig {
-                addr: String::from("127.0.0.1:45022"),
+                addr: String::from("127.0.0.1:45122"),
                 sql_conf: None,
             },
             DbProxyConfig {
-                addr: String::from("127.0.0.1:45023"),
+                addr: String::from("127.0.0.1:45123"),
                 sql_conf: None,
             },
         ],
