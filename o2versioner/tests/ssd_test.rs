@@ -47,8 +47,119 @@ async fn test_ssd_constrained_default() {
     test_suites(conf, &common::sql_transaction_samples()).await;
 }
 
+#[tokio::test]
+async fn test_ssd_constrained_disable_single_read_opt() {
+    let _guard = tests_helper::init_fast_logger();
+
+    let sequencer_max_connection = 1;
+    let conf = Config {
+        scheduler: SchedulerConfig {
+            addr: String::from("127.0.0.1:45020"),
+            admin_addr: None,
+            max_connection: Some(2),
+            sequencer_pool_size: sequencer_max_connection,
+            dispatcher_queue_size: 1,
+            transceiver_queue_size: 1,
+            performance_logging: None,
+            detailed_logging: None,
+            disable_early_release: false,
+            disable_single_read_optimization: true,
+        },
+        sequencer: SequencerConfig {
+            addr: String::from("127.0.0.1:45021"),
+            max_connection: Some(sequencer_max_connection),
+        },
+        dbproxy: vec![
+            DbProxyConfig {
+                addr: String::from("127.0.0.1:45022"),
+                sql_conf: None,
+            },
+            DbProxyConfig {
+                addr: String::from("127.0.0.1:45023"),
+                sql_conf: None,
+            },
+        ],
+    };
+
+    test_suites(conf, &common::sql_transaction_samples()).await;
+}
+
+#[tokio::test]
+async fn test_ssd_constrained_disable_early_release() {
+    let _guard = tests_helper::init_fast_logger();
+
+    let sequencer_max_connection = 1;
+    let conf = Config {
+        scheduler: SchedulerConfig {
+            addr: String::from("127.0.0.1:45040"),
+            admin_addr: None,
+            max_connection: Some(2),
+            sequencer_pool_size: sequencer_max_connection,
+            dispatcher_queue_size: 1,
+            transceiver_queue_size: 1,
+            performance_logging: None,
+            detailed_logging: None,
+            disable_early_release: true,
+            disable_single_read_optimization: false,
+        },
+        sequencer: SequencerConfig {
+            addr: String::from("127.0.0.1:45041"),
+            max_connection: Some(sequencer_max_connection),
+        },
+        dbproxy: vec![
+            DbProxyConfig {
+                addr: String::from("127.0.0.1:45042"),
+                sql_conf: None,
+            },
+            DbProxyConfig {
+                addr: String::from("127.0.0.1:45043"),
+                sql_conf: None,
+            },
+        ],
+    };
+
+    test_suites(conf, &common::sql_transaction_samples()).await;
+}
+
+#[tokio::test]
+async fn test_ssd_constrained_disable_single_read_opt_and_early_release() {
+    let _guard = tests_helper::init_fast_logger();
+
+    let sequencer_max_connection = 1;
+    let conf = Config {
+        scheduler: SchedulerConfig {
+            addr: String::from("127.0.0.1:45060"),
+            admin_addr: None,
+            max_connection: Some(2),
+            sequencer_pool_size: sequencer_max_connection,
+            dispatcher_queue_size: 1,
+            transceiver_queue_size: 1,
+            performance_logging: None,
+            detailed_logging: None,
+            disable_early_release: true,
+            disable_single_read_optimization: true,
+        },
+        sequencer: SequencerConfig {
+            addr: String::from("127.0.0.1:45061"),
+            max_connection: Some(sequencer_max_connection),
+        },
+        dbproxy: vec![
+            DbProxyConfig {
+                addr: String::from("127.0.0.1:45062"),
+                sql_conf: None,
+            },
+            DbProxyConfig {
+                addr: String::from("127.0.0.1:45063"),
+                sql_conf: None,
+            },
+        ],
+    };
+
+    test_suites(conf, &common::sql_transaction_samples()).await;
+}
+
 /// Launch the entire setup based on `Config`, inputs are defined inside this function.
-/// 
+///
 /// # Notes:
 /// All sub suites defined inside this function must be able to run with any `Config`
 async fn test_suites(conf: Config, transaction_samples: &Vec<Vec<Message>>) {
