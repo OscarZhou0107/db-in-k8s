@@ -248,6 +248,7 @@ impl EarlyReleaseTables {
         Self::from_iter(self)
     }
 
+    /// Check whether `EarlyReleaseTables` contains no tables
     pub fn is_empty(&self) -> bool {
         return self.0.is_empty();
     }

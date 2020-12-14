@@ -13,17 +13,26 @@ impl MsqlFinalString {
         Self(s.into())
     }
 
+    /// Get a `&str` to the current `MsqlFinalString`
     pub fn inner(&self) -> &str {
         &self.0[..]
     }
 
+    /// Convert the current `MsqlFinalString` to a `String`
     pub fn into_inner(self) -> String {
         self.0
     }
 }
 
-/// For conversion into `String`
+impl AsRef<str> for MsqlFinalString {
+    /// For conversion of `&MsqlFinalString` to `&str`
+    fn as_ref(&self) -> &str {
+        self.inner()
+    }
+}
+
 impl From<MsqlFinalString> for String {
+    /// For conversion into `String`
     fn from(m: MsqlFinalString) -> Self {
         m.into_inner()
     }
@@ -33,6 +42,8 @@ impl<M> From<M> for MsqlFinalString
 where
     M: IntoMsqlFinalString,
 {
+    /// For conversion of any structs that implement the trait `IntoMsqlFinalString`
+    /// into `MsqlFinalString`
     fn from(m: M) -> Self {
         m.into_msqlfinalstring()
     }

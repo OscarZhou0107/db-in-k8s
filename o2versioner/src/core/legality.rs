@@ -11,23 +11,26 @@ pub enum Legality {
     Panic(String),
 }
 
-/// Use this function as a single point for query diagnostics,
-/// all legalization must be done before this function call.
-/// Code after this function call in later stages can simply panic.
 impl Legality {
+    /// Returns a `Legality::Legal` variant
     pub fn legal() -> Self {
         Self::Legal
     }
 
+    /// Returns a `Legality::Critical` variant with the argument
     pub fn critical<S: Into<String>>(s: S) -> Self {
         Self::Critical(s.into())
     }
 
+    /// Returns a `Legality::Panic` variant with the argument
     pub fn panic<S: Into<String>>(s: S) -> Self {
         Self::Panic(s.into())
     }
 
-    fn check_tableops_match_txvn(query: &MsqlQuery, txvn: &TxVN) -> Option<Self> {
+    /// Check whether the `TableOps` within the argument `MsqlQuery` matches
+    /// with the argument `TxVN`, and if error, returns `Err(Legality::Critical)`
+    /// or `Err(Legality::Panic)`
+    fn check_tableops_match_txvn(query: &MsqlQuery, txvn: &TxVN) -> Result<(), Self> {
         if txvn.get_from_tableops(&query.tableops()).is_err() {
             let missing_tableops: Vec<_> = query
                 .tableops()
@@ -36,15 +39,18 @@ impl Legality {
                 .filter(|tableop| txvn.get_from_tableop(tableop).is_none())
                 .map(|tableop| tableop.table())
                 .collect();
-            Some(Self::critical(format!(
+            Err(Self::critical(format!(
                 "Query is using tables not declared in the BeginTx: {:?}",
                 missing_tableops
             )))
         } else {
-            None
+            Ok(())
         }
     }
 
+    /// A single point for query diagnostics,
+    /// all legalization must be done before this function call.
+    /// Code after this function call in later stages can simply panic.
     pub fn final_check(msql: &Msql, txvn_opt: &Option<TxVN>) -> Self {
         match msql {
             Msql::BeginTx(_begintx) => {
@@ -59,7 +65,7 @@ impl Legality {
                     match &query.tableops().access_pattern() {
                         AccessPattern::Mixed => Self::critical("Does not support query with mixed R and W"),
                         AccessPattern::ReadOnly => {
-                            if let Some(err) = Self::check_tableops_match_txvn(query, txvn) {
+                            if let Err(err) = Self::check_tableops_match_txvn(query, txvn) {
                                 err
                             } else if query.has_early_release() {
                                 Self::critical("Does not support early release on R queries")
@@ -68,7 +74,7 @@ impl Legality {
                             }
                         }
                         AccessPattern::WriteOnly => {
-                            if let Some(err) = Self::check_tableops_match_txvn(query, txvn) {
+                            if let Err(err) = Self::check_tableops_match_txvn(query, txvn) {
                                 err
                             } else if txvn.get_from_ertables(&query.early_release_tables()).is_err() {
                                 Self::critical(

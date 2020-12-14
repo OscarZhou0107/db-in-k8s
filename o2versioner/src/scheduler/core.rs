@@ -30,10 +30,12 @@ impl State {
         }
     }
 
+    /// Share `DbVNManager` by creating a strong reference to the `Arc` pointer
     pub fn share_dbvn_manager(&self) -> Arc<RwLock<DbVNManager>> {
         self.dbvn_manager.clone()
     }
 
+    /// Share `ClientRecord` by creating a strong reference to the `Arc` pointer
     pub async fn share_client_record(&self, client: SocketAddr) -> Arc<RwLock<ClientRecord>> {
         self.client_records.share_client_record(client).await
     }
@@ -142,10 +144,8 @@ impl FromIterator<SocketAddr> for DbVNManager {
 }
 
 impl DbVNManager {
-    // pub fn get_all_addr(&self) -> Vec<SocketAddr> {
-    //     self.0.iter().map(|(addr, _)| addr.clone()).collect()
-    // }
-
+    /// Find all dbproxies that have their versions ready to execute the
+    /// ready query associated with the argument `TableOps`
     pub fn get_all_that_can_execute_read_query(
         &self,
         tableops: &TableOps,
@@ -189,6 +189,7 @@ impl DbVNManager {
             .unwrap()
     }
 
+    /// Performa a version release on the argument dbproxy
     pub fn release_version(&mut self, dbproxy_addr: &SocketAddr, release_request: DbVNReleaseRequest) {
         if !self.0.contains_key(dbproxy_addr) {
             warn!(
