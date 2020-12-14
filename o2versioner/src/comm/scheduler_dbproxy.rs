@@ -4,17 +4,6 @@ use super::msql_response::MsqlResponse;
 use crate::core::*;
 use serde::{Deserialize, Serialize};
 
-pub enum EndTx {
-    Commit,
-    Abort,
-}
-
-/// Errors representing why a `Message` request can fail
-pub enum Error {
-    MissingTxBegin,
-    Invalid,
-}
-
 /// Expecting every request will have a response replied back via the same tcp stream
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
