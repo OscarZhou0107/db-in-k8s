@@ -150,6 +150,7 @@ impl FromIterator<TableOp> for TableOps {
     fn from_iter<I: IntoIterator<Item = TableOp>>(iter: I) -> Self {
         Self(
             iter.into_iter()
+                .filter(|tableop| !tableop.table.is_empty())
                 .sorted_by(|left, right| {
                     if left.table != right.table {
                         Ord::cmp(&left.table, &right.table)
@@ -462,6 +463,73 @@ mod tests_tableops {
                 TableOp::new("table_1", RWOperation::R)
             ]
         );
+
+        assert_eq!(TableOps::from_iter(vec![]).into_vec(), vec![]);
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("    ", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
+            ])
+            .into_iter()
+            .collect::<Vec<_>>(),
+            vec![
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("    ", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("    ", RWOperation::W),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("    ", RWOperation::W),
+            ])
+            .into_vec(),
+            vec![]
+        );
     }
 
     #[test]
@@ -560,6 +628,9 @@ mod tests_tableops {
     fn test_add_tableop() {
         let tableops = TableOps::default();
 
+        let tableops = tableops.add_tableop(TableOp::new("    ", RWOperation::R));
+        assert_eq!(tableops.get(), vec![].as_slice());
+
         let tableops = tableops.add_tableop(TableOp::new("table_0", RWOperation::R));
         assert_eq!(tableops.get(), vec![TableOp::new("table_0", RWOperation::R)].as_slice());
 
@@ -592,6 +663,47 @@ mod tests_tableops {
             vec![
                 TableOp::new("table_0", RWOperation::W),
                 TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("    ", RWOperation::W));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("", RWOperation::R));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("table_1", RWOperation::W));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("table_3", RWOperation::R));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W),
+                TableOp::new("table_3", RWOperation::R)
             ]
             .as_slice()
         );
