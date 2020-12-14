@@ -1,3 +1,5 @@
+//! Configurations for scheduler, sequencer and dbproxy
+
 use config;
 use serde::Deserialize;
 use std::net::SocketAddr;

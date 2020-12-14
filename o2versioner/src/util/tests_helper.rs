@@ -1,3 +1,5 @@
+//! Testing related helper functions
+
 use super::tcp;
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};

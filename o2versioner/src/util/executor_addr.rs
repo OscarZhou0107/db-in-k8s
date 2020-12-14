@@ -1,3 +1,5 @@
+//! Provides a way to talk to an `Executor` by sending a request and waiting for a reply
+
 use futures::TryFutureExt;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;

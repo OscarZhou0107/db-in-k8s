@@ -1,3 +1,5 @@
+//! Tcp related utilities
+
 use async_trait::async_trait;
 use bb8;
 use futures::prelude::*;

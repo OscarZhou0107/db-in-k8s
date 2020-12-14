@@ -1,3 +1,5 @@
+//! Common utility functions
+
 use chrono::Utc;
 use flate2::write::GzEncoder;
 use flate2::Compression;
