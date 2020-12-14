@@ -1,3 +1,8 @@
+//! The `core` module - Algorithm and Data Structures
+//! - Algorithm related data structures.
+//! - Everything here is written in synchronous style.
+//! - Does not use any synchronization primitives.
+
 mod database_version;
 mod legality;
 mod metadata;

@@ -1,3 +1,5 @@
+//! Communication between scheduler and dbproxy
+
 use super::msql_response::MsqlResponse;
 use crate::core::*;
 use serde::{Deserialize, Serialize};

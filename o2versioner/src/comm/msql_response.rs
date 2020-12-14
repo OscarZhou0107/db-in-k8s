@@ -1,8 +1,7 @@
-/// This module contains everything about the response
-/// to a Msql query.
 use crate::core::Msql;
 use serde::{Deserialize, Serialize};
 
+/// A response for a `Msql` request
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MsqlResponse {
     BeginTx(Result<(), String>),

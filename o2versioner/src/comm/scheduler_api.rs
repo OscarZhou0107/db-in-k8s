@@ -1,3 +1,5 @@
+//! Communication between client and scheduler
+
 use super::msql_response::MsqlResponse;
 use crate::core::{Msql, MsqlText};
 use serde::{Deserialize, Serialize};

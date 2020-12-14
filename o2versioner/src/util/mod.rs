@@ -1,3 +1,5 @@
+//! The `util` module - Utilitiy Functions
+
 pub mod common;
 pub mod config;
 pub mod executor;
