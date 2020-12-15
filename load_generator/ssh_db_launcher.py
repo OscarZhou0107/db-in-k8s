@@ -33,21 +33,16 @@ if __name__ == "__main__":
     if args.mock_db:
         mock_db = "--mock_db"
 
-    host_abbr = ["206", "207", "208", "209", "210"]
+    # TODO: add all machine # with a db server
+    host_abbr = ["212"]
+    # TODO: add db commands you want to execute on each machine -> should have a 1-1 mapping with # in host_abbr
+    cmds = ["cargo run -- --dbproxy 0"]
+
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
     host_num = len(hosts)
     client_num_per_host = math.ceil(client_num/host_num)
 
-    client_range_per_host = []
-    num = 0
-    for i in range(host_num - 1):
-        num = num + client_num_per_host
-        client_range_per_host.append("{} {}".format(num - client_num_per_host, num))
-    client_range_per_host.append("{} {}".format(num, client_num))
-
-    #host_index = [str(x) for x in range(host_num)]
-    
     # create all connections
     conns = []
     for i in range(host_num):
@@ -63,18 +58,12 @@ if __name__ == "__main__":
     
     # start shells and get stdin, stdout, stderr
     inout = []
-    cmds = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
-            cmds.append(cmd)
-            print(cmd)
-            #if DEBUG: 
-               #cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
-               #cmd = "pwd"
             # get_pty means get a pseudo terminal. 
             # With it, if we close the ssh, the pty is also closed, 
             #     which sends a SIGHUP to cause the commands it ran to terminate
+            # TODO: may need to pass in an actual command here rather than "", but it won't get executed anyway...
             stdin, stdout, stderr = conns[i].exec_command("", get_pty=True)
             inout.append([stdin, stdout, stderr])
         else:
@@ -104,11 +93,8 @@ if __name__ == "__main__":
         if text == "kill":
             os.killpg(os.getpid(), signal.SIGTERM)
         if text == "status":
-        #else:
             for i in range(host_num):
                 if inout[i]:
-                    inout[i][0].write("{}\r\n".format(text))
-                    inout[i][0].flush()
                     print("reading from stdout of {}".format(hosts[i]))
                     time.sleep(0.1)
 
