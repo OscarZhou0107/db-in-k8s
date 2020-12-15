@@ -172,10 +172,6 @@ def jsonToByte(serialized):
     encoded = msgLen + serialized.encode('utf-8')
     return encoded
 
-def byteToJson(raw):
-    return json.loads((raw[4:]).decode('utf-8'))
-
-
 class Client:
     def __init__(self, c_id, port, mix):
         self.c_id = c_id
@@ -230,17 +226,20 @@ class Client:
                 self.soc.sendall(jsonToByte(begin))
 
                 # receive response to BEGIN
-                try:
-                    data = byteToJson(self.soc.recv(2**24))
-                    self.logger.info("### Receiving data: BEGIN")
-                    self.logger.debug(data)
+                length = int.from_bytes(self.soc.recv(4), byteorder="big")
+                received = self.soc.recv(2**24).decode('utf-8')
+                final = received
+                while len(final) < length:
+                    received = self.soc.recv(2**24).decode('utf-8')
+                    final = final + received
+                data = json.loads(final)
+                
+                self.logger.info("### Receiving data: BEGIN")
+                self.logger.debug(data)
 
-                    if OK not in data["reply"]["BeginTx"]:
-                        self.logger.error("Begin response contains error, terminating...")
-                        return 0
-                except:
-                    print("begin tcp receiving failed")
-
+                if OK not in data["reply"]["BeginTx"]:
+                    self.logger.error("Begin response contains error, terminating...")
+                    return 0
             
             if self.curr == 'adminConf':
                 okay = self.doAdminConf()
@@ -286,16 +285,19 @@ class Client:
                 self.soc.sendall(jsonToByte(commit))
 
                 # receive reponse to commit
-                try:
-                    data = byteToJson(self.soc.recv(2**24))
-                    self.logger.info("### Receiving data: COMMIT")
-                    self.logger.debug(data)
+                length = int.from_bytes(self.soc.recv(4), byteorder="big")
+                received = self.soc.recv(2**24).decode('utf-8')
+                final = received
+                while len(final) < length:
+                    received = self.soc.recv(2**24).decode('utf-8')
+                    final = final + received
+                data = json.loads(final)
+                self.logger.info("### Receiving data: COMMIT")
+                self.logger.debug(data)
 
-                    if OK not in data["reply"]["EndTx"]:
-                        self.logger.error("End response contains error, terminating...")
-                        return 0
-                except:
-                    print("commit receiving failed")
+                if OK not in data["reply"]["EndTx"]:
+                    self.logger.error("End response contains error, terminating...")
+                    return 0
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
@@ -1050,42 +1052,44 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        try:
-            response = byteToJson(self.soc.recv(2**24))
         
-            self.logger.info("### Receiving data: Query {}".format(name))
-            self.logger.debug(response)
+        length = int.from_bytes(self.soc.recv(4), byteorder="big")
+        received = self.soc.recv(2**24).decode('utf-8')
+        final = received
+        while len(final) < length:
+            received = self.soc.recv(2**24).decode('utf-8')
+            final = final + received
+        response = json.loads(final)
 
-            if MOCK:
-                self.logger.warning("mock_db mode on")
-                return ["0"] * 20 
+        self.logger.info("### Receiving data: Query {}".format(name))
+        self.logger.debug(response)
 
-            if ALLOW_ABORT and OK not in response["reply"]["Query"]:
-                if "aborted" in response["reply"]["Query"]["Err"]:
-                    return "Abort"
+        if MOCK:
+            self.logger.warning("mock_db mode on")
+            return ["0"] * 20 
 
-            if OK not in response["reply"]["Query"]:
-                self.logger.error("Response to {} contains error".format(name))
-                return "Err"
+        if ALLOW_ABORT and OK not in response["reply"]["Query"]:
+            if "aborted" in response["reply"]["Query"]["Err"]:
+                return "Abort"
 
-            response = response["reply"]["Query"][OK]
-            self.logger.critical("csv string: {}".format(response))
-            if not response:
-                self.logger.warning("Response to {} is empty".format(name))
-                return "Empty"
+        if OK not in response["reply"]["Query"]:
+            self.logger.error("Response to {} contains error".format(name))
+            return "Err"
 
-            result = list(csv.reader(response.splitlines()))
-            for i in range(len(result)):
-                for j in range(len(result[0])):
-                    if result[i][j].startswith('"') and result[i][j].endswith('"'):
-                        result[i][j] = result[i][j][1:-1]
-            self.logger.info("csv list: {}".format(result))
-            
-            return result
+        response = response["reply"]["Query"][OK]
+        self.logger.critical("csv string: {}".format(response))
+        if not response:
+            self.logger.warning("Response to {} is empty".format(name))
+            return "Empty"
+
+        result = list(csv.reader(response.splitlines()))
+        for i in range(len(result)):
+            for j in range(len(result[0])):
+                if result[i][j].startswith('"') and result[i][j].endswith('"'):
+                    result[i][j] = result[i][j][1:-1]
+        self.logger.info("csv list: {}".format(result))
         
-        except:
-            print("query tcp receiving failed")
-            return "Abort"
+        return result
     
     def isErr(self, response):
         return response == "Err"
