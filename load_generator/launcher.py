@@ -30,9 +30,9 @@ def launch_client(cids, mix, pid, python, debug, mock_db, ssh):
             procs[subprocess.Popen([python, script, "--c_id", str(cid)])] = command
             #procs.add(subprocess.Popen(["python3", script]))
         else:
-            command = "{} {} --port {} --c_id {} --mix {} --debug {} --ssh {}".format(python, script, port, cid, mix, debug, mock_db, ssh)
+            command = "{} {} --port {} --c_id {} --mix {} --debug {} --mock_db {} --ssh {}".format(python, script, port, cid, mix, debug, mock_db, ssh)
             print(command)
-            procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug), "--mock_db", str(mock_db)]))] = command #, stderr=subprocess.PIPE))
+            procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug), "--mock_db", str(mock_db), "--ssh", str(ssh)]))] = command #, stderr=subprocess.PIPE))
 
     try:
         # p.poll() only gets return code
