@@ -292,8 +292,10 @@ class Client:
                 self.logger.info("### Receiving data: COMMIT")
 
                 length = int.from_bytes(self.soc.recv(4), byteorder="big")
+                self.logger.debug("length: {}", length)
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
+                self.logger.debug("initial data, len: {}, string len: {}, string: {}".format(length, len(final), final))
                 while len(final) < length:
                     self.logger.debug("before loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
                     self.logger.info("LOOPPPPPPPPPPPPPPPP")
