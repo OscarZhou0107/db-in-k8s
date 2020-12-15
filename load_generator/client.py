@@ -868,7 +868,7 @@ class Client:
             if self.isErr(response):
                 self.logger.error("Response to doTitleSearch has error")
                 return False
-        else: # searchType == 3
+        elif searchType == 3: # searchType == 3
             # subject
             searchKey = generateRandomSubject()
             query = sql.replaceVars(sql.sqlNameToCommand["doSubjectSearch"], 1, [searchKey])
