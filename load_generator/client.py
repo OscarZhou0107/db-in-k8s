@@ -1280,7 +1280,7 @@ if __name__ == "__main__":
 
     DEBUG = args.debug
     MOCK = args.mock_db
-    HOST = '127.0.0.1'
+    HOST = '128.100.13.240'
     if args.ssh: 
         HOST = '128.100.13.240'
 
