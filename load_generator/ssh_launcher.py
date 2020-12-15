@@ -85,10 +85,11 @@ if __name__ == "__main__":
         text = input("kill or status: \n")
         if text == "kill":
             os.killpg(os.getpid(), signal.SIGTERM)
-        if text == "status":
+        #if text == "status":
+        else:
             for i in range(host_num):
                 if inout[i]:
-                    inout[i][0].write("status\r\n")
+                    inout[i][0].write("{}\r\n".format(text))
                     inout[i][0].flush()
                     print("reading from stdout of {}".format(hosts[i]))
                     time.sleep(0.1)
