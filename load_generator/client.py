@@ -1281,7 +1281,7 @@ if __name__ == "__main__":
     MOCK = args.mock_db
     HOST = '127.0.0.1'
     if args.ssh: 
-        HOST = '128.100.13.212/24'
+        HOST = '128.100.13.212'
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
