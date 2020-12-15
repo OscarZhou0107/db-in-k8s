@@ -13,6 +13,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--username", type=str, default="qinsinin")
     parser.add_argument("--password", type=str)
+    parser.add_argument("--db_num", type=int)
 
     parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
 
@@ -20,19 +21,22 @@ if __name__ == "__main__":
     username = args.username
     password = args.password
     python = args.python
+    db_num = args.db_num
 
     # TODO: add all machine # with a db server
-    host_abbr = ["212"]
+    host_abbr = ["212", "244", "243", "242", "241"]
+    host_num = len(host_abbr)
     # TODO: add db commands you want to execute on each machine -> should have a 1-1 mapping with # in host_abbr
-    cmds = ["cargo run -- --dbproxy 0"]
+    partial = "cargo run --release -- --dbproxy "
+    cmds = [partial + str(x) for x in range(host_num)]
+    print(cmds)
 
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
-    host_num = len(hosts)
 
     # create all connections
     conns = []
-    for i in range(host_num):
+    for i in range(db_num):
         conn = paramiko.SSHClient()
         conn.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
@@ -45,7 +49,7 @@ if __name__ == "__main__":
     
     # start shells and get stdin, stdout, stderr
     inout = []
-    for i in range(host_num):
+    for i in range(db_num):
         if conns[i]:
             # get_pty means get a pseudo terminal. 
             # With it, if we close the ssh, the pty is also closed, 
@@ -60,8 +64,9 @@ if __name__ == "__main__":
     time.sleep(5)
 
     # run all cmds
-    for i in range(host_num):
+    for i in range(db_num):
         if inout[i]:
+            inout[i][0].write("cd /groups/qlhgrp/dv-in-rust/\r\n")
             inout[i][0].write("{}\r\n".format(cmds[i]))
             inout[i][0].flush()
             print("reading from stdout of {}".format(hosts[i]))
@@ -80,7 +85,7 @@ if __name__ == "__main__":
         if text == "kill":
             os.killpg(os.getpid(), signal.SIGTERM)
         if text == "status":
-            for i in range(host_num):
+            for i in range(db_num):
                 if inout[i]:
                     print("reading from stdout of {}".format(hosts[i]))
                     time.sleep(0.1)
