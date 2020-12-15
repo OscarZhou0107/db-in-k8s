@@ -9,6 +9,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
+/// Temproary `RequestRecord` representing
+/// the starting half, use `RequestRecordStart::finish`
+/// to properly convert it into a `RequestRecord`
 pub struct RequestRecordStart {
     req: Msql,
     req_timestamp: DateTime<Utc>,
@@ -41,6 +44,8 @@ impl RequestRecordStart {
     }
 }
 
+/// Record that properly represents an entire
+/// lifespan of a request
 #[derive(Debug, Clone)]
 pub struct RequestRecord {
     req: Msql,
@@ -145,6 +150,9 @@ impl PerformanceRequestRecord {
     }
 }
 
+/// Keeps all `RequestRecord` (if `detailed_record == true`) and
+/// `PerformanceRequestRecord` for a particualr client with
+/// `ClientRecord::client_addr`
 #[derive(Debug, Clone)]
 pub struct ClientRecord {
     client_addr: SocketAddr,
