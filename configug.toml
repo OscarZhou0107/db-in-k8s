@@ -11,17 +11,20 @@ admin_addr = "127.0.0.1:9999"
 addr = "127.0.0.1:19876"
 
 [[dbproxy]]
-addr = "127.0.0.1:38875"
-sql_conf = "host=34.70.104.125 port=5432 dbname=tpcw user=postgres password=Abc@123"
+addr = "ug212.eecg.toronto.edu"
+sql_conf = "host=ug212.eecg.toronto.edu port=33333 dbna:me=tpcw user=qinsinin"
 
 [[dbproxy]]
-addr = "127.0.0.1:38876"
-sql_conf = "host=34.69.18.204 port=5432 dbname=tpcw user=postgres password=Abc@123"
+addr = "ug244.eecg.toronto.edu"
+sql_conf = "host=ug244.eecg.toronto.edu port=33333 dbname=tpcw user=qinsinin"
+
 
 [[dbproxy]]
-addr = "127.0.0.1:38877"
-sql_conf = "host=34.122.129.200 port=5432 dbname=tpcw user=postgres password=Abc@123"
+addr = "ug243.eecg.toronto.edu"
+sql_conf = "host=ug243.eecg.toronto.edu port=33333 dbname=tpcw user=qinsinin"
+
 
 [[dbproxy]]
-addr = "127.0.0.1:38878"
-sql_conf = "host=34.70.96.183 port=5432 dbname=tpcw user=postgres password=Abc@123"
+addr = "ug242.eecg.toronto.edu"
+sql_conf = "host=ug242.eecg.toronto.edu port=33333 dbname=tpcw user=qinsinin"
+
