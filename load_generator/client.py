@@ -172,10 +172,6 @@ def jsonToByte(serialized):
     encoded = msgLen + serialized.encode('utf-8')
     return encoded
 
-def byteToJson(raw):
-    return json.loads((raw[4:]).decode('utf-8'))
-
-
 class Client:
     def __init__(self, c_id, port, mix):
         self.c_id = c_id
@@ -230,7 +226,14 @@ class Client:
                 self.soc.sendall(jsonToByte(begin))
 
                 # receive response to BEGIN
-                data = byteToJson(self.soc.recv(2**24))
+                length = int.from_bytes(self.soc.recv(4), byteorder="big")
+                received = self.soc.recv(2**24).decode('utf-8')
+                final = received
+                while len(final) < length:
+                    received = self.soc.recv(2**24).decode('utf-8')
+                    final = final + received
+                data = json.loads(final)
+                
                 self.logger.info("### Receiving data: BEGIN")
                 self.logger.debug(data)
 
@@ -282,7 +285,13 @@ class Client:
                 self.soc.sendall(jsonToByte(commit))
 
                 # receive reponse to commit
-                data = byteToJson(self.soc.recv(2**24))
+                length = int.from_bytes(self.soc.recv(4), byteorder="big")
+                received = self.soc.recv(2**24).decode('utf-8')
+                final = received
+                while len(final) < length:
+                    received = self.soc.recv(2**24).decode('utf-8')
+                    final = final + received
+                data = json.loads(final)
                 self.logger.info("### Receiving data: COMMIT")
                 self.logger.debug(data)
 
@@ -1043,7 +1052,15 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        response = byteToJson(self.soc.recv(2**24))
+        
+        length = int.from_bytes(self.soc.recv(4), byteorder="big")
+        received = self.soc.recv(2**24).decode('utf-8')
+        final = received
+        while len(final) < length:
+            received = self.soc.recv(2**24).decode('utf-8')
+            final = final + received
+        response = json.loads(final)
+
         self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
