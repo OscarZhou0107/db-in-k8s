@@ -2,7 +2,7 @@
 # cargo run -- --scheduler -c ./configug.toml
 
 [scheduler]
-addr = "127.0.0.1:2077"
+addr = "128.100.13.240:2077"
 admin_addr = "127.0.0.1:9999"
 #disable_early_release = true
 #disable_single_read_optimization = true
