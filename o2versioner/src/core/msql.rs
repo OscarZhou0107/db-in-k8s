@@ -306,6 +306,7 @@ pub enum Msql {
 }
 
 impl Msql {
+    /// Check whether the current `Msql` is a `Msql::BeginTx` variant
     pub fn is_begintx(&self) -> bool {
         match self {
             Self::BeginTx(_) => true,
@@ -313,6 +314,7 @@ impl Msql {
         }
     }
 
+    /// Try to get a `&MsqlBeginTx` if the current `Msql` is a `Msql::BeginTx` variant
     pub fn try_get_begintx(&self) -> Result<&MsqlBeginTx, ()> {
         match self {
             Self::BeginTx(x) => Ok(x),
@@ -320,6 +322,7 @@ impl Msql {
         }
     }
 
+    /// Try to get a `&mut MsqlBeginTx` if the current `Msql` is a `Msql::BeginTx` variant
     pub fn try_get_mut_begintx(&mut self) -> Result<&mut MsqlBeginTx, ()> {
         match self {
             Self::BeginTx(x) => Ok(x),
@@ -327,6 +330,7 @@ impl Msql {
         }
     }
 
+    /// Check whether the current `Msql` is a `Msql::Query` variant
     pub fn is_query(&self) -> bool {
         match self {
             Self::Query(_) => true,
@@ -334,6 +338,7 @@ impl Msql {
         }
     }
 
+    /// Try to get a `&MsqlQuery` if the current `Msql` is a `Msql::Query` variant
     pub fn try_get_query(&self) -> Result<&MsqlQuery, ()> {
         match self {
             Self::Query(x) => Ok(x),
@@ -341,6 +346,7 @@ impl Msql {
         }
     }
 
+    /// Try to get a `&mut MsqlQuery` if the current `Msql` is a `Msql::Query` variant
     pub fn try_get_mut_query(&mut self) -> Result<&mut MsqlQuery, ()> {
         match self {
             Self::Query(x) => Ok(x),
@@ -348,6 +354,7 @@ impl Msql {
         }
     }
 
+    /// Check whether the current `Msql` is a `Msql::EndTx` variant
     pub fn is_endtx(&self) -> bool {
         match self {
             Self::EndTx(_) => true,
@@ -355,6 +362,7 @@ impl Msql {
         }
     }
 
+    /// Try to get a `&MsqlEndTx` if the current `Msql` is a `Msql::EndTx` variant
     pub fn try_get_endtx(&self) -> Result<&MsqlEndTx, ()> {
         match self {
             Self::EndTx(x) => Ok(x),
@@ -362,6 +370,7 @@ impl Msql {
         }
     }
 
+    /// Try to get a `&mut MsqlEndTx` if the current `Msql` is a `Msql::EndTx` variant
     pub fn try_get_mut_endtx(&mut self) -> Result<&mut MsqlEndTx, ()> {
         match self {
             Self::EndTx(x) => Ok(x),

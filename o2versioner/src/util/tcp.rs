@@ -160,6 +160,28 @@ where
     responses
 }
 
+/// For asynchronous pooled tcp connection
+///
+/// The pool will be destructed once all references
+/// to the pool object are dropped
+///
+/// # Example
+/// To create an asynchronous Tcp connection pool
+/// ```
+/// use bb8::Pool;
+/// use o2versioner::util::tcp::TcpStreamConnectionManager;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let pool = Pool::builder()
+///         .build(TcpStreamConnectionManager::new("127.0.0.1:56565").await)
+///         .await?;
+///
+///     // To get a tcp socket exclusively
+///     // let tcp_stream = pool.get().await?;
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug)]
 pub struct TcpStreamConnectionManager {
     addrs: Vec<SocketAddr>,

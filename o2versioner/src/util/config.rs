@@ -1,4 +1,9 @@
 //! Configurations for scheduler, sequencer and dbproxy
+//!
+//! # To set up the configuration
+//! 1. Can be parsed from file by using `Config::from_file<S: Into<String>>(path: S)`
+//! 2. Construct the structs directly
+//! 3. Use builder style setter functions to modify them
 
 use config;
 use serde::Deserialize;
