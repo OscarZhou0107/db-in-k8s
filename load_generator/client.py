@@ -1043,7 +1043,7 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        response = byteToJson(self.soc.recv(2**24))
+        response = byteToJson(self.soc.recv(2**30))
         self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
