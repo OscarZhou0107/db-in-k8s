@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--client_num", type=int, required=True)
 
     parser.add_argument("--mix", type=int, required=True)
-    parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
+    parser.add_argument("--python", type=str, default="python3", help="Python alias to use")w
     parser.add_argument("--debug", action='store_true')
     parser.add_argument("--mock_db", action='store_true')
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     inout = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} launcher.py --mix {} --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
+            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
             if DEBUG: 
                cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
             # get_pty means get a pseudo terminal. 
