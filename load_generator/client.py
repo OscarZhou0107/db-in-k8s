@@ -848,8 +848,7 @@ class Client:
         # doTitleSearch
         # doSubjectSearch
         #searchType = randint(1, 3)
-        searchType = 4 # hack: since we cannot get soundex to work
-        # hack: unterminated string
+        searchType = 3 # hack: since we cannot get soundex to work, skip queries using it
         if searchType == 1:
             # author
             searchKey = generateRandomString()
