@@ -65,7 +65,7 @@ if __name__ == "__main__":
     inout = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
+            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {};".format(python, mix, client_range_per_host[i], debug, mock_db)
             print(cmd)
             if DEBUG: 
                cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
