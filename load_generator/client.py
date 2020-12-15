@@ -232,7 +232,7 @@ class Client:
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
-                    print("LOOPPPPPPPPPPPPPPPP")
+                    self.logger.info("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
                 data = json.loads(final)
@@ -293,7 +293,7 @@ class Client:
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
-                    print("LOOPPPPPPPPPPPPPPPP")
+                    self.logger.info("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
                 data = json.loads(final)
@@ -1063,7 +1063,7 @@ class Client:
         received = self.soc.recv(2**24).decode('utf-8')
         final = received
         while len(final) < length:
-            print("LOOPPPPPPPPPPPPPPPP")
+            self.logger.info("LOOPPPPPPPPPPPPPPPP")
             received = self.soc.recv(2**24).decode('utf-8')
             final = final + received
         response = json.loads(final)
