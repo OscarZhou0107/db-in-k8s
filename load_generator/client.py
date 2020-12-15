@@ -230,13 +230,17 @@ class Client:
                 self.soc.sendall(jsonToByte(begin))
 
                 # receive response to BEGIN
-                data = byteToJson(self.soc.recv(2**24))
-                self.logger.info("### Receiving data: BEGIN")
-                self.logger.debug(data)
+                try:
+                    data = byteToJson(self.soc.recv(2**24))
+                    self.logger.info("### Receiving data: BEGIN")
+                    self.logger.debug(data)
 
-                if OK not in data["reply"]["BeginTx"]:
-                    self.logger.error("Begin response contains error, terminating...")
-                    return 0
+                    if OK not in data["reply"]["BeginTx"]:
+                        self.logger.error("Begin response contains error, terminating...")
+                        return 0
+                except:
+                    print("begin tcp receiving failed")
+
             
             if self.curr == 'adminConf':
                 okay = self.doAdminConf()
@@ -282,13 +286,16 @@ class Client:
                 self.soc.sendall(jsonToByte(commit))
 
                 # receive reponse to commit
-                data = byteToJson(self.soc.recv(2**24))
-                self.logger.info("### Receiving data: COMMIT")
-                self.logger.debug(data)
+                try:
+                    data = byteToJson(self.soc.recv(2**24))
+                    self.logger.info("### Receiving data: COMMIT")
+                    self.logger.debug(data)
 
-                if OK not in data["reply"]["EndTx"]:
-                    self.logger.error("End response contains error, terminating...")
-                    return 0
+                    if OK not in data["reply"]["EndTx"]:
+                        self.logger.error("End response contains error, terminating...")
+                        return 0
+                except:
+                    print("commit receiving failed")
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
@@ -848,8 +855,7 @@ class Client:
         # doTitleSearch
         # doSubjectSearch
         #searchType = randint(1, 3)
-        searchType = 4 # hack: since we cannot get soundex to work, skip queries using it
-        # hack: nonterminated string
+        searchType = 3 # hack: since we cannot get soundex to work, skip queries using it
         if searchType == 1:
             # author
             searchKey = generateRandomString()
@@ -1044,7 +1050,12 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        response = byteToJson(self.soc.recv(2**24))
+        try:
+            response = byteToJson(self.soc.recv(2**24))
+        except:
+            print("query tcp receiving failed")
+            return "Abort"
+        
         self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
