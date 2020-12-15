@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     host_abbr = ["206"] #, "207", "208", "209", "210"]
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
-    print("host: {}", hosts[0])
+    print("host: {}".format(hosts[0]))
     host_num = len(hosts)
     client_num_per_host = math.ceil(client_num/host_num)
 
@@ -67,8 +67,8 @@ if __name__ == "__main__":
         if conns[i]:
             cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
             if DEBUG: 
-               #cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
-               cmd = "pwd"
+               cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
+               #cmd = "pwd"
             # get_pty means get a pseudo terminal. 
             # With it, if we close the ssh, the pty is also closed, 
             #     which sends a SIGHUP to cause the commands it ran to terminate
@@ -87,7 +87,8 @@ if __name__ == "__main__":
         if text == "status":
             for i in range(host_num):
                 if inout[i]:
-                    inout[i][0].write("status\r\n")
+                    #inout[i][0].write("status\r\n")
+                    inout[i][0].write("pwd\r\n")
                     inout[i][0].flush()
                     print("reading from stdout of {}".format(hosts[i]))
                     time.sleep(0.1)
