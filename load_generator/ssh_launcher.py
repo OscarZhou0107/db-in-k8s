@@ -33,7 +33,7 @@ if __name__ == "__main__":
     if args.mock_db:
         mock_db = "--mock_db"
 
-    host_abbr = ["209"] #, "207", "208", "209", "210"]
+    host_abbr = ["206", "207", "208", "209", "210"]
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
     host_num = len(hosts)
@@ -63,12 +63,14 @@ if __name__ == "__main__":
     
     # construct and execute commands
     inout = []
+    cmds = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {};".format(python, mix, client_range_per_host[i], debug, mock_db)
+            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
+            cmds.append(cmd)
             print(cmd)
-            if DEBUG: 
-               cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
+            #if DEBUG: 
+               #cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
                #cmd = "pwd"
             # get_pty means get a pseudo terminal. 
             # With it, if we close the ssh, the pty is also closed, 
@@ -79,14 +81,22 @@ if __name__ == "__main__":
             inout.append(None)
 
     # otherwise read/write to std stream might fail
-    time.sleep(3)
+    time.sleep(5)
 
-    # read whatever currently in the buffer
-    buffered = len(inout[i][1].channel.in_buffer)
-    #print("buffered {} bytes".format(buffered))
-    if buffered:
-        res = inout[i][1].read(buffered).decode("utf-8")
-        print(res.split("\n"))
+    # run all cmds
+    for i in range(host_num):
+        if inout[i]:
+            inout[i][0].write("{}\r\n".format(cmds[i]))
+            inout[i][0].flush()
+            print("reading from stdout of {}".format(hosts[i]))
+            time.sleep(0.1)
+
+            # read whatever currently in the buffer
+            buffered = len(inout[i][1].channel.in_buffer)
+            #print("buffered {} bytes".format(buffered))
+            if buffered:
+                res = inout[i][1].read(buffered).decode("utf-8")
+                print(res.split("\n"))
 
     print("starting while loop...")
     while True:
