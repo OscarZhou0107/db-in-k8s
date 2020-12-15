@@ -33,14 +33,8 @@ async fn test_ssd_constrained_default() {
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45002"),
-                sql_conf: None,
-            },
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45003"),
-                sql_conf: None,
-            },
+            DbProxyConfig::new("127.0.0.1:45002"),
+            DbProxyConfig::new("127.0.0.1:45003"),
         ],
     };
 
@@ -70,14 +64,8 @@ async fn test_ssd_constrained_disable_single_read_opt() {
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45122"),
-                sql_conf: None,
-            },
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45123"),
-                sql_conf: None,
-            },
+            DbProxyConfig::new("127.0.0.1:45122"),
+            DbProxyConfig::new("127.0.0.1:45123"),
         ],
     };
 
@@ -107,14 +95,8 @@ async fn test_ssd_constrained_disable_early_release() {
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45042"),
-                sql_conf: None,
-            },
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45043"),
-                sql_conf: None,
-            },
+            DbProxyConfig::new("127.0.0.1:45042"),
+            DbProxyConfig::new("127.0.0.1:45043"),
         ],
     };
 
@@ -144,14 +126,8 @@ async fn test_ssd_constrained_disable_single_read_opt_and_early_release() {
             max_connection: Some(sequencer_max_connection),
         },
         dbproxy: vec![
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45062"),
-                sql_conf: None,
-            },
-            DbProxyConfig {
-                addr: String::from("127.0.0.1:45063"),
-                sql_conf: None,
-            },
+            DbProxyConfig::new("127.0.0.1:45062"),
+            DbProxyConfig::new("127.0.0.1:45063"),
         ],
     };
 

@@ -11,8 +11,9 @@ max_connection = 50
 
 [[dbproxy]]
 addr = "127.0.0.1:8876"
+db_mock_latency = {begintx = {mean = 10, stddev = 1}}
 sql_conf = "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
 
 [[dbproxy]]
-addr = "127.0.0.1:8876"
+addr = "127.0.0.1:8877"
 sql_conf = "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
