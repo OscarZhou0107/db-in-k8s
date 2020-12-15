@@ -27,7 +27,7 @@ if __name__ == "__main__":
     host_abbr = ["212", "244", "243", "242", "241"]
     host_num = len(host_abbr)
     # TODO: add db commands you want to execute on each machine -> should have a 1-1 mapping with # in host_abbr
-    partial = "cargo run --release -- --dbproxy "
+    partial = "cargo run --release -- -c configug.toml --dbproxy "
     cmds = [partial + str(x) for x in range(host_num)]
     print(cmds)
 
