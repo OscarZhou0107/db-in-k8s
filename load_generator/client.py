@@ -1043,36 +1043,40 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        response = byteToJson(self.soc.recv(2**30))
-        self.logger.info("### Receiving data: Query {}".format(name))
-        self.logger.debug(response)
+        try:
+            response = byteToJson(self.soc.recv(2**24))
+            self.logger.info("### Receiving data: Query {}".format(name))
+            self.logger.debug(response)
 
-        if MOCK:
-            self.logger.warning("mock_db mode on")
-            return ["0"] * 20 
+            if MOCK:
+                self.logger.warning("mock_db mode on")
+                return ["0"] * 20 
 
-        if ALLOW_ABORT and OK not in response["reply"]["Query"]:
-            if "aborted" in response["reply"]["Query"]["Err"]:
-                return "Abort"
+            if ALLOW_ABORT and OK not in response["reply"]["Query"]:
+                if "aborted" in response["reply"]["Query"]["Err"]:
+                    return "Abort"
 
-        if OK not in response["reply"]["Query"]:
-            self.logger.error("Response to {} contains error".format(name))
-            return "Err"
+            if OK not in response["reply"]["Query"]:
+                self.logger.error("Response to {} contains error".format(name))
+                return "Err"
 
-        response = response["reply"]["Query"][OK]
-        self.logger.critical("csv string: {}".format(response))
-        if not response:
-            self.logger.warning("Response to {} is empty".format(name))
-            return "Empty"
+            response = response["reply"]["Query"][OK]
+            self.logger.critical("csv string: {}".format(response))
+            if not response:
+                self.logger.warning("Response to {} is empty".format(name))
+                return "Empty"
 
-        result = list(csv.reader(response.splitlines()))
-        for i in range(len(result)):
-            for j in range(len(result[0])):
-                if result[i][j].startswith('"') and result[i][j].endswith('"'):
-                    result[i][j] = result[i][j][1:-1]
-        self.logger.info("csv list: {}".format(result))
+            result = list(csv.reader(response.splitlines()))
+            for i in range(len(result)):
+                for j in range(len(result[0])):
+                    if result[i][j].startswith('"') and result[i][j].endswith('"'):
+                        result[i][j] = result[i][j][1:-1]
+            self.logger.info("csv list: {}".format(result))
+            
+            return result
         
-        return result
+        except:
+            return "Abort"
     
     def isErr(self, response):
         return response == "Err"
