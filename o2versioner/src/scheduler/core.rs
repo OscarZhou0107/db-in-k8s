@@ -76,7 +76,7 @@ impl State {
                 .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
                 .for_each(|d| wrt.serialize(d).unwrap());
             info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
-            Some(dbproxy_stats_csv_path.to_string_lossy().to_string())
+            Some(cur_log_dir.as_path().to_string_lossy().to_string())
         } else {
             info!("Due to the conf setting, performance loggings are not dumped");
             None
