@@ -79,7 +79,7 @@ if __name__ == "__main__":
             inout.append(None)
 
     # otherwise read/write to std stream might fail
-    time.sleep(5)
+    time.sleep(10)
 
     while True:
         text = input("kill or status: \n")
