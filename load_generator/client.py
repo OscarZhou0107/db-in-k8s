@@ -18,7 +18,7 @@ import sql
 
 
 #HOST = '127.0.0.1'
-HOST = "ug212.eecg.utoronto.ca"
+HOST = "128.100.13.212"
 TT = 0
 #TT = 0.5 # think time
 MAX_TIME = 6000
