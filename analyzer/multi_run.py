@@ -31,9 +31,9 @@ def parse_single_run(run_name, args):
     if args.debug:
         print('Debug:', 'Parsing', run_name)
 
-    perfdb = single_run.PerfDB(perf_csv_path=os.path.join(os.path.join(args.dir, run_name), 'perf.csv'))
+    perfdb = single_run.PerfDB(perf_csv_path=os.path.join(os.path.join(args.dir, run_name), 'perf.csv.gz'))
 
-    dbproxy_stats_db = single_run.DbproxyStatsDB(os.path.join(os.path.join(args.dir, run_name), 'dbproxy_stats.csv'))
+    dbproxy_stats_db = single_run.DbproxyStatsDB(os.path.join(os.path.join(args.dir, run_name), 'dbproxy_stats.csv.gz'))
 
     info_str = 'Info: Parsed {} with {} clients, {} dbproxies, {} unfiltered request datapoints'.format(run_name, perfdb.get_num_clients(), dbproxy_stats_db.get_num_dbproxy(), len(perfdb))
     print(info_str)
@@ -101,7 +101,7 @@ def plot_charts(args, database):
 
 
 def init(parser):
-    parser.add_argument('--dir', type=str, required=True, help='log files directory for all runs')
+    parser.add_argument('dir', type=str, help='log files directory for all runs')
     parser.add_argument('--debug', action='store_true', help='debug messages')
     parser.add_argument('--output', type=str, help='directory to dump the files')
 
