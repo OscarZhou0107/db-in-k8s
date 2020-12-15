@@ -33,7 +33,7 @@ if __name__ == "__main__":
     if args.mock_db:
         mock_db = "--mock_db"
 
-    host_abbr = ["206"] #, "207", "208", "209", "210"]
+    host_abbr = ["209"] #, "207", "208", "209", "210"]
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
     host_num = len(hosts)
@@ -66,6 +66,7 @@ if __name__ == "__main__":
     for i in range(host_num):
         if conns[i]:
             cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
+            print(cmd)
             if DEBUG: 
                cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
                #cmd = "pwd"
