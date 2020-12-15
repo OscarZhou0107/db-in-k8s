@@ -6,7 +6,7 @@
 //! 3. Use builder style setter functions to modify them
 
 use config;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 /// Config for scheduler, sequencer and dbproxies
@@ -14,7 +14,7 @@ use std::net::SocketAddr;
 /// # Notes
 /// `Config::dbproxy` represents a collection of `DbProxyConfig`, where
 /// each is the config for the corresponding dbproxy instance
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub scheduler: SchedulerConfig,
@@ -49,7 +49,7 @@ impl Config {
 }
 
 /// Config for scheduler
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SchedulerConfig {
     pub addr: String,
@@ -142,7 +142,7 @@ impl SchedulerConfig {
 }
 
 /// Config for sequencer
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SequencerConfig {
     pub addr: String,
@@ -179,12 +179,14 @@ impl SequencerConfig {
 }
 
 /// Config for a single dbproxy instance
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DbProxyConfig {
     pub addr: String,
     /// If `None`, using mock_db
     pub sql_conf: Option<String>,
+    /// By default, mock_latency is has distribution of ~N (0, 0)
+    pub db_mock_latency: DbMockLatency,
 }
 
 impl Default for DbProxyConfig {
@@ -192,6 +194,7 @@ impl Default for DbProxyConfig {
         Self {
             addr: String::new(),
             sql_conf: None,
+            db_mock_latency: Default::default(),
         }
     }
 }
@@ -211,15 +214,82 @@ impl DbProxyConfig {
         self
     }
 
+    pub fn set_db_mock_latency(mut self, db_mock_latency: DbMockLatency) -> Self {
+        self.db_mock_latency = db_mock_latency;
+        self
+    }
+
     pub fn to_addr(&self) -> SocketAddr {
         self.addr.parse().expect("Invalid dbproxy addr")
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DbMockLatency {
+    begintx: LatencyDistr,
+    read: LatencyDistr,
+    write: LatencyDistr,
+    endtx: LatencyDistr,
+}
+
+impl Default for DbMockLatency {
+    fn default() -> Self {
+        Self {
+            begintx: Default::default(),
+            read: Default::default(),
+            write: Default::default(),
+            endtx: Default::default(),
+        }
+    }
+}
+
+impl DbMockLatency {
+    pub fn set_begintx(mut self, begintx: LatencyDistr) -> Self {
+        self.begintx = begintx;
+        self
+    }
+
+    pub fn set_read(mut self, read: LatencyDistr) -> Self {
+        self.read = read;
+        self
+    }
+
+    pub fn set_write(mut self, write: LatencyDistr) -> Self {
+        self.write = write;
+        self
+    }
+
+    pub fn set_endtx(mut self, endtx: LatencyDistr) -> Self {
+        self.endtx = endtx;
+        self
+    }
+}
+
+/// In units of ms
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LatencyDistr {
+    mean: u32,
+    stddev: u32,
+}
+
+impl Default for LatencyDistr {
+    fn default() -> Self {
+        Self { mean: 0, stddev: 0 }
+    }
+}
+
+impl LatencyDistr {
+    /// In units of ms
+    pub fn new(mean: u32, stddev: u32) -> Self {
+        Self { mean, stddev }
     }
 }
 
 /// Unit test for `Config`
 #[cfg(test)]
 mod tests_config {
-    use super::{Config, DbProxyConfig, SchedulerConfig, SequencerConfig};
+    use super::*;
 
     #[test]
     fn test_from_file() {
@@ -240,10 +310,12 @@ mod tests_config {
                     .set_disable_single_read_optimization(false),
                 sequencer: SequencerConfig::new("127.0.0.1:9876").set_max_connection(Some(50)),
                 dbproxy: vec![
-                    DbProxyConfig::new("127.0.0.1:8876").set_sql_conf(Some(
-                        "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
-                    )),
-                    DbProxyConfig::new("127.0.0.1:8876").set_sql_conf(Some(
+                    DbProxyConfig::new("127.0.0.1:8876")
+                        .set_sql_conf(Some(
+                            "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
+                        ))
+                        .set_db_mock_latency(DbMockLatency::default().set_begintx(LatencyDistr::new(10, 1))),
+                    DbProxyConfig::new("127.0.0.1:8877").set_sql_conf(Some(
                         "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
                     ))
                 ]

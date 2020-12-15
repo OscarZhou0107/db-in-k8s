@@ -271,10 +271,9 @@ async fn helper_spawn_client_sender(tcp_write: OwnedWriteHalf, mut messages: Vec
 }
 
 async fn helper_spawn_proxy(addr: SocketAddr) {
-    let config = DbProxyConfig {
-        addr: addr.to_string(),
-        sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
-    };
+    let config = DbProxyConfig::new(addr.to_string()).set_sql_conf(Some(
+        "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
+    ));
 
     dbproxy_main(config).await;
 }

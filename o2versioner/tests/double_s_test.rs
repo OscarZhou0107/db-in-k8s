@@ -94,14 +94,12 @@ async fn run_double_s_limited() {
             max_connection: None,
         },
         dbproxy: vec![
-            DbProxyConfig {
-                addr: String::from(dbproxy0_addr),
-                sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
-            },
-            DbProxyConfig {
-                addr: String::from(dbproxy1_addr),
-                sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
-            },
+            DbProxyConfig::new(dbproxy0_addr).set_sql_conf(Some(
+                "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
+            )),
+            DbProxyConfig::new(dbproxy1_addr).set_sql_conf(Some(
+                "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
+            )),
         ],
     };
 
@@ -185,14 +183,12 @@ async fn run_double_s_unlimited() {
             max_connection: None,
         },
         dbproxy: vec![
-            DbProxyConfig {
-                addr: String::from(dbproxy0_addr),
-                sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
-            },
-            DbProxyConfig {
-                addr: String::from(dbproxy1_addr),
-                sql_conf: Some("host=localhost port=5432 dbname=Test user=postgres password=Abc@123".to_string()),
-            },
+            DbProxyConfig::new(dbproxy0_addr).set_sql_conf(Some(
+                "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
+            )),
+            DbProxyConfig::new(dbproxy1_addr).set_sql_conf(Some(
+                "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
+            )),
         ],
     };
 
