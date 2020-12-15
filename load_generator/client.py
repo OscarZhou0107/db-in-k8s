@@ -229,7 +229,7 @@ class Client:
                 self.logger.info("### Receiving data: BEGIN")
 
                 length = int.from_bytes(self.soc.recv(4), byteorder="big")
-                self.logger.debug("length: {}", length)
+                self.logger.debug("length: {}".format(length))
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 self.logger.debug("initial data, len: {}, string len: {}, string: {}".format(length, len(final), final))
@@ -294,7 +294,7 @@ class Client:
                 self.logger.info("### Receiving data: COMMIT")
 
                 length = int.from_bytes(self.soc.recv(4), byteorder="big")
-                self.logger.debug("length: {}", length)
+                self.logger.debug("length: {}".format(length))
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 self.logger.debug("initial data, len: {}, string len: {}, string: {}".format(length, len(final), final))
@@ -1069,7 +1069,7 @@ class Client:
         self.logger.info("### Receiving data: Query {}".format(name))
 
         length = int.from_bytes(self.soc.recv(4), byteorder="big")
-        self.logger.debug("length: {}", length)
+        self.logger.debug("length: {}".format(length))
         received = self.soc.recv(2**24).decode('utf-8')
         final = received
         self.logger.debug("initial data, len: {}, string len: {}, string: {}".format(length, len(final), final))
