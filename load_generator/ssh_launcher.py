@@ -14,12 +14,26 @@ if __name__ == "__main__":
     parser.add_argument("--username", type=str)
     parser.add_argument("--password", type=str)
     parser.add_argument("--client_num", type=int, required=True)
+
+    parser.add_argument("--mix", type=int, required=True)
+    parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
+    parser.add_argument("--debug", action='store_true')
+    parser.add_argument("--mock_db", action='store_true')
+
     args = parser.parse_args()
     username = args.username
     password = args.password
     client_num = args.client_num
+    mix = args.mix
+    python = args.python
+    debug = ""
+    if args.debug:
+        debug = "--debug"
+    mock_db = ""
+    if args.mock_db:
+        mock_db = "--mock_db"
 
-    host_abbr = ["209", "210"]
+    host_abbr = ["206", "207", "208", "209", "210"]
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     host_num = len(hosts)
     client_num_per_host = math.ceil(client_num/host_num)
@@ -50,7 +64,7 @@ if __name__ == "__main__":
     inout = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "python3 launcher.py --range {}".format(client_range_per_host[i])
+            cmd = "{} launcher.py --mix {} --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
             if DEBUG: 
                cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
             # get_pty means get a pseudo terminal. 
@@ -65,10 +79,10 @@ if __name__ == "__main__":
     time.sleep(5)
 
     while True:
-        text = input("kill all or status all: \n")
-        if text == "kill all":
+        text = input("kill or status: \n")
+        if text == "kill":
             os.killpg(os.getpid(), signal.SIGTERM)
-        if text == "status all":
+        if text == "status":
             for i in range(host_num):
                 if inout[i]:
                     inout[i][0].write("status\r\n")
@@ -78,7 +92,7 @@ if __name__ == "__main__":
 
                     # read whatever currently in the buffer
                     buffered = len(inout[i][1].channel.in_buffer)
-                    print("buffered {} bytes".format(buffered))
+                    #print("buffered {} bytes".format(buffered))
                     if buffered:
                         res = inout[i][1].read(buffered).decode("utf-8")
                         print(res.split("\n"))
