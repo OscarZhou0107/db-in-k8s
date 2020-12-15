@@ -226,15 +226,17 @@ class Client:
                 self.soc.sendall(jsonToByte(begin))
 
                 # receive response to BEGIN
+                self.logger.info("### Receiving data: BEGIN")
+
                 length = int.from_bytes(self.soc.recv(4), byteorder="big")
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
+                    print("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
                 data = json.loads(final)
-                
-                self.logger.info("### Receiving data: BEGIN")
+
                 self.logger.debug(data)
 
                 if OK not in data["reply"]["BeginTx"]:
@@ -285,14 +287,17 @@ class Client:
                 self.soc.sendall(jsonToByte(commit))
 
                 # receive reponse to commit
+                self.logger.info("### Receiving data: COMMIT")
+
                 length = int.from_bytes(self.soc.recv(4), byteorder="big")
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
+                    print("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
                 data = json.loads(final)
-                self.logger.info("### Receiving data: COMMIT")
+
                 self.logger.debug(data)
 
                 if OK not in data["reply"]["EndTx"]:
@@ -1053,15 +1058,16 @@ class Client:
 
         self.soc.sendall(jsonToByte(serialized))
         
+        self.logger.info("### Receiving data: Query {}".format(name))
         length = int.from_bytes(self.soc.recv(4), byteorder="big")
         received = self.soc.recv(2**24).decode('utf-8')
         final = received
         while len(final) < length:
+            print("LOOPPPPPPPPPPPPPPPP")
             received = self.soc.recv(2**24).decode('utf-8')
             final = final + received
         response = json.loads(final)
 
-        self.logger.info("### Receiving data: Query {}".format(name))
         self.logger.debug(response)
 
         if MOCK:
