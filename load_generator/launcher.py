@@ -30,7 +30,7 @@ def launch_client(cids, mix, pid, python, debug, mock_db, ssh):
             procs[subprocess.Popen([python, script, "--c_id", str(cid)])] = command
             #procs.add(subprocess.Popen(["python3", script]))
         else:
-            command = "{} {} --port {} --c_id {} --mix {} --debug {}".format(python, script, port, cid, mix, debug, mock_db)
+            command = "{} {} --port {} --c_id {} --mix {} --debug {} --ssh {}".format(python, script, port, cid, mix, debug, mock_db, ssh)
             print(command)
             procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug), "--mock_db", str(mock_db)]))] = command #, stderr=subprocess.PIPE))
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     cids = list(range(int(cid_range[0]), int(cid_range[1])))
     pid = os.getpid()
     # put launch_client into a separate process
-    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, int(args.debug), int(args.mock_db), args.ssh))
+    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, int(args.debug), int(args.mock_db), int(args.ssh)))
     p.start()
 
     start_time = time.time()

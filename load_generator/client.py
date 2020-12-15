@@ -15,10 +15,6 @@ import web_to_sql
 import con_data
 import sql
 
-
-
-#HOST = '127.0.0.1'
-HOST = "128.100.13.212"
 TT = 0
 #TT = 0.5 # think time
 MAX_TIME = 6000
@@ -1260,6 +1256,8 @@ if __name__ == "__main__":
     parser.add_argument("--mix", type=int, default=0)
     parser.add_argument("--debug", type=int, default=0)
     parser.add_argument("--mock_db", type=int, default=0)
+    parser.add_argument("--ssh", type=int, default=0)
+
     args = parser.parse_args()
 
     if args.mix == 0:
@@ -1280,6 +1278,9 @@ if __name__ == "__main__":
 
     DEBUG = args.debug
     MOCK = args.mock_db
+    HOST = '127.0.0.1'
+    if args.ssh: 
+        HOST = "128.100.13.212"
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
