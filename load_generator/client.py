@@ -232,9 +232,11 @@ class Client:
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
+                    self.logger.debug("before loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
                     self.logger.info("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
+                    self.logger.debug("after loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
                 data = json.loads(final)
 
                 self.logger.debug(data)
@@ -293,9 +295,11 @@ class Client:
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
+                    self.logger.debug("before loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
                     self.logger.info("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
+                    self.logger.debug("after loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
                 data = json.loads(final)
 
                 self.logger.debug(data)
@@ -1063,9 +1067,11 @@ class Client:
         received = self.soc.recv(2**24).decode('utf-8')
         final = received
         while len(final) < length:
+            self.logger.debug("before loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
             self.logger.info("LOOPPPPPPPPPPPPPPPP")
             received = self.soc.recv(2**24).decode('utf-8')
             final = final + received
+            self.logger.debug("after loop, len: {}, string len: {}, string: {}".format(length, len(final), final))
         response = json.loads(final)
 
         self.logger.debug(response)
