@@ -79,8 +79,16 @@ if __name__ == "__main__":
             inout.append(None)
 
     # otherwise read/write to std stream might fail
-    time.sleep(10)
+    time.sleep(3)
 
+    # read whatever currently in the buffer
+    buffered = len(inout[i][1].channel.in_buffer)
+    #print("buffered {} bytes".format(buffered))
+    if buffered:
+        res = inout[i][1].read(buffered).decode("utf-8")
+        print(res.split("\n"))
+
+    print("starting while loop...")
     while True:
         text = input("kill or status: \n")
         if text == "kill":
