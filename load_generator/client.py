@@ -232,7 +232,7 @@ class Client:
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
-                    print("LOOPPPPPPPPPPPPPPPP")
+                    self.logger.info("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
                 data = json.loads(final)
@@ -293,7 +293,7 @@ class Client:
                 received = self.soc.recv(2**24).decode('utf-8')
                 final = received
                 while len(final) < length:
-                    print("LOOPPPPPPPPPPPPPPPP")
+                    self.logger.info("LOOPPPPPPPPPPPPPPPP")
                     received = self.soc.recv(2**24).decode('utf-8')
                     final = final + received
                 data = json.loads(final)
@@ -862,7 +862,7 @@ class Client:
         # doTitleSearch
         # doSubjectSearch
         #searchType = randint(1, 3)
-        searchType = 3 # hack: since we cannot get soundex to work, skip queries using it
+        searchType = 4 # hack: since we cannot get soundex to work, skip queries using it
         if searchType == 1:
             # author
             searchKey = generateRandomString()
@@ -1057,13 +1057,13 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        
+
         self.logger.info("### Receiving data: Query {}".format(name))
         length = int.from_bytes(self.soc.recv(4), byteorder="big")
         received = self.soc.recv(2**24).decode('utf-8')
         final = received
         while len(final) < length:
-            print("LOOPPPPPPPPPPPPPPPP")
+            self.logger.info("LOOPPPPPPPPPPPPPPPP")
             received = self.soc.recv(2**24).decode('utf-8')
             final = final + received
         response = json.loads(final)
