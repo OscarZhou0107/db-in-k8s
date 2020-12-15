@@ -185,7 +185,7 @@ async fn test_sequencer_stop() {
 
     let sequencer_handle = tokio::spawn(sequencer_main(conf));
 
-    sleep(Duration::from_millis(200)).await;
+    sleep(Duration::from_millis(300)).await;
 
     let tester_handle_0 = tokio::spawn(async move {
         let msgs = vec![

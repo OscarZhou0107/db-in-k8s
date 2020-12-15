@@ -72,7 +72,11 @@ impl TableOp {
 
 /// Representing a collection of TableOp
 ///
-/// Automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
+/// # Notes
+/// 1. The space characters are removed from the table names
+/// 2. Does not contain any tables with empty name
+/// 3. Does not contain any duplicated tables
+/// 4. Automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
 /// (`RWOperation`s with same `String` are ordered such that `RWOperation::W` comes before `RWOperation::R`)
 ///
 /// # Examples
@@ -150,6 +154,7 @@ impl FromIterator<TableOp> for TableOps {
     fn from_iter<I: IntoIterator<Item = TableOp>>(iter: I) -> Self {
         Self(
             iter.into_iter()
+                .filter(|tableop| !tableop.table.is_empty())
                 .sorted_by(|left, right| {
                     if left.table != right.table {
                         Ord::cmp(&left.table, &right.table)
@@ -220,6 +225,13 @@ where
     }
 }
 
+/// Represents the annotation of all tables to be early released
+///
+/// # Notes
+/// 1. The space characters are removed from the table names
+/// 2. Does not contain any tables with empty name
+/// 3. Sorted in ascending order of table names
+/// 4. Does not contain any duplicated tables
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EarlyReleaseTables(Vec<String>);
 
@@ -248,6 +260,7 @@ impl EarlyReleaseTables {
         Self::from_iter(self)
     }
 
+    /// Check whether `EarlyReleaseTables` contains no tables
     pub fn is_empty(&self) -> bool {
         return self.0.is_empty();
     }
@@ -461,6 +474,73 @@ mod tests_tableops {
                 TableOp::new("table_1", RWOperation::R)
             ]
         );
+
+        assert_eq!(TableOps::from_iter(vec![]).into_vec(), vec![]);
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("    ", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
+            ])
+            .into_iter()
+            .collect::<Vec<_>>(),
+            vec![
+                TableOp::new("table_r_0", RWOperation::R),
+                TableOp::new("table_r_1", RWOperation::R)
+            ]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("    ", RWOperation::R),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("table_0", RWOperation::R),
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("    ", RWOperation::W),
+                TableOp::new("table_0", RWOperation::W)
+            ])
+            .into_vec(),
+            vec![TableOp::new("table_0", RWOperation::W)]
+        );
+
+        assert_eq!(
+            TableOps::from_iter(vec![
+                TableOp::new("          ", RWOperation::R),
+                TableOp::new("    ", RWOperation::W),
+            ])
+            .into_vec(),
+            vec![]
+        );
     }
 
     #[test]
@@ -559,6 +639,9 @@ mod tests_tableops {
     fn test_add_tableop() {
         let tableops = TableOps::default();
 
+        let tableops = tableops.add_tableop(TableOp::new("    ", RWOperation::R));
+        assert_eq!(tableops.get(), vec![].as_slice());
+
         let tableops = tableops.add_tableop(TableOp::new("table_0", RWOperation::R));
         assert_eq!(tableops.get(), vec![TableOp::new("table_0", RWOperation::R)].as_slice());
 
@@ -591,6 +674,47 @@ mod tests_tableops {
             vec![
                 TableOp::new("table_0", RWOperation::W),
                 TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("    ", RWOperation::W));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("", RWOperation::R));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("table_1", RWOperation::W));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W)
+            ]
+            .as_slice()
+        );
+
+        let tableops = tableops.add_tableop(TableOp::new("table_3", RWOperation::R));
+        assert_eq!(
+            tableops.get(),
+            vec![
+                TableOp::new("table_0", RWOperation::W),
+                TableOp::new("table_1", RWOperation::W),
+                TableOp::new("table_3", RWOperation::R)
             ]
             .as_slice()
         );
@@ -670,6 +794,34 @@ mod tests_early_release_tables {
             Vec::<String>::new()
         );
         assert_eq!(EarlyReleaseTables::from_iter(vec![""]).into_vec(), Vec::<String>::new());
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    "]).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", ""]).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "   "]).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "table0", "   "]).into_vec(),
+            vec!["table0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "table0", "   ", "table0"]).into_vec(),
+            vec!["table0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "table0", "   ", "    table0   "]).into_vec(),
+            vec!["table0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "   table0", "   ", "    table0   "]).into_vec(),
+            vec!["table0".to_owned()]
+        );
     }
 
     #[test]
@@ -733,6 +885,31 @@ mod tests_early_release_tables {
         assert_eq!(
             EarlyReleaseTables::default().add_table("").into_vec(),
             Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("    ")
+                .add_table("table_0")
+                .into_vec(),
+            vec!["table_0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("")
+                .add_table("table_0")
+                .into_vec(),
+            vec!["table_0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("")
+                .add_table("table_1")
+                .add_table("   ")
+                .into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
         );
     }
 

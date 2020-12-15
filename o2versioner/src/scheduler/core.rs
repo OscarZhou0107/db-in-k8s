@@ -3,14 +3,13 @@ use super::transceiver::TransceiverAddr;
 use crate::core::*;
 use crate::util::common::{create_zip_csv_writer, prepare_logging_dir};
 use crate::util::config::*;
-use futures::prelude::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 #[derive(Debug, Clone)]
@@ -18,7 +17,7 @@ use tracing::{info, warn};
 /// the entire scheduler
 pub struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
-    client_records: Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>>,
+    client_records: ClientRecords,
     conf: Arc<Config>,
 }
 
@@ -26,41 +25,19 @@ impl State {
     pub fn new(dbvn_manager: DbVNManager, conf: Config) -> Self {
         Self {
             dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
-            client_records: Arc::new(Mutex::new(HashMap::new())),
+            client_records: ClientRecords::new(conf.scheduler.detailed_logging.is_some()),
             conf: Arc::new(conf),
         }
     }
 
+    /// Share `DbVNManager` by creating a strong reference to the `Arc` pointer
     pub fn share_dbvn_manager(&self) -> Arc<RwLock<DbVNManager>> {
         self.dbvn_manager.clone()
     }
 
+    /// Share `ClientRecord` by creating a strong reference to the `Arc` pointer
     pub async fn share_client_record(&self, client: SocketAddr) -> Arc<RwLock<ClientRecord>> {
-        self.client_records
-            .lock()
-            .await
-            .entry(client.clone())
-            .or_insert_with(|| {
-                Arc::new(RwLock::new(ClientRecord::new(
-                    client,
-                    self.conf.scheduler.detailed_logging.is_some(),
-                )))
-            })
-            .clone()
-    }
-
-    // pub fn share_client_records(&self) -> Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>> {
-    //     self.client_records.clone()
-    // }
-
-    pub async fn collect_client_records(&self) -> HashMap<SocketAddr, ClientRecord> {
-        stream::iter(self.client_records.lock().await.iter())
-            .then(|(client_addr, client_record)| async move {
-                let client_record = client_record.read().await;
-                (client_addr.clone(), client_record.clone())
-            })
-            .collect()
-            .await
+        self.client_records.share_client_record(client).await
     }
 
     /// Dump the performance logging, returns the path of logging dumps if dumped
@@ -74,11 +51,10 @@ impl State {
             perf_csv_path_builder.push("perf.csv.gz");
             let perf_csv_path = perf_csv_path_builder.as_path();
             let mut wrt = create_zip_csv_writer(perf_csv_path).unwrap();
-            self.collect_client_records()
+            self.client_records
+                .collect_flattened_performance()
                 .await
                 .into_iter()
-                .map(|(_, reqrecord)| reqrecord.performance_records().to_vec())
-                .flatten()
                 .for_each(|r| wrt.serialize(r).unwrap());
             info!("Dumped performance logging to {}", perf_csv_path.display());
 
@@ -100,7 +76,7 @@ impl State {
                 .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
                 .for_each(|d| wrt.serialize(d).unwrap());
             info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
-            Some(dbproxy_stats_csv_path.to_string_lossy().to_string())
+            Some(cur_log_dir.as_path().to_string_lossy().to_string())
         } else {
             info!("Due to the conf setting, performance loggings are not dumped");
             None
@@ -168,10 +144,8 @@ impl FromIterator<SocketAddr> for DbVNManager {
 }
 
 impl DbVNManager {
-    // pub fn get_all_addr(&self) -> Vec<SocketAddr> {
-    //     self.0.iter().map(|(addr, _)| addr.clone()).collect()
-    // }
-
+    /// Find all dbproxies that have their versions ready to execute the
+    /// ready query associated with the argument `TableOps`
     pub fn get_all_that_can_execute_read_query(
         &self,
         tableops: &TableOps,
@@ -215,6 +189,7 @@ impl DbVNManager {
             .unwrap()
     }
 
+    /// Performa a version release on the argument dbproxy
     pub fn release_version(&mut self, dbproxy_addr: &SocketAddr, release_request: DbVNReleaseRequest) {
         if !self.0.contains_key(dbproxy_addr) {
             warn!(

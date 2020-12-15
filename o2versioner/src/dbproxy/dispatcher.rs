@@ -17,6 +17,13 @@ use tokio_postgres::NoTls;
 use tracing::{debug, field, info, instrument, trace, Instrument, Span};
 use uuid::Uuid;
 
+/// An event loop to process the incoming Msql request
+/// from the queue (enqueued by the receiver) once they are
+/// ready for versions, and reply back via the responder
+///
+/// Every transaction is spawned as a task, and will be done
+/// once the transaction is properly terminated via Sql transaction
+/// commit or rollback
 pub struct Dispatcher {
     pending_queue: Arc<Mutex<PendingQueue>>,
     responder_sender: mpsc::Sender<QueryResult>,
@@ -197,6 +204,7 @@ impl Executor for Dispatcher {
     }
 }
 
+/// Executes a Sql transaction with a postgre DBMS
 struct TransactionExecutor {
     transaction_uuid: Uuid,
     client_meta: ClientMeta,
@@ -279,6 +287,7 @@ impl Executor for TransactionExecutor {
     }
 }
 
+/// Executes a single Sql read query without transaction with a postgre DBMS
 struct SingleReadExecutor {
     transaction_uuid: Uuid,
     client_meta: ClientMeta,
@@ -325,6 +334,7 @@ impl Executor for SingleReadExecutor {
     }
 }
 
+/// Executes a single Sql read query without transaction without a real DBMS
 struct MockSingleReadExecutor {
     transaction_uuid: Uuid,
     client_meta: ClientMeta,
@@ -362,6 +372,7 @@ impl Executor for MockSingleReadExecutor {
     }
 }
 
+/// Executes a Sql transaction without a real DBMS
 struct MockTransactionExecutor {
     transaction_uuid: Uuid,
     client_meta: ClientMeta,

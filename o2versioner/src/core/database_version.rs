@@ -29,6 +29,7 @@ impl Default for DbVN {
 }
 
 impl DbVN {
+    /// Get the `DbTableVN` from current `DbVN` that matches with the argument `TableOp`
     pub fn get_from_tableop(&self, tableop: &TableOp) -> DbTableVN {
         DbTableVN::new(
             tableop.table(),
@@ -36,6 +37,7 @@ impl DbVN {
         )
     }
 
+    /// Get a `Vec<DbTableVN>` from current `DbVN` that matches with the argument `TableOps`
     pub fn get_from_tableops(&self, tableops: &TableOps) -> Vec<DbTableVN> {
         tableops
             .get()
@@ -44,6 +46,7 @@ impl DbVN {
             .collect()
     }
 
+    /// Check whether the specific `TxTableVN` can be executed on the current `DbVN`
     fn can_execute_query_on_table(&self, txtablevn: &TxTableVN) -> bool {
         match &txtablevn.op {
             RWOperation::R => self.0.get(&txtablevn.table).cloned().unwrap_or_default() >= txtablevn.vn,

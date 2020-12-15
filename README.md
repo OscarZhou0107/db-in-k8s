@@ -71,6 +71,31 @@ find  -name '*.py' | xargs wc -l | sort -nr
 ```
 
 
+### Benchmarking
+
+
+#### Generate perf logging files
+```sh
+# Sonnect to the admin addr via netcat or telnet
+netcat localhost 9999
+telnet localhost 9999
+
+# Send a "perf" to the admin
+perf
+```
+
+
+#### Analyze the data
+Single run analysis
+```sh
+python3 -m analyzer single ./perf/xx
+```
+Multi run analysis
+```sh
+python3 -m analyzer multi ./perf
+```
+
+
 ## Progress
 
 

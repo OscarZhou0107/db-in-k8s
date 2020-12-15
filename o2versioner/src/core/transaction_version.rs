@@ -15,6 +15,7 @@ pub struct TxTableVN {
 }
 
 impl TxTableVN {
+    /// Create a new `TxTableVN`
     pub fn new<S: Into<String>>(table: S, vn: VN, op: RWOperation) -> Self {
         Self {
             table: table.into(),
@@ -177,10 +178,12 @@ impl IntoIterator for DbVNReleaseRequest {
 }
 
 impl DbVNReleaseRequest {
+    /// Converted into a `Vec<String>` representing the tables
     pub fn into_inner(self) -> Vec<String> {
         self.0
     }
 
+    /// As a `&[String]` representing the tables
     pub fn inner(&self) -> &[String] {
         &self.0
     }

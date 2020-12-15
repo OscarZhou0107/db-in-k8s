@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::net::SocketAddr;
 
+/// Meta data regarding the current client session
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientMeta {
     client_addr: SocketAddr,
@@ -22,19 +23,24 @@ impl ClientMeta {
         }
     }
 
+    /// Get the `ClientMeta::client_addr`
     pub fn client_addr(&self) -> SocketAddr {
         self.client_addr
     }
 
+    /// Get the `ClientMeta::cur_txid`
     pub fn current_txid(&self) -> usize {
         self.cur_txid
     }
 
+    /// Marks the current transaction as completed by
+    /// incrementing `ClientMeta::cur_txid`
     pub fn transaction_finished(&mut self) {
         self.cur_txid += 1;
     }
 }
 
+/// Meta data regarding the current request within the current client session
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RequestMeta {
     pub client_addr: SocketAddr,
@@ -61,6 +67,7 @@ impl RequestMeta {
         }
     }
 
+    /// Acquire a `ClientMeta` from the current `RequestMeta`
     pub fn to_client_meta(&self) -> ClientMeta {
         ClientMeta {
             client_addr: self.client_addr.clone(),

@@ -131,15 +131,29 @@ pub fn sql_transaction_samples() -> Vec<Vec<Message>> {
             )),
             Message::RequestMsqlText(MsqlText::endtx(Option::<String>::None, MsqlEndTxMode::Commit)),
         ],
+        // #3 Single read
         vec![Message::RequestMsqlText(MsqlText::query(
             "select * from w1;",
             "read w1",
             Some(""),
         ))],
+        // #4 Single write
         vec![Message::RequestMsqlText(MsqlText::query(
             "update w3 set name=\"ray\" where id = 22;",
             "write w3",
             Some(""),
+        ))],
+        // #5 Single read with early release
+        vec![Message::RequestMsqlText(MsqlText::query(
+            "select * from w1;",
+            "read w1",
+            Some("w1"),
+        ))],
+        // #6 Single write with early release
+        vec![Message::RequestMsqlText(MsqlText::query(
+            "update w3 set name=\"ray\" where id = 22;",
+            "write w3",
+            Some("w3"),
         ))],
     ]
 }

@@ -335,6 +335,12 @@ impl State {
 
 pub type DispatcherAddr = ExecutorAddr<DispatcherRequest>;
 
+/// An executor for dispatching Sql requests to the corresponding
+/// dbproxies.
+/// 
+/// Write queries are sent to all dbproxies, while read queries
+/// are gated here until their versions are ready and are only
+/// sent to a single dbproxy
 pub struct Dispatcher {
     state: State,
     request_rx: RequestReceiver<DispatcherRequest>,

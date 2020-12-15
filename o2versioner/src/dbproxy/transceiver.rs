@@ -15,6 +15,8 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{debug, field, info, info_span, instrument, Instrument, Span};
 
+/// Creates a tcp connection and splits it into
+/// `Receiver` and `Responder`
 pub async fn connection<A>(
     addr: A,
     pending_queue: Arc<Mutex<PendingQueue>>,
@@ -35,6 +37,7 @@ where
     (receiver, responder)
 }
 
+/// Handles the incoming tcp request from scheduler
 pub struct Receiver {
     pending_queue: Arc<Mutex<PendingQueue>>,
     tcp_read: OwnedReadHalf,
@@ -88,6 +91,7 @@ impl Executor for Receiver {
     }
 }
 
+/// Sends the tcp reply messages back to scheduler
 pub struct Responder {
     receiver: mpsc::Receiver<QueryResult>,
     version: Arc<Mutex<DbVersion>>,

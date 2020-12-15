@@ -1,3 +1,5 @@
+//! Communication between scheduler and sequencer
+
 use crate::core::{ClientMeta, MsqlBeginTx, TxVN};
 use serde::{Deserialize, Serialize};
 

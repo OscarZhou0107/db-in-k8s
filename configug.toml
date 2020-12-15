@@ -1,0 +1,30 @@
+# cd dv-in-rust
+# cargo run -- --scheduler -c ./configug.toml
+
+[scheduler]
+addr = "127.0.0.1:2077"
+admin_addr = "127.0.0.1:9999"
+#disable_early_release = true
+#disable_single_read_optimization = true
+
+[sequencer]
+addr = "127.0.0.1:19876"
+
+[[dbproxy]]
+addr = "ug212.eecg.toronto.edu"
+sql_conf = "host=ug212.eecg.toronto.edu port=33333 dbna:me=tpcw user=qinsinin"
+
+[[dbproxy]]
+addr = "ug244.eecg.toronto.edu"
+sql_conf = "host=ug244.eecg.toronto.edu port=33333 dbname=tpcw user=qinsinin"
+
+
+[[dbproxy]]
+addr = "ug243.eecg.toronto.edu"
+sql_conf = "host=ug243.eecg.toronto.edu port=33333 dbname=tpcw user=qinsinin"
+
+
+[[dbproxy]]
+addr = "ug242.eecg.toronto.edu"
+sql_conf = "host=ug242.eecg.toronto.edu port=33333 dbname=tpcw user=qinsinin"
+

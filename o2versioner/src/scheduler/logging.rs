@@ -2,9 +2,16 @@
 use crate::comm::MsqlResponse;
 use crate::core::*;
 use chrono::{DateTime, Utc};
+use futures::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
 
+/// Temproary `RequestRecord` representing
+/// the starting half, use `RequestRecordStart::finish`
+/// to properly convert it into a `RequestRecord`
 pub struct RequestRecordStart {
     req: Msql,
     req_timestamp: DateTime<Utc>,
@@ -37,6 +44,8 @@ impl RequestRecordStart {
     }
 }
 
+/// Record that properly represents an entire
+/// lifespan of a request
 #[derive(Debug, Clone)]
 pub struct RequestRecord {
     req: Msql,
@@ -94,6 +103,56 @@ impl RequestRecord {
     }
 }
 
+/// For performance benchmarking, converted from `RequestRecord`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PerformanceRequestRecord {
+    client_addr: Option<SocketAddr>,
+    request_type: String,
+    request_result: String,
+    initial_timestamp: DateTime<Utc>,
+    final_timestamp: DateTime<Utc>,
+}
+
+impl From<RequestRecord> for PerformanceRequestRecord {
+    fn from(r: RequestRecord) -> Self {
+        let request_type = match &r.req {
+            Msql::BeginTx(_) => "BeginTx".to_owned(),
+            Msql::Query(query) => {
+                if r.initial_txvn.is_some() {
+                    if !query.has_early_release() {
+                        query.tableops().access_pattern().as_ref().to_owned()
+                    } else {
+                        format!("{}EarlyRelease", query.tableops().access_pattern().as_ref())
+                    }
+                } else {
+                    format!("Single{}", query.tableops().access_pattern().as_ref())
+                }
+            }
+            Msql::EndTx(endtx) => endtx.mode().as_ref().to_owned(),
+        };
+
+        let request_result = if r.res.is_ok() { "Ok" } else { "Err" };
+
+        Self {
+            client_addr: None,
+            request_type,
+            request_result: request_result.into(),
+            initial_timestamp: r.req_timestamp,
+            final_timestamp: r.res_timestamp,
+        }
+    }
+}
+
+impl PerformanceRequestRecord {
+    pub fn set_client_addr(mut self, client_addr: Option<SocketAddr>) -> Self {
+        self.client_addr = client_addr;
+        self
+    }
+}
+
+/// Keeps all `RequestRecord` (if `detailed_record == true`) and
+/// `PerformanceRequestRecord` for a particualr client with
+/// `ClientRecord::client_addr`
 #[derive(Debug, Clone)]
 pub struct ClientRecord {
     client_addr: SocketAddr,
@@ -143,49 +202,60 @@ impl ClientRecord {
     }
 }
 
-/// For performance benchmarking, converted from `RequestRecord`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerformanceRequestRecord {
-    client_addr: Option<SocketAddr>,
-    request_type: String,
-    request_result: String,
-    initial_timestamp: DateTime<Utc>,
-    final_timestamp: DateTime<Utc>,
+/// Shareable mapping of client_addr -> `ClientRecord`
+#[derive(Debug, Clone)]
+pub struct ClientRecords {
+    detailed_record: bool,
+    records: Arc<Mutex<HashMap<SocketAddr, Arc<RwLock<ClientRecord>>>>>,
 }
 
-impl From<RequestRecord> for PerformanceRequestRecord {
-    fn from(r: RequestRecord) -> Self {
-        let request_type = match &r.req {
-            Msql::BeginTx(_) => "BeginTx".to_owned(),
-            Msql::Query(query) => {
-                if r.initial_txvn.is_some() {
-                    if !query.has_early_release() {
-                        query.tableops().access_pattern().as_ref().to_owned()
-                    } else {
-                        format!("{}EarlyRelease", query.tableops().access_pattern().as_ref())
-                    }
-                } else {
-                    format!("Single{}", query.tableops().access_pattern().as_ref())
-                }
-            }
-            Msql::EndTx(endtx) => endtx.mode().as_ref().to_owned(),
-        };
-
-        let request_result = if r.res.is_ok() { "Ok" } else { "Err" };
-
+impl ClientRecords {
+    pub fn new(detailed_record: bool) -> Self {
         Self {
-            client_addr: None,
-            request_type,
-            request_result: request_result.into(),
-            initial_timestamp: r.req_timestamp,
-            final_timestamp: r.res_timestamp,
+            detailed_record,
+            records: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-}
 
-impl PerformanceRequestRecord {
-    pub fn set_client_addr(mut self, client_addr: Option<SocketAddr>) -> Self {
-        self.client_addr = client_addr;
-        self
+    pub async fn share_client_record(&self, client: SocketAddr) -> Arc<RwLock<ClientRecord>> {
+        self.records
+            .lock()
+            .await
+            .entry(client.clone())
+            .or_insert_with(|| Arc::new(RwLock::new(ClientRecord::new(client, self.detailed_record))))
+            .clone()
+    }
+
+    /// Takes a snapshot of all current `ClientRecord`s and returns the a `HashMap` that represents
+    /// a mapping from client_addr to `ClientRecord`
+    pub async fn collect(&self) -> HashMap<SocketAddr, ClientRecord> {
+        stream::iter(self.records.lock().await.iter())
+            .then(|(client_addr, client_record)| async move {
+                let client_record = client_record.read().await;
+                (client_addr.clone(), client_record.clone())
+            })
+            .collect()
+            .await
+    }
+
+    /// Takes a snapshot of current `ClientRecord`s and returns the a `HashMap` that represents
+    /// a mapping from client_addr to `PerformanceRequestRecord`
+    pub async fn collect_performance(&self) -> HashMap<SocketAddr, Vec<PerformanceRequestRecord>> {
+        self.collect()
+            .await
+            .into_iter()
+            .map(|(client_addr, reqrecord)| (client_addr, reqrecord.performance_records().to_vec()))
+            .collect()
+    }
+
+    /// Takes a snapshot of current `ClientRecord`s and returns a flattened `Vec` that concatenates
+    /// all `PerformanceRequestRecord`
+    pub async fn collect_flattened_performance(&self) -> Vec<PerformanceRequestRecord> {
+        self.collect_performance()
+            .await
+            .into_iter()
+            .map(|(_, reqrecord)| reqrecord)
+            .flatten()
+            .collect()
     }
 }

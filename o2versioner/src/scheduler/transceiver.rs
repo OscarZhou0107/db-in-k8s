@@ -49,6 +49,11 @@ impl ExecutorRequest for TransceiverRequest {
 
 pub type TransceiverAddr = ExecutorAddr<TransceiverRequest>;
 
+/// Responding for the tcp communication with a single dbproxy
+///
+/// # Notes
+/// 1. Uses a single TCP connection for both sending and receiving
+/// 2. Sending and receiving are split so can send and receive concurrently
 pub struct Transceiver {
     dbproxy_addr: SocketAddr,
     request_rx: RequestReceiver<TransceiverRequest>,
