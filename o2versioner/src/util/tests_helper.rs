@@ -12,6 +12,9 @@ use tokio::net::{TcpStream, ToSocketAddrs};
 use tracing::dispatcher::DefaultGuard;
 use tracing::{debug, error, field, info_span, instrument, trace, Instrument, Span};
 
+/// Init testing logger with `tracing::Level::TRACE` verbosity
+///
+/// The logging is only enabled in the lifespan of the returned `DefaultGuard`
 #[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_logger() -> DefaultGuard {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
@@ -23,6 +26,9 @@ pub fn init_logger() -> DefaultGuard {
     tracing::subscriber::set_default(subscriber)
 }
 
+/// Init testing logger with `tracing::Level::INFO` verbosity
+///
+/// The logging is only enabled in the lifespan of the returned `DefaultGuard`
 #[must_use = "Dropping the guard unregisters the subscriber."]
 pub fn init_fast_logger() -> DefaultGuard {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
