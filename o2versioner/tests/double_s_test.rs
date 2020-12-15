@@ -175,7 +175,7 @@ async fn run_double_s_unlimited() {
             sequencer_pool_size: 10,
             dispatcher_queue_size: 5000,
             transceiver_queue_size: 5000,
-            performance_logging: Some("./logging".to_owned()),
+            performance_logging: Some("./perf".to_owned()),
             detailed_logging: None,
             disable_early_release: false,
             disable_single_read_optimization: false,
