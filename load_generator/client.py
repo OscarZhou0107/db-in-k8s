@@ -15,9 +15,6 @@ import web_to_sql
 import con_data
 import sql
 
-
-
-HOST = '127.0.0.1'
 TT = 0
 #TT = 0.5 # think time
 MAX_TIME = 6000
@@ -209,12 +206,12 @@ class Client:
         # set name for this logger
         self.logger = logging.getLogger("client_" + str(c_id) + "_process_" + str(os.getpid()))
         
-        
         # set up random seed
         seed(c_id)
 
     def run(self):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("### connect to {} at port {}".format(HOST, self.port))
         self.soc.connect((HOST, self.port))
         self.logger.info("Client {} in process {} connected at port {}".format(self.c_id, os.getpid(), self.port))
 
@@ -850,7 +847,9 @@ class Client:
         # doAuthorSearch
         # doTitleSearch
         # doSubjectSearch
-        searchType = randint(1, 3)
+        #searchType = randint(1, 3)
+        searchType = 4 # hack: since we cannot get soundex to work
+        # hack: unterminated string
         if searchType == 1:
             # author
             searchKey = generateRandomString()
@@ -869,7 +868,7 @@ class Client:
             if self.isErr(response):
                 self.logger.error("Response to doTitleSearch has error")
                 return False
-        else: # searchType == 3
+        elif searchType == 3: # searchType == 3
             # subject
             searchKey = generateRandomSubject()
             query = sql.replaceVars(sql.sqlNameToCommand["doSubjectSearch"], 1, [searchKey])
@@ -1259,6 +1258,8 @@ if __name__ == "__main__":
     parser.add_argument("--mix", type=int, default=0)
     parser.add_argument("--debug", type=int, default=0)
     parser.add_argument("--mock_db", type=int, default=0)
+    parser.add_argument("--ssh", type=int, default=0)
+
     args = parser.parse_args()
 
     if args.mix == 0:
@@ -1279,6 +1280,9 @@ if __name__ == "__main__":
 
     DEBUG = args.debug
     MOCK = args.mock_db
+    HOST = '127.0.0.1'
+    if args.ssh: 
+        HOST = '128.100.13.212'
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
