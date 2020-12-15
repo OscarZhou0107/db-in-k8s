@@ -230,17 +230,13 @@ class Client:
                 self.soc.sendall(jsonToByte(begin))
 
                 # receive response to BEGIN
-                try:
-                    data = byteToJson(self.soc.recv(2**24))
-                    self.logger.info("### Receiving data: BEGIN")
-                    self.logger.debug(data)
+                data = byteToJson(self.soc.recv(2**24))
+                self.logger.info("### Receiving data: BEGIN")
+                self.logger.debug(data)
 
-                    if OK not in data["reply"]["BeginTx"]:
-                        self.logger.error("Begin response contains error, terminating...")
-                        return 0
-                except:
-                    print("begin tcp receiving failed")
-
+                if OK not in data["reply"]["BeginTx"]:
+                    self.logger.error("Begin response contains error, terminating...")
+                    return 0
             
             if self.curr == 'adminConf':
                 okay = self.doAdminConf()
@@ -286,16 +282,13 @@ class Client:
                 self.soc.sendall(jsonToByte(commit))
 
                 # receive reponse to commit
-                try:
-                    data = byteToJson(self.soc.recv(2**24))
-                    self.logger.info("### Receiving data: COMMIT")
-                    self.logger.debug(data)
+                data = byteToJson(self.soc.recv(2**24))
+                self.logger.info("### Receiving data: COMMIT")
+                self.logger.debug(data)
 
-                    if OK not in data["reply"]["EndTx"]:
-                        self.logger.error("End response contains error, terminating...")
-                        return 0
-                except:
-                    print("commit receiving failed")
+                if OK not in data["reply"]["EndTx"]:
+                    self.logger.error("End response contains error, terminating...")
+                    return 0
             
             # determine next state
             self.curr = determineNext(curr_index, self.mix)
@@ -1050,42 +1043,36 @@ class Client:
         self.logger.debug(serialized)
 
         self.soc.sendall(jsonToByte(serialized))
-        try:
-            response = byteToJson(self.soc.recv(2**24))
+        response = byteToJson(self.soc.recv(2**24))
+        self.logger.info("### Receiving data: Query {}".format(name))
+        self.logger.debug(response)
+
+        if MOCK:
+            self.logger.warning("mock_db mode on")
+            return ["0"] * 20 
+
+        if ALLOW_ABORT and OK not in response["reply"]["Query"]:
+            if "aborted" in response["reply"]["Query"]["Err"]:
+                return "Abort"
+
+        if OK not in response["reply"]["Query"]:
+            self.logger.error("Response to {} contains error".format(name))
+            return "Err"
+
+        response = response["reply"]["Query"][OK]
+        self.logger.critical("csv string: {}".format(response))
+        if not response:
+            self.logger.warning("Response to {} is empty".format(name))
+            return "Empty"
+
+        result = list(csv.reader(response.splitlines()))
+        for i in range(len(result)):
+            for j in range(len(result[0])):
+                if result[i][j].startswith('"') and result[i][j].endswith('"'):
+                    result[i][j] = result[i][j][1:-1]
+        self.logger.info("csv list: {}".format(result))
         
-            self.logger.info("### Receiving data: Query {}".format(name))
-            self.logger.debug(response)
-
-            if MOCK:
-                self.logger.warning("mock_db mode on")
-                return ["0"] * 20 
-
-            if ALLOW_ABORT and OK not in response["reply"]["Query"]:
-                if "aborted" in response["reply"]["Query"]["Err"]:
-                    return "Abort"
-
-            if OK not in response["reply"]["Query"]:
-                self.logger.error("Response to {} contains error".format(name))
-                return "Err"
-
-            response = response["reply"]["Query"][OK]
-            self.logger.critical("csv string: {}".format(response))
-            if not response:
-                self.logger.warning("Response to {} is empty".format(name))
-                return "Empty"
-
-            result = list(csv.reader(response.splitlines()))
-            for i in range(len(result)):
-                for j in range(len(result[0])):
-                    if result[i][j].startswith('"') and result[i][j].endswith('"'):
-                        result[i][j] = result[i][j][1:-1]
-            self.logger.info("csv list: {}".format(result))
-            
-            return result
-        
-        except:
-            print("query tcp receiving failed")
-            return "Abort"
+        return result
     
     def isErr(self, response):
         return response == "Err"
