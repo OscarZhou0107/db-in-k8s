@@ -16,7 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--client_num", type=int, required=True)
 
     parser.add_argument("--mix", type=int, required=True)
-    parser.add_argument("--python", type=str, default="python3", help="Python alias to use")w
+    parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
     parser.add_argument("--debug", action='store_true')
     parser.add_argument("--mock_db", action='store_true')
 
