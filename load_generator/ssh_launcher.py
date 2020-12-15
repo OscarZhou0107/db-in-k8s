@@ -11,7 +11,7 @@ DEBUG = 0
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--username", type=str)
+    parser.add_argument("--username", type=str, default="qinsinin")
     parser.add_argument("--password", type=str)
     parser.add_argument("--client_num", type=int, required=True)
 

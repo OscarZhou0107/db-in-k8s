@@ -209,7 +209,6 @@ class Client:
         # set name for this logger
         self.logger = logging.getLogger("client_" + str(c_id) + "_process_" + str(os.getpid()))
         
-        
         # set up random seed
         seed(c_id)
 
