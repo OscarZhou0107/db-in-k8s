@@ -72,7 +72,11 @@ impl TableOp {
 
 /// Representing a collection of TableOp
 ///
-/// Automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
+/// # Notes
+/// 1. The space characters are removed from the table names
+/// 2. Does not contain any tables with empty name
+/// 3. Does not contain any duplicated tables
+/// 4. Automatically sorted in ascending order by `TableOp::table` and by `TableOp::op`
 /// (`RWOperation`s with same `String` are ordered such that `RWOperation::W` comes before `RWOperation::R`)
 ///
 /// # Examples
@@ -221,6 +225,13 @@ where
     }
 }
 
+/// Represents the annotation of all tables to be early released
+///
+/// # Notes
+/// 1. The space characters are removed from the table names
+/// 2. Does not contain any tables with empty name
+/// 3. Sorted in ascending order of table names
+/// 4. Does not contain any duplicated tables
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EarlyReleaseTables(Vec<String>);
 
@@ -783,6 +794,34 @@ mod tests_early_release_tables {
             Vec::<String>::new()
         );
         assert_eq!(EarlyReleaseTables::from_iter(vec![""]).into_vec(), Vec::<String>::new());
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    "]).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", ""]).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "   "]).into_vec(),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "table0", "   "]).into_vec(),
+            vec!["table0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "table0", "   ", "table0"]).into_vec(),
+            vec!["table0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "table0", "   ", "    table0   "]).into_vec(),
+            vec!["table0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::from_iter(vec!["    ", "   table0", "   ", "    table0   "]).into_vec(),
+            vec!["table0".to_owned()]
+        );
     }
 
     #[test]
@@ -846,6 +885,31 @@ mod tests_early_release_tables {
         assert_eq!(
             EarlyReleaseTables::default().add_table("").into_vec(),
             Vec::<String>::new()
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("    ")
+                .add_table("table_0")
+                .into_vec(),
+            vec!["table_0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("")
+                .add_table("table_0")
+                .into_vec(),
+            vec!["table_0".to_owned()]
+        );
+        assert_eq!(
+            EarlyReleaseTables::default()
+                .add_table("table_0")
+                .add_table("")
+                .add_table("table_1")
+                .add_table("   ")
+                .into_vec(),
+            vec!["table_0".to_owned(), "table_1".to_owned()]
         );
     }
 
