@@ -166,6 +166,8 @@ async fn test_suites(conf: Config, transaction_samples: &Vec<Vec<Message>>) {
     test_suites_mixed(conf.clone(), transaction_samples).await;
     test_suites_single_read(conf.clone(), transaction_samples).await;
     test_suites_single_write(conf.clone(), transaction_samples).await;
+    test_suites_single_read_with_early_release(conf.clone(), transaction_samples).await;
+    test_suites_single_write_with_early_release(conf.clone(), transaction_samples).await;
 }
 
 async fn test_suites_mixed(conf: Config, transaction_samples: &Vec<Vec<Message>>) {
@@ -198,6 +200,16 @@ async fn test_suites_single_read(conf: Config, transaction_samples: &Vec<Vec<Mes
 async fn test_suites_single_write(conf: Config, transaction_samples: &Vec<Vec<Message>>) {
     let tx_sets = [transaction_samples[4].clone()].concat();
     spawn_test(conf.clone(), tx_sets).await;
+}
+
+async fn test_suites_single_read_with_early_release(conf: Config, transaction_samples: &Vec<Vec<Message>>) {
+    let tx_sets = [transaction_samples[5].clone()].concat();
+    spawn_test(conf, tx_sets).await;
+}
+
+async fn test_suites_single_write_with_early_release(conf: Config, transaction_samples: &Vec<Vec<Message>>) {
+    let tx_sets = [transaction_samples[6].clone()].concat();
+    spawn_test(conf, tx_sets).await;
 }
 
 /// Launch the entire setup based on `Config`, and with
