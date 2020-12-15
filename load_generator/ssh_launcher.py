@@ -6,7 +6,7 @@ import argparse
 import math
 import signal
 
-DEBUG = 1
+DEBUG = 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     inout = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
+            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
             if DEBUG: 
                cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
                #cmd = "pwd"
@@ -87,8 +87,7 @@ if __name__ == "__main__":
         if text == "status":
             for i in range(host_num):
                 if inout[i]:
-                    #inout[i][0].write("status\r\n")
-                    inout[i][0].write("pwd\r\n")
+                    inout[i][0].write("status\r\n")
                     inout[i][0].flush()
                     print("reading from stdout of {}".format(hosts[i]))
                     time.sleep(0.1)
