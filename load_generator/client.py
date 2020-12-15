@@ -211,7 +211,7 @@ class Client:
 
     def run(self):
         self.soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print("connect to {}", HOST)
+        print("### connect to {} at port {}".format(HOST, self.port))
         self.soc.connect((HOST, self.port))
         self.logger.info("Client {} in process {} connected at port {}".format(self.c_id, os.getpid(), self.port))
 
