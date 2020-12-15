@@ -6,7 +6,7 @@ import argparse
 import math
 import signal
 
-DEBUG = 0
+DEBUG = 1
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -66,7 +66,8 @@ if __name__ == "__main__":
         if conns[i]:
             cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
             if DEBUG: 
-               cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
+               #cmd = "python3 ssh_test.py --range {}".format(client_range_per_host[i])
+               cmd = "pwd"
             # get_pty means get a pseudo terminal. 
             # With it, if we close the ssh, the pty is also closed, 
             #     which sends a SIGHUP to cause the commands it ran to terminate
