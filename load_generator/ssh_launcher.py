@@ -33,8 +33,9 @@ if __name__ == "__main__":
     if args.mock_db:
         mock_db = "--mock_db"
 
-    host_abbr = ["206", "207", "208", "209", "210"]
+    host_abbr = ["206"] #, "207", "208", "209", "210"]
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
+    print("host: {}", hosts[0])
     host_num = len(hosts)
     client_num_per_host = math.ceil(client_num/host_num)
 
