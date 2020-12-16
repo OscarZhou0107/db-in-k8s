@@ -118,7 +118,7 @@ class PerfDB(DB):
     def get_num_clients(self):
         return len(set(map(lambda x: x['client_addr'], self)))
 
-    def get_throughput(self, interval_length=timedelta(seconds=0.1)):
+    def get_throughput(self, interval_length=timedelta(seconds=0.25)):
         '''
         A list of groups, each group is defined to be
         having final_timestamp within [k, k+1] integer multiple of interval_length since the earliest initial_timestamp
@@ -320,22 +320,24 @@ def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
     axr = fig.add_subplot(1, 2, 2)
 
     # Category of interest
-    request_types_oi = ['BeginTx', ['Commit', 'Rollback'], ['ReadOnly', 'ReadOnlyEarlyRelease'], ['WriteOnly', 'WriteOnlyEarlyRelease'], 'SingleReadOnly', 'SingleWriteOnly']
-    request_types_oi = [['Commit', 'Rollback'], ['ReadOnly', 'ReadOnlyEarlyRelease'], ['WriteOnly', 'WriteOnlyEarlyRelease'], 'SingleReadOnly', 'SingleWriteOnly']
+    request_types_oi = [['BeginTx', 'Commit', 'Rollback'], ['ReadOnly', 'ReadOnlyEarlyRelease'], ['WriteOnly', 'WriteOnlyEarlyRelease'], 'SingleReadOnly', 'SingleWriteOnly']
 
     for request_type in request_types_oi:
-        request_type_str = request_type if type(request_type) == str else ' & '.join(request_type)
+        request_type_str = request_type if type(request_type) == str else ' & '.join(set(map(lambda t: 'ReadOnly' if t == 'ReadOnlyEarlyRelease' else t, request_type)))
 
         # Get filtered
         filtered_perfdb = perfdb.get_filtered(construct_filter(request_type))
 
+        if len(filtered_perfdb) == 0:
+            continue
+
         # Plot throughput distribution
         filtered_throuput = filtered_perfdb.get_throughput()
         if filtered_throuput is not None:
-            filtered_throuput.plot_distribution(axl, alpha=0.3, label=request_type_str, bins=50, log=False)
+            filtered_throuput.plot_distribution(axl, alpha=0.4, label=request_type_str, bins=50, log=False)
 
         # Plot latency distribution
-        filtered_perfdb.plot_latency_distribution(axr, alpha=0.3, label=request_type_str, bins=50, log=True)
+        filtered_perfdb.plot_latency_distribution(axr, alpha=0.4, label=request_type_str, bins=50, log=True)
 
     axl.legend()
     axr.legend()
