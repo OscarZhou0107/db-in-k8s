@@ -116,6 +116,7 @@ def plot_charts(args, database):
         print('Info:', 'Selected: {:.2f}, {:.2f}'.format(x[indx], y[indx]))
         run_name = run_names[indx]
         single_run.print_stats(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
+        single_run.plot_distribution_charts(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
 
     fig.canvas.callbacks.connect('pick_event', on_pick)
 

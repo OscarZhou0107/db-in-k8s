@@ -197,8 +197,10 @@ class Throughput(list):
             for row in group_of_rows:
                 DBRow(row).pretty_print_row()
 
-    # def plot_distribution(self, ax):
-    #     ax.hist
+    def plot_distribution(self, ax):
+        throughputs = tuple(zip(*self.get_trajectory()))[1]
+        ax.hist(throughputs, density=True, bins=50, edgecolor='black')
+        ax.set(xlabel='Throughput(#request_finished/sec)', ylabel='Probability Density')
 
 
 class DbproxyStatsDB(DB):
@@ -289,11 +291,15 @@ def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
     figsize = (16, 8)
     figname = 'distribution_' + str(run_name)
     fig = plt.figure(figname, figsize=figsize)
-    fig.suptitle( 'Distribution with' + str(perfdb.get_num_clients()) + ' Clients ' + str(dbproxy_stats_db.get_num_dbproxies()) + ' Dbproxies', fontsize=16)
+    fig.suptitle( 'Distribution with ' + str(perfdb.get_num_clients()) + ' Clients ' + str(dbproxy_stats_db.get_num_dbproxies()) + ' Dbproxies', fontsize=16)
     fig.set_tight_layout(True)
 
     axl = fig.add_subplot(1, 2, 1)
     axr = fig.add_subplot(1, 2, 2)
+
+    perfdb.get_filtered(successful_request_filter).get_throughput().plot_distribution(axl)
+
+    plt.show()
 
 
 def init(parser):
@@ -307,8 +313,13 @@ def main(args):
     # Parse dbproxy stats csv
     dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv.gz'))
 
+    run_name = os.path.basename(os.path.dirname(os.path.join(args.log_dir, '')))
+
     # Print some stats
-    print_stats(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=os.path.basename(os.path.dirname(os.path.join(args.log_dir, ''))))
+    print_stats(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=run_name)
+
+    # Plot
+    plot_distribution_charts(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=run_name)
 
 
 if __name__ == '__main__':
