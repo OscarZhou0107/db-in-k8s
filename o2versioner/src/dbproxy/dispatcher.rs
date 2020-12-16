@@ -71,7 +71,7 @@ impl Dispatcher {
 impl Executor for Dispatcher {
     #[instrument(name = "dispatcher", skip(self))]
     async fn run(mut self: Box<Self>) {
-        let postgres_pool_size = 80;
+        let postgres_pool_size = 100;
         let transaction_channel_queue_size = 100;
         info!("started");
 

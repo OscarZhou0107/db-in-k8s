@@ -15,7 +15,6 @@ addr = "128.100.13.212:38875"
 sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 
 
-
 [[dbproxy]]
 addr = "128.100.13.244:38875"
 sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
