@@ -83,14 +83,16 @@ def plot_charts(args, database):
         print('stddev_latencies', stddev_latencies)
         
         # Left y-axis for throughput
-        axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='s', capsize=3)  # , picker=True, pickradius=2)
+        axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies',
+            marker='s', capsize=2, elinewidth=1)  # , picker=True, pickradius=2)
         axl.set(xlabel='Number of Clients', ylabel='Average Throughput on Successful Queries (#queries/sec)')
         axl.grid(axis='x', linestyle='--')
         axl.grid(axis='y', linestyle='-')
         axl.legend()
 
         # Right y-axis for latency
-        axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies', marker='s', capsize=3)
+        axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies',
+            marker='s', capsize=2, elinewidth=1)
         axr.set(xlabel='Number of Clients', ylabel='Average Latency on Successful Queries (sec)')
         axr.grid(axis='x', linestyle='--')
         axr.grid(axis='y', linestyle='-')
