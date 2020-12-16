@@ -108,7 +108,7 @@ class PerfDB(DB):
     def get_num_clients(self):
         return len(set(map(lambda x: x['client_addr'], self)))
 
-    def get_throughput(self, interval_length=timedelta(seconds=1)):
+    def get_throughput(self, interval_length=timedelta(seconds=0.1)):
         '''
         A list of groups, each group is defined to be
         having final_timestamp within [k, k+1] integer multiple of interval_length since the earliest initial_timestamp
@@ -135,7 +135,7 @@ class PerfDB(DB):
             groups_of_rows.append(sorted(rows, key=lambda row: row['final_timestamp']))
             secs.append(sec)
 
-        return Throughput(zip(secs, groups_of_rows))
+        return Throughput(data=zip(secs, groups_of_rows), interval_length=interval_length)
 
     def get_latency_stats(self):
         '''
@@ -166,29 +166,9 @@ class Throughput(list):
     sorted by len_after_first_group, and len_after_first_group is unique throughout the list
     rows are also sorted based on final_timestamp
     '''
-
-    def get_trajectory(self):
-        '''
-        [(len_after_first_group, nrows)]
-        or number of requests completed at len_after_first_group th group
-        '''
-        return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), self))
-
-    def get_stats(self):
-        '''
-        (peak, mean, stddev, geomean, median)
-        '''
-        values = tuple(zip(*self.get_trajectory()))[1]
-        return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
-
-    def print_trajectory(self):
-        print('Info:')
-        print('Info:', 'Throughput (#RequestFinished/Sec) Trajectory')
-        trajectory = self.get_trajectory()
-        for item in trajectory:
-            print('Info:', item)
-        print('Info:')
-        print('Info:', 'Peak throughput is', max(trajectory, key=lambda kv: kv[1]))
+    def __init__(self, data, interval_length):
+        super().__init__(data)
+        self._interval_length = interval_length
 
     def print_detailed_trajectory(self):
         for (sec, group_of_rows) in self:
@@ -196,9 +176,37 @@ class Throughput(list):
             print('Info:', sec)
             for row in group_of_rows:
                 DBRow(row).pretty_print_row()
+                
+    def get_trajectory(self):
+        '''
+        [(len_after_first_group, nrows)]
+        or number of requests completed at len_after_first_group th group
+        '''
+        return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), self))
+
+    def print_trajectory(self):
+        print('Info:')
+        print('Info:', 'Throughput Trajectory')
+        trajectory = self.get_trajectory()
+        for item in trajectory:
+            print('Info:', item)
+        print('Info:')
+        print('Info:', 'Peak throughput is', max(trajectory, key=lambda kv: kv[1]))
+
+    def get_throughputs_per_sec(self):
+        base_throughputs = tuple(zip(*self.get_trajectory()))[1]
+        multiplier = timedelta(seconds=1) / self._interval_length
+        return list(map(lambda t: multiplier * t, base_throughputs))
+
+    def get_stats(self):
+        '''
+        (peak, mean, stddev, geomean, median)
+        '''
+        values = self.get_throughputs_per_sec()
+        return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
 
     def plot_distribution(self, ax):
-        throughputs = tuple(zip(*self.get_trajectory()))[1]
+        throughputs = self.get_throughputs_per_sec()
         ax.hist(throughputs, bins=30, edgecolor='black')
         ax.set(xlabel='Throughput (#RequestFinished/Sec)', ylabel='Frequency')
 

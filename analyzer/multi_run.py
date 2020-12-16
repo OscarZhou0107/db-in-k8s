@@ -53,7 +53,7 @@ def plot_charts(args, database):
         database_by_num_dbproxy[num_dbproxy].append((run_name, perfdb))
 
     figsize = (16, 8)
-    figname = 'scalability_' + str(len(database_list)) + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S')
+    figname = str(len(database_list)) + '_' + args.dir.replace('/', '_').replace('\\', '_').replace('.', '_') + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S')
     fig = plt.figure(figname, figsize=figsize)
     fig.suptitle( 'Scalability of Throughput with varying Number of Clients and Dbproxies', fontsize=16)
     fig.set_tight_layout(True)
