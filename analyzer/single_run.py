@@ -108,10 +108,8 @@ class PerfDB(DB):
     def get_num_clients(self):
         return len(set(map(lambda x: x['client_addr'], self)))
 
-    def get_throughput(self, filter_func=None, interval_length=timedelta(seconds=1)):
+    def get_throughput(self, interval_length=timedelta(seconds=1)):
         '''
-        filter_func(row) returns false to ignore the row if filter_func is not None
-
         A list of groups, each group is defined to be
         having final_timestamp within [k, k+1] integer multiple of interval_length since the earliest initial_timestamp
 
@@ -119,8 +117,6 @@ class PerfDB(DB):
         '''
 
         db = list(self)
-        if filter_func is not None:
-            db = list(filter(filter_func, db))
 
         if len(db) == 0:
             return
@@ -141,20 +137,24 @@ class PerfDB(DB):
 
         return Throughput(zip(secs, groups_of_rows))
 
-    def get_latency_stats(self, filter_func=None):
+    def get_latency_stats(self):
         '''
         in seconds
         (mean, stddev, geomean, median)
         '''
         db = list(self)
-        if filter_func is not None:
-            db = list(filter(filter_func, db))
 
         if len(db) < 2:
             return
 
         latency = list(map(lambda row: row['latency'], db))
         return (statistics.mean(latency), statistics.stdev(latency), geomean(latency), statistics.median(latency))
+
+    def plot_latency_distribution(self, ax):
+        db = list(self)
+        latencies = list(map(lambda row: row['latency'], db))
+        ax.hist(latencies, bins=30, edgecolor='black')
+        ax.set(xlabel='Latency (Sec/RequestFinished)', ylabel='Frequency')
 
     def get_filtered(self, filter_func):
         return PerfDB(data=list(filter(filter_func, self)))
@@ -183,7 +183,7 @@ class Throughput(list):
 
     def print_trajectory(self):
         print('Info:')
-        print('Info:', 'Throughput(#request_finished/sec) Trajectory')
+        print('Info:', 'Throughput (#RequestFinished/Sec) Trajectory')
         trajectory = self.get_trajectory()
         for item in trajectory:
             print('Info:', item)
@@ -199,8 +199,8 @@ class Throughput(list):
 
     def plot_distribution(self, ax):
         throughputs = tuple(zip(*self.get_trajectory()))[1]
-        ax.hist(throughputs, density=True, bins=50, edgecolor='black')
-        ax.set(xlabel='Throughput(#request_finished/sec)', ylabel='Probability Density')
+        ax.hist(throughputs, bins=30, edgecolor='black')
+        ax.set(xlabel='Throughput (#RequestFinished/Sec)', ylabel='Frequency')
 
 
 class DbproxyStatsDB(DB):
@@ -224,7 +224,7 @@ def print_perfdb_latency_stats(perfdb):
     print('Info:', 'Request Latency Stats - Sec / Request')
     for request_type in get_request_type_list():
         for request_result in get_request_result_list():
-            res = perfdb.get_latency_stats(filter_func=construct_filter(request_type, request_result))
+            res = perfdb.get_filtered(construct_filter(request_type, request_result)).get_latency_stats()
             if res is not None:
                 mean, stddev, geomean, median = res
 
@@ -297,7 +297,10 @@ def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
     axl = fig.add_subplot(1, 2, 1)
     axr = fig.add_subplot(1, 2, 2)
 
-    perfdb.get_filtered(successful_request_filter).get_throughput().plot_distribution(axl)
+    sr_perfdb = perfdb.get_filtered(successful_request_filter)
+
+    sr_perfdb.get_throughput().plot_distribution(axl)
+    sr_perfdb.plot_latency_distribution(axr)
 
     plt.show()
 
