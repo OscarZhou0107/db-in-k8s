@@ -16,7 +16,7 @@ addr = "128.100.13.212:38875"
 [dbproxy.db_mock_latency]
 begintx = {mean = 0.00125, stddev = 0.0025}
 endtx = {mean = 0.02, stddev = 0.085}
-read = {mean = 0.23 stddev = 0.325}
+read = {mean = 0.23, stddev = 0.325}
 write = {mean = 0.06, stddev = 0.2125}
 
 
@@ -26,7 +26,7 @@ addr = "128.100.13.244:38875"
 [dbproxy.db_mock_latency]
 begintx = {mean = 0.00125, stddev = 0.0025}
 endtx = {mean = 0.02, stddev = 0.085}
-read = {mean = 0.23 stddev = 0.325}
+read = {mean = 0.23, stddev = 0.325}
 write = {mean = 0.06, stddev = 0.2125}
 
 
@@ -36,7 +36,7 @@ addr = "128.100.13.243:38875"
 [dbproxy.db_mock_latency]
 begintx = {mean = 0.00125, stddev = 0.0025}
 endtx = {mean = 0.02, stddev = 0.085}
-read = {mean = 0.23 stddev = 0.325}
+read = {mean = 0.23, stddev = 0.325}
 write = {mean = 0.06, stddev = 0.2125}
 
 
@@ -46,7 +46,7 @@ addr ="128.100.13.242:38875"
 [dbproxy.db_mock_latency]
 begintx = {mean = 0.00125, stddev = 0.0025}
 endtx = {mean = 0.02, stddev = 0.085}
-read = {mean = 0.23 stddev = 0.325}
+read = {mean = 0.23, stddev = 0.325}
 write = {mean = 0.06, stddev = 0.2125}
 
 [[dbproxy]]
@@ -55,7 +55,7 @@ addr = "128.100.13.241:38875"
 [dbproxy.db_mock_latency]
 begintx = {mean = 0.00125, stddev = 0.0025}
 endtx = {mean = 0.02, stddev = 0.085}
-read = {mean = 0.23 stddev = 0.325}
+read = {mean = 0.23, stddev = 0.325}
 write = {mean = 0.06, stddev = 0.2125}
 
 
