@@ -26,27 +26,27 @@ def geomean(data):
 
 
 def construct_filter(request_type=None, request_result=None):
-    def in_op(rowv, against):
-        return rowv in against
-    def eq_op(rowv, against):
-        return rowv == against
+    def op(value, against):
+        assert(type(value) == str)
 
-    if type(request_type) == str:
-        request_type_checker = eq_op
-    else:
-        request_type_checker = in_op
+        if type(against) == str:
+            return value == against
+        elif type(against) == list:
+            return value in against
+        else:
+            assert(0)
 
     def request_filter(row):
         if request_type is None:
             if request_result is None:
                 None
             else:
-                return row['request_result'] == request_result
+                return op(row['request_result'], request_result)
         else:
             if request_result is None:
-                return request_type_checker(row['request_type'], request_type)
+                return op(row['request_type'], request_type)
             else:
-                return row['request_result'] == request_result and request_type_checker(row['request_type'], request_type)
+                return op(row['request_result'], request_result) and op(row['request_type'], request_type)
     return request_filter
 
 
