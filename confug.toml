@@ -14,47 +14,47 @@ addr = "127.0.0.1:19876"
 addr = "128.100.13.212:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 [dbproxy.db_mock_latency]
-begintx = {mean = 10, stddev = 2}
-endtx = {mean = 5, stddev = 1}
-read = {mean = 5, stddev = 1}
-write = {mean = 10, stddev = 1}
+begintx = {mean = 0.005, stddev = 0.01}
+endtx = {mean = 0.08, stddev = 0.35}
+read = {mean = 0.92, stddev = 1.305}
+write = {mean = 0.345, stddev = 0.9505}
 
 [[dbproxy]]
 addr = "128.100.13.244:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 [dbproxy.db_mock_latency]
-begintx = {mean = 10, stddev = 2}
-endtx = {mean = 5, stddev = 1}
-read = {mean = 5, stddev = 1}
-write = {mean = 10, stddev = 1}
+begintx = {mean = 0.005, stddev = 0.01}
+endtx = {mean = 0.08, stddev = 0.35}
+read = {mean = 0.92, stddev = 1.305}
+write = {mean = 0.345, stddev = 0.9505}
 
 
 [[dbproxy]]
 addr = "128.100.13.243:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 [dbproxy.db_mock_latency]
-begintx = {mean = 10, stddev = 2}
-endtx = {mean = 5, stddev = 1}
-read = {mean = 5, stddev = 1}
-write = {mean = 10, stddev = 1}
+begintx = {mean = 0.005, stddev = 0.01}
+endtx = {mean = 0.08, stddev = 0.35}
+read = {mean = 0.92, stddev = 1.305}
+write = {mean = 0.345, stddev = 0.9505}
 
 
 [[dbproxy]]
 addr ="128.100.13.242:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 [dbproxy.db_mock_latency]
-begintx = {mean = 10, stddev = 2}
-endtx = {mean = 5, stddev = 1}
-read = {mean = 5, stddev = 1}
-write = {mean = 10, stddev = 1}
+begintx = {mean = 0.005, stddev = 0.01}
+endtx = {mean = 0.08, stddev = 0.35}
+read = {mean = 0.92, stddev = 1.305}
+write = {mean = 0.345, stddev = 0.9505}
 
 [[dbproxy]]
 addr = "128.100.13.241:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 [dbproxy.db_mock_latency]
-begintx = {mean = 10, stddev = 2}
-endtx = {mean = 5, stddev = 1}
-read = {mean = 5, stddev = 1}
-write = {mean = 10, stddev = 1}
+begintx = {mean = 0.005, stddev = 0.01}
+endtx = {mean = 0.08, stddev = 0.35}
+read = {mean = 0.92, stddev = 1.305}
+write = {mean = 0.345, stddev = 0.9505}
 
 
