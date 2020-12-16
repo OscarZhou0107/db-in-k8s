@@ -31,7 +31,6 @@ if __name__ == "__main__":
     partial = "cargo run --release -- -c confug.toml"
     cmds = [partial + str(x) for x in range(host_num)]
     print(cmds)
-    cmds = [cmd + mock_db for cmd in cmds]
 
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
