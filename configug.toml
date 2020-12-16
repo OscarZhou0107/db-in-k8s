@@ -12,24 +12,26 @@ addr = "127.0.0.1:19876"
 
 [[dbproxy]]
 addr = "128.100.13.212:38875"
-sql_conf = "host=128.100.13.212 port=33333 dbname=tpcw user=qinsinin"
+sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
+
+
 
 [[dbproxy]]
 addr = "128.100.13.244:38875"
-sql_conf = "host=128.100.13.244 port=33333 dbname=tpcw user=qinsinin"
+sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 
 
 [[dbproxy]]
 addr = "128.100.13.243:38875"
-sql_conf = "host=128.100.13.243 port=33333 dbname=tpcw user=qinsinin"
+sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 
 
 [[dbproxy]]
 addr ="128.100.13.242:38875"
-sql_conf = "host=128.100.13.242 port=33333 dbname=tpcw user=qinsinin"
+sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 
 [[dbproxy]]
 addr = "128.100.13.241:38875"
-sql_conf = "host=128.100.13.241 port=33333 dbname=tpcw user=qinsinin"
+sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 
 
