@@ -35,7 +35,7 @@ use unicase::UniCase;
 /// to the admin port, which will then force to not accept any new
 /// connections.
 #[instrument(name = "scheduler", skip(conf))]
-pub async fn main(conf: Config) {
+pub async fn main(conf: Conf) {
     // Create the main state
     let state = State::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()), conf.clone());
 
@@ -228,7 +228,7 @@ async fn admin(
 /// Once this tcp connection is closed, this function will return
 #[instrument(name="conn", skip(conf, socket, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty))]
 async fn process_connection(
-    conf: SchedulerConfig,
+    conf: SchedulerConf,
     mut socket: TcpStream,
     conn_state: ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
@@ -300,7 +300,7 @@ async fn process_connection(
 
 #[instrument(name="request", skip(conf, msg, conn_state, sequencer_socket_pool, dispatcher_addr), fields(message=field::Empty, id=field::Empty, txid=field::Empty, cmd=field::Empty))]
 async fn process_request(
-    conf: SchedulerConfig,
+    conf: SchedulerConf,
     msg: scheduler_api::Message,
     conn_state: Arc<Mutex<ConnectionState>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
@@ -349,7 +349,7 @@ async fn process_request(
 }
 
 async fn process_msql(
-    conf: SchedulerConfig,
+    conf: SchedulerConf,
     msql: Msql,
     conn_state: &mut ConnectionState,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,

@@ -17,13 +17,13 @@ use std::net::SocketAddr;
 /// each is the config for the corresponding dbproxy instance
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Config {
-    pub scheduler: SchedulerConfig,
-    pub sequencer: SequencerConfig,
-    pub dbproxy: Vec<DbProxyConfig>,
+pub struct Conf {
+    pub scheduler: SchedulerConf,
+    pub sequencer: SequencerConf,
+    pub dbproxy: Vec<DbProxyConf>,
 }
 
-impl Default for Config {
+impl Default for Conf {
     fn default() -> Self {
         Self {
             scheduler: Default::default(),
@@ -33,8 +33,8 @@ impl Default for Config {
     }
 }
 
-impl Config {
-    /// Load `Config` from file at `path`
+impl Conf {
+    /// Load `Conf` from file at `path`
     pub fn from_file<S: Into<String>>(path: S) -> Self {
         let mut source = config::Config::default();
         source
@@ -49,10 +49,10 @@ impl Config {
     }
 }
 
-/// Config for scheduler
+/// Conf for scheduler
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct SchedulerConfig {
+pub struct SchedulerConf {
     pub addr: String,
     pub admin_addr: Option<String>,
     pub max_connection: Option<u32>,
@@ -65,7 +65,7 @@ pub struct SchedulerConfig {
     pub disable_single_read_optimization: bool,
 }
 
-impl Default for SchedulerConfig {
+impl Default for SchedulerConf {
     fn default() -> Self {
         Self {
             addr: String::new(),
@@ -82,7 +82,7 @@ impl Default for SchedulerConfig {
     }
 }
 
-impl SchedulerConfig {
+impl SchedulerConf {
     pub fn new<S: Into<String>>(addr: S) -> Self {
         Self::default().set_addr(addr)
     }
@@ -142,15 +142,15 @@ impl SchedulerConfig {
     }
 }
 
-/// Config for sequencer
+/// Conf for sequencer
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct SequencerConfig {
+pub struct SequencerConf {
     pub addr: String,
     pub max_connection: Option<u32>,
 }
 
-impl Default for SequencerConfig {
+impl Default for SequencerConf {
     fn default() -> Self {
         Self {
             addr: String::new(),
@@ -159,7 +159,7 @@ impl Default for SequencerConfig {
     }
 }
 
-impl SequencerConfig {
+impl SequencerConf {
     pub fn new<S: Into<String>>(addr: S) -> Self {
         Self::default().set_addr(addr)
     }
@@ -179,10 +179,10 @@ impl SequencerConfig {
     }
 }
 
-/// Config for a single dbproxy instance
+/// Conf for a single dbproxy instance
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct DbProxyConfig {
+pub struct DbProxyConf {
     pub addr: String,
     /// If `None`, using mock_db
     pub sql_conf: Option<String>,
@@ -191,7 +191,7 @@ pub struct DbProxyConfig {
     pub db_mock_latency: Option<DbMockLatency>,
 }
 
-impl Default for DbProxyConfig {
+impl Default for DbProxyConf {
     fn default() -> Self {
         Self {
             addr: String::new(),
@@ -201,7 +201,7 @@ impl Default for DbProxyConfig {
     }
 }
 
-impl DbProxyConfig {
+impl DbProxyConf {
     pub fn new<S: Into<String>>(addr: S) -> Self {
         Self::default().set_addr(addr)
     }
@@ -301,19 +301,19 @@ impl fmt::Debug for LatencyDistr {
     }
 }
 
-/// Unit test for `Config`
+/// Unit test for `Conf`
 #[cfg(test)]
-mod tests_config {
+mod tests_conf {
     use super::*;
 
     #[test]
     fn test_from_file() {
-        let conf = Config::from_file("tests/conf/conf1.toml");
+        let conf = Conf::from_file("tests/conf/conf1.toml");
 
         assert_eq!(
             conf,
-            Config {
-                scheduler: SchedulerConfig::new("127.0.0.1:1077")
+            Conf {
+                scheduler: SchedulerConf::new("127.0.0.1:1077")
                     .set_admin_addr(Option::<String>::None)
                     .set_max_connection(Some(50))
                     .set_sequencer_pool_size(20)
@@ -323,14 +323,14 @@ mod tests_config {
                     .set_detailed_logging(Option::<String>::None)
                     .set_disable_early_release(false)
                     .set_disable_single_read_optimization(false),
-                sequencer: SequencerConfig::new("127.0.0.1:9876").set_max_connection(Some(50)),
+                sequencer: SequencerConf::new("127.0.0.1:9876").set_max_connection(Some(50)),
                 dbproxy: vec![
-                    DbProxyConfig::new("127.0.0.1:8876")
+                    DbProxyConf::new("127.0.0.1:8876")
                         .set_sql_conf(Some(
                             "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
                         ))
                         .set_db_mock_latency(Some(DbMockLatency::default().set_begintx(LatencyDistr::new(10, 1)))),
-                    DbProxyConfig::new("127.0.0.1:8877").set_sql_conf(Some(
+                    DbProxyConf::new("127.0.0.1:8877").set_sql_conf(Some(
                         "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
                     ))
                 ]

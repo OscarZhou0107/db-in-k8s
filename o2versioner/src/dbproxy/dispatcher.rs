@@ -1,7 +1,7 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
 use super::mockdb;
 use super::postgresdb;
-use crate::util::conf::DbProxyConfig;
+use crate::util::conf::DbProxyConf;
 use crate::util::executor::Executor;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
@@ -28,7 +28,7 @@ use uuid::Uuid;
 pub struct Dispatcher {
     pending_queue: Arc<Mutex<PendingQueue>>,
     responder_sender: mpsc::Sender<QueryResult>,
-    conf: DbProxyConfig,
+    conf: DbProxyConf,
     version: Arc<Mutex<DbVersion>>,
     transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     stop_receiver: Option<oneshot::Receiver<()>>,
@@ -38,7 +38,7 @@ impl Dispatcher {
     pub fn new(
         pending_queue: Arc<Mutex<PendingQueue>>,
         responder_sender: mpsc::Sender<QueryResult>,
-        conf: DbProxyConfig,
+        conf: DbProxyConf,
         version: Arc<Mutex<DbVersion>>,
         transactions: Arc<Mutex<HashMap<Uuid, mpsc::Sender<QueueMessage>>>>,
     ) -> (oneshot::Sender<()>, Self) {
