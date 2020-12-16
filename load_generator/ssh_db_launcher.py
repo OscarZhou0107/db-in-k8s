@@ -14,7 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--username", type=str, default="qinsinin")
     parser.add_argument("--password", type=str)
     parser.add_argument("--db_num", type=int)
-    parser.add_argument("--mock", action='store_true', help="If use mock db")
+    parser.add_argument("--mock_db", action='store_true', help="If use mock db")
 
     parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
 
