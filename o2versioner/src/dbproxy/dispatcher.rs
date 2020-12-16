@@ -1,7 +1,7 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
 use super::mockdb;
 use super::postgresdb;
-use crate::util::config::DbProxyConfig;
+use crate::util::conf::DbProxyConfig;
 use crate::util::executor::Executor;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;

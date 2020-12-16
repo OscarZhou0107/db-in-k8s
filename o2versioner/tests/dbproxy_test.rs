@@ -3,7 +3,7 @@ use o2versioner::comm::scheduler_dbproxy::Message;
 use o2versioner::comm::MsqlResponse;
 use o2versioner::core::*;
 use o2versioner::dbproxy_main;
-use o2versioner::util::config::DbProxyConfig;
+use o2versioner::util::conf::DbProxyConfig;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::{tcp::OwnedWriteHalf, TcpStream};

@@ -2,7 +2,7 @@ use super::logging::*;
 use super::transceiver::TransceiverAddr;
 use crate::core::*;
 use crate::util::common::{create_zip_csv_writer, prepare_logging_dir};
-use crate::util::config::*;
+use crate::util::conf::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;

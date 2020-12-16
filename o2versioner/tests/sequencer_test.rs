@@ -1,7 +1,7 @@
 use o2versioner::comm::scheduler_sequencer::Message;
 use o2versioner::core::*;
 use o2versioner::sequencer_main;
-use o2versioner::util::config::SequencerConfig;
+use o2versioner::util::conf::SequencerConfig;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration};

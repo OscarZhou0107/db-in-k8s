@@ -1,6 +1,6 @@
 use super::core::{QueryResult, QueueMessage, Task};
 use crate::core::*;
-use crate::util::config::{DbMockLatency, LatencyDistr};
+use crate::util::conf::{DbMockLatency, LatencyDistr};
 use crate::util::executor::Executor;
 use async_trait::async_trait;
 use rand::rngs::StdRng;

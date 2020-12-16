@@ -1,7 +1,7 @@
 use super::core::{DbVersion, PendingQueue};
 use super::dispatcher::Dispatcher;
 use super::transceiver;
-use crate::util::config::DbProxyConfig;
+use crate::util::conf::DbProxyConfig;
 use crate::util::executor::Executor;
 use std::collections::HashMap;
 use std::sync::Arc;

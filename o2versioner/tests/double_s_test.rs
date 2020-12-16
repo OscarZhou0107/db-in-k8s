@@ -4,7 +4,7 @@ use o2versioner::comm::MsqlResponse;
 use o2versioner::core::*;
 use o2versioner::scheduler_main;
 use o2versioner::sequencer_main;
-use o2versioner::util::config::*;
+use o2versioner::util::conf::*;
 use o2versioner::util::tcp::*;
 use o2versioner::util::tests_helper;
 use rand::Rng;

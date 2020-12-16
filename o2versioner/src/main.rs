@@ -1,7 +1,7 @@
 use std::env;
 
 use clap::{App, Arg, ArgGroup, ArgMatches};
-use o2versioner::util::config::Config;
+use o2versioner::util::conf::Config;
 use o2versioner::{dbproxy_main, scheduler_main, sequencer_main};
 use tracing::info;
 
