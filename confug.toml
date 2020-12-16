@@ -19,7 +19,6 @@ endtx = {mean = 0.02, stddev = 0.085}
 read = {mean = 0.23, stddev = 0.325}
 write = {mean = 0.06, stddev = 0.2125}
 
-
 [[dbproxy]]
 addr = "128.100.13.244:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
