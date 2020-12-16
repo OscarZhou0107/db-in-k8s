@@ -216,7 +216,7 @@ def print_perfdb_latency_stats(perfdb):
 
                 request_type = 'All' if request_type is None else request_type
                 request_result = 'All' if request_result is None else request_result
-                print('Info:', '{:<27} {:<6} [Mean: {:>4.2f}] [SD: {:>4.2f}] [Geomean: {:>4.2f}] [Median: {:>4.2f}]'.format(request_type, request_result, mean, stddev, geomean, median))
+                print('Info:', '{:<27} {:<6} [Mean: {:>4.3f}] [SD: {:>4.3f}] [Geomean: {:>4.3f}] [Median: {:>4.3f}]'.format(request_type, request_result, mean, stddev, geomean, median))
 
 
 def print_perfdb_success_ratio_stats(perfdb):
