@@ -3,7 +3,7 @@ use o2versioner::comm::scheduler_dbproxy::Message;
 use o2versioner::comm::MsqlResponse;
 use o2versioner::core::*;
 use o2versioner::dbproxy_main;
-use o2versioner::util::conf::DbProxyConfig;
+use o2versioner::util::conf::DbProxyConf;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::{tcp::OwnedWriteHalf, TcpStream};
@@ -271,9 +271,9 @@ async fn helper_spawn_client_sender(tcp_write: OwnedWriteHalf, mut messages: Vec
 }
 
 async fn helper_spawn_proxy(addr: SocketAddr) {
-    let config = DbProxyConfig::new(addr.to_string()).set_sql_conf(Some(
+    let conf = DbProxyConf::new(addr.to_string()).set_sql_conf(Some(
         "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
     ));
 
-    dbproxy_main(config).await;
+    dbproxy_main(conf).await;
 }
