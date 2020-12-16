@@ -14,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument("--username", type=str, default="qinsinin")
     parser.add_argument("--password", type=str)
     parser.add_argument("--db_num", type=int)
+    parser.add_argument("--mock_db", action='store_true', help="If use mock db")
 
     parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
 
@@ -23,13 +24,18 @@ if __name__ == "__main__":
     python = args.python
     db_num = args.db_num
 
+    mock_db = ""
+    if args.mock_db:
+        mock_db = " --mock_db "
+
     # TODO: add all machine # with a db server
     host_abbr = ["212", "244", "243", "242", "241"]
     host_num = len(host_abbr)
     # TODO: add db commands you want to execute on each machine -> should have a 1-1 mapping with # in host_abbr
-    partial = "cargo run --release -- -c configug.toml --dbproxy "
+    partial = "cargo run --release -- -c confug.toml --dbproxy "
     cmds = [partial + str(x) for x in range(host_num)]
     print(cmds)
+    cmds = [cmd + mock_db for cmd in cmds]
 
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
