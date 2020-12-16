@@ -20,12 +20,19 @@ async fn main() {
         2 | _ => tracing::Level::TRACE,
     };
     println!("Verbosity set to {:?}", max_level);
+
     let collector = tracing_subscriber::fmt()
         .with_max_level(max_level)
         .with_target(false)
-        .without_time()
-        .finish();
-    tracing::subscriber::set_global_default(collector).unwrap();
+        .without_time();
+
+    if matches.is_present("plain") {
+        tracing::subscriber::set_global_default(collector.with_ansi(false).finish()).unwrap();
+    } else if matches.is_present("json") {
+        tracing::subscriber::set_global_default(collector.json().finish()).unwrap();
+    } else {
+        tracing::subscriber::set_global_default(collector.with_ansi(true).finish()).unwrap();
+    };
 
     // Parse config
     info!("current dir is: {}", env::current_dir().unwrap().to_str().unwrap());
@@ -76,5 +83,8 @@ fn parse_args() -> ArgMatches<'static> {
                 .required(true),
         )
         .arg(Arg::with_name("v").short("v").multiple(true).help("v-debug, vv-trace"))
+        .arg(Arg::with_name("plain").long("plain").help("Dump logs in plain format"))
+        .arg(Arg::with_name("json").long("json").help("Dump logs as json"))
+        .group(ArgGroup::with_name("log").args(&["plain", "json"]).required(false))
         .get_matches()
 }
