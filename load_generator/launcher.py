@@ -9,7 +9,7 @@ import multiprocessing
 
 DEBUG = 0
 
-def launch_client(cids, mix, pid, python, debug, mock_db, ssh, port):
+def launch_client(cids, mix, pid, python, debug, mock_db, ssh, port, ip):
     script = "client.py"
     if DEBUG:
         script = "test.py"
@@ -29,9 +29,9 @@ def launch_client(cids, mix, pid, python, debug, mock_db, ssh, port):
             procs[subprocess.Popen([python, script, "--c_id", str(cid)])] = command
             #procs.add(subprocess.Popen(["python3", script]))
         else:
-            command = "{} {} --port {} --c_id {} --mix {} --debug {} --mock_db {} --ssh {}".format(python, script, port, cid, mix, debug, mock_db, ssh)
+            command = "{} {} --port {} --c_id {} --mix {} --debug {} --mock_db {} --ssh {} --ip {}".format(python, script, port, cid, mix, debug, mock_db, ssh, ip)
             print(command)
-            procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug), "--mock_db", str(mock_db), "--ssh", str(ssh)]))] = command #, stderr=subprocess.PIPE))
+            procs[(subprocess.Popen([python, script, "--port", str(port), "--c_id", str(cid), "--mix", str(mix), "--debug", str(debug), "--mock_db", str(mock_db), "--ssh", str(ssh), "--ip", ip]))] = command #, stderr=subprocess.PIPE))
 
     try:
         # p.poll() only gets return code
@@ -71,6 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--mock_db", action='store_true')
     parser.add_argument("--ssh", action='store_true')
     parser.add_argument("--port", type=int, default=2077)
+    parser.add_argument("--ip", type=str, default='128.100.13.240')
     args = parser.parse_args()
 
     mix = args.mix
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     cids = list(range(int(cid_range[0]), int(cid_range[1])))
     pid = os.getpid()
     # put launch_client into a separate process
-    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, int(args.debug), int(args.mock_db), int(args.ssh), args.port))
+    p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, int(args.debug), int(args.mock_db), int(args.ssh), args.port, args.ip))
     p.start()
 
     start_time = time.time()

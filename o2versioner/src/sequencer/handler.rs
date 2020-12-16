@@ -1,6 +1,6 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer::*;
-use crate::util::config::SequencerConfig;
+use crate::util::conf::SequencerConfig;
 use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;

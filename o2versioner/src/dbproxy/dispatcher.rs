@@ -1,7 +1,7 @@
 use super::core::{DbVersion, PendingQueue, QueryResult, QueueMessage, Task};
 use super::mockdb;
 use super::postgresdb;
-use crate::util::config::DbProxyConfig;
+use crate::util::conf::DbProxyConfig;
 use crate::util::executor::Executor;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
@@ -95,6 +95,13 @@ impl Executor for Dispatcher {
             None
         };
 
+        if let Some(db_mock_latency) = self.conf.db_mock_latency.as_ref() {
+            info!("Using mocked db latency: {:?}", db_mock_latency);
+        } else {
+            info!("Not using mocked db latency");
+        }
+        let mock_db_latency_provider_opt = self.conf.db_mock_latency.clone().map(|c| c.into());
+
         let mut previously_has_operation = false;
         let mut stop_receiver = self.stop_receiver.take().unwrap();
         loop {
@@ -123,6 +130,7 @@ impl Executor for Dispatcher {
 
             stream::iter(operations.clone())
                 .for_each(|op| {
+                    let mock_db_latency_provider_opt_cloned = mock_db_latency_provider_opt.clone();
                     let pool_opt_cloned = pool_opt.clone();
                     let responder_sender_cloned = self.responder_sender.clone();
                     let transactions_cloned = self.transactions.clone();
@@ -145,6 +153,7 @@ impl Executor for Dispatcher {
                                         op.identifier.to_client_meta(),
                                         op.clone(),
                                         responder_sender_cloned,
+                                        mock_db_latency_provider_opt_cloned.clone(),
                                     ))
                                 };
                                 tokio::spawn(singleread_executor.run().in_current_span());
@@ -176,6 +185,7 @@ impl Executor for Dispatcher {
                                                         op.identifier.to_client_meta(),
                                                         transaction_channel_queue_size,
                                                         responder_sender_cloned,
+                                                        mock_db_latency_provider_opt_cloned.clone(),
                                                     );
                                                 (transaction_tx, Box::new(transaction_executor))
                                             };

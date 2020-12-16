@@ -7,6 +7,7 @@
 
 use config;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::net::SocketAddr;
 
 /// Config for scheduler, sequencer and dbproxies
@@ -185,8 +186,9 @@ pub struct DbProxyConfig {
     pub addr: String,
     /// If `None`, using mock_db
     pub sql_conf: Option<String>,
-    /// By default, mock_latency is has distribution of ~N (0, 0)
-    pub db_mock_latency: DbMockLatency,
+    /// By default, None
+    /// DbMockLatency also has default distribution of ~N (0, 0), 100% 0ms
+    pub db_mock_latency: Option<DbMockLatency>,
 }
 
 impl Default for DbProxyConfig {
@@ -194,7 +196,7 @@ impl Default for DbProxyConfig {
         Self {
             addr: String::new(),
             sql_conf: None,
-            db_mock_latency: Default::default(),
+            db_mock_latency: None,
         }
     }
 }
@@ -214,7 +216,7 @@ impl DbProxyConfig {
         self
     }
 
-    pub fn set_db_mock_latency(mut self, db_mock_latency: DbMockLatency) -> Self {
+    pub fn set_db_mock_latency(mut self, db_mock_latency: Option<DbMockLatency>) -> Self {
         self.db_mock_latency = db_mock_latency;
         self
     }
@@ -224,13 +226,14 @@ impl DbProxyConfig {
     }
 }
 
+/// In units of ms, by default, 100% 0ms
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DbMockLatency {
-    begintx: LatencyDistr,
-    read: LatencyDistr,
-    write: LatencyDistr,
-    endtx: LatencyDistr,
+    pub begintx: LatencyDistr,
+    pub read: LatencyDistr,
+    pub write: LatencyDistr,
+    pub endtx: LatencyDistr,
 }
 
 impl Default for DbMockLatency {
@@ -266,11 +269,11 @@ impl DbMockLatency {
     }
 }
 
-/// In units of ms
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+/// In units of ms, by default, 100% 0ms
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LatencyDistr {
-    mean: u32,
-    stddev: u32,
+    pub mean: u32,
+    pub stddev: u32,
 }
 
 impl Default for LatencyDistr {
@@ -286,6 +289,18 @@ impl LatencyDistr {
     }
 }
 
+impl fmt::Display for LatencyDistr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Latency(ms) ~ N({}, {}**2)", self.mean, self.stddev)
+    }
+}
+
+impl fmt::Debug for LatencyDistr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
+    }
+}
+
 /// Unit test for `Config`
 #[cfg(test)]
 mod tests_config {
@@ -293,7 +308,7 @@ mod tests_config {
 
     #[test]
     fn test_from_file() {
-        let conf = Config::from_file("tests/config/conf1.toml");
+        let conf = Config::from_file("tests/conf/conf1.toml");
 
         assert_eq!(
             conf,
@@ -314,7 +329,7 @@ mod tests_config {
                         .set_sql_conf(Some(
                             "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
                         ))
-                        .set_db_mock_latency(DbMockLatency::default().set_begintx(LatencyDistr::new(10, 1))),
+                        .set_db_mock_latency(Some(DbMockLatency::default().set_begintx(LatencyDistr::new(10, 1)))),
                     DbProxyConfig::new("127.0.0.1:8877").set_sql_conf(Some(
                         "host=localhost port=5432 dbname=Test user=postgres password=Abc@123"
                     ))

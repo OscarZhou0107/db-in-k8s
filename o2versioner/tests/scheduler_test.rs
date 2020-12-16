@@ -1,7 +1,7 @@
 use o2versioner::comm::scheduler_api::Message;
 use o2versioner::core::*;
 use o2versioner::scheduler_main;
-use o2versioner::util::config::*;
+use o2versioner::util::conf::*;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration};

@@ -6,7 +6,7 @@ use super::transceiver::*;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
-use crate::util::config::*;
+use crate::util::conf::*;
 use crate::util::executor::Executor;
 use crate::util::tcp;
 use bb8::Pool;
