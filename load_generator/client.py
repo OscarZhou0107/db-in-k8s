@@ -1294,6 +1294,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=int, default=0)
     parser.add_argument("--mock_db", type=int, default=0)
     parser.add_argument("--ssh", type=int, default=0)
+    parser.add_argument("--ip", type=str, default='128.100.13.240')
 
     args = parser.parse_args()
 
@@ -1315,9 +1316,7 @@ if __name__ == "__main__":
 
     DEBUG = args.debug
     MOCK = args.mock_db
-    HOST = '127.0.0.1'
-    if args.ssh: 
-        HOST = '128.100.13.240'
+    HOST = args.ip
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
