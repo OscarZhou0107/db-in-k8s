@@ -10,12 +10,20 @@ addr = "127.0.0.1:19876"
 [[dbproxy]]
 addr = "127.0.0.1:38875"
 #sql_conf = "host=34.70.104.125 port=5432 dbname=tpcw user=postgres password=Abc@123"
-db_mock_latency = {begintx.mean = 1000, begintx.stddev = 200, read.mean = 500, read.stddev = 100, write.mean = 1000, write.stddev = 100, endtx.mean = 500, endtx.stddev = 100}
+[dbproxy.db_mock_latency]
+begintx = {mean = 1000, stddev = 200}
+endtx = {mean = 500, stddev = 100}
+read = {mean = 500, stddev = 100}
+write = {mean = 1000, stddev = 100}
 
 [[dbproxy]]
 addr = "127.0.0.1:38876"
 #sql_conf = "host=34.69.18.204 port=5432 dbname=tpcw user=postgres password=Abc@123"
-db_mock_latency = {begintx.mean = 1000, begintx.stddev = 200, read.mean = 500, read.stddev = 100, write.mean = 1000, write.stddev = 100, endtx.mean = 500, endtx.stddev = 100}
+[dbproxy.db_mock_latency]
+begintx = {mean = 1000, stddev = 200}
+endtx = {mean = 500, stddev = 100}
+read = {mean = 500, stddev = 100}
+write = {mean = 1000, stddev = 100}
 
 # [[dbproxy]]
 # addr = "127.0.0.1:38877"

@@ -7,6 +7,7 @@
 
 use config;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::net::SocketAddr;
 
 /// Config for scheduler, sequencer and dbproxies
@@ -269,7 +270,7 @@ impl DbMockLatency {
 }
 
 /// In units of ms, by default, 100% 0ms
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LatencyDistr {
     pub mean: u32,
     pub stddev: u32,
@@ -285,6 +286,18 @@ impl LatencyDistr {
     /// In units of ms
     pub fn new(mean: u32, stddev: u32) -> Self {
         Self { mean, stddev }
+    }
+}
+
+impl fmt::Display for LatencyDistr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Latency(ms) ~ N({}, {}**2)", self.mean, self.stddev)
+    }
+}
+
+impl fmt::Debug for LatencyDistr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }
 
