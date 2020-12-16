@@ -25,7 +25,17 @@ def geomean(data):
     return math.exp(math.fsum(math.log(x) for x in data) / len(data))
 
 
-def construct_filter(request_type, request_result):
+def construct_filter(request_type=None, request_result=None):
+    def in_op(rowv, against):
+        return rowv in against
+    def eq_op(rowv, against):
+        return rowv == against
+
+    if type(request_type) == str:
+        request_type_checker = eq_op
+    else:
+        request_type_checker = in_op
+
     def request_filter(row):
         if request_type is None:
             if request_result is None:
@@ -34,9 +44,9 @@ def construct_filter(request_type, request_result):
                 return row['request_result'] == request_result
         else:
             if request_result is None:
-                return row['request_type'] == request_type
+                return request_type_checker(row['request_type'], request_type)
             else:
-                return row['request_result'] == request_result and row['request_type'] == request_type
+                return row['request_result'] == request_result and request_type_checker(row['request_type'], request_type)
     return request_filter
 
 
@@ -150,10 +160,14 @@ class PerfDB(DB):
         latency = list(map(lambda row: row['latency'], db))
         return (statistics.mean(latency), statistics.stdev(latency), geomean(latency), statistics.median(latency))
 
-    def plot_latency_distribution(self, ax):
+    def plot_latency_distribution(self, ax, alpha=1, label=None, bins=50, log=True):
         db = list(self)
+
+        if len(db) == 0:
+            return
+        
         latencies = list(map(lambda row: row['latency'], db))
-        ax.hist(latencies, bins=30, edgecolor='black')
+        ax.hist(latencies, bins=bins, edgecolor='black', alpha=alpha, label=label, log=log)
         ax.set(xlabel='Latency (Sec/RequestFinished)', ylabel='Frequency')
 
     def get_filtered(self, filter_func):
@@ -205,9 +219,9 @@ class Throughput(list):
         values = self.get_throughputs_per_sec()
         return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
 
-    def plot_distribution(self, ax):
+    def plot_distribution(self, ax, alpha=1, label=None, bins=70, log=False):
         throughputs = self.get_throughputs_per_sec()
-        ax.hist(throughputs, bins=30, edgecolor='black')
+        ax.hist(throughputs, bins=bins, edgecolor='black', alpha=alpha, label=label, log=log)
         ax.set(xlabel='Throughput (#RequestFinished/Sec)', ylabel='Frequency')
 
 
@@ -305,10 +319,26 @@ def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
     axl = fig.add_subplot(1, 2, 1)
     axr = fig.add_subplot(1, 2, 2)
 
-    sr_perfdb = perfdb.get_filtered(successful_request_filter)
+    # Category of interest
+    request_types_oi = ['BeginTx', ['Commit', 'Rollback'], ['ReadOnly', 'ReadOnlyEarlyRelease'], ['WriteOnly', 'WriteOnlyEarlyRelease'], 'SingleReadOnly', 'SingleWriteOnly']
+    request_types_oi = [['Commit', 'Rollback'], ['ReadOnly', 'ReadOnlyEarlyRelease'], ['WriteOnly', 'WriteOnlyEarlyRelease'], 'SingleReadOnly', 'SingleWriteOnly']
 
-    sr_perfdb.get_throughput().plot_distribution(axl)
-    sr_perfdb.plot_latency_distribution(axr)
+    for request_type in request_types_oi:
+        request_type_str = request_type if type(request_type) == str else ' & '.join(request_type)
+
+        # Get filtered
+        filtered_perfdb = perfdb.get_filtered(construct_filter(request_type))
+
+        # Plot throughput distribution
+        filtered_throuput = filtered_perfdb.get_throughput()
+        if filtered_throuput is not None:
+            filtered_throuput.plot_distribution(axl, alpha=0.3, label=request_type_str, bins=50, log=False)
+
+        # Plot latency distribution
+        filtered_perfdb.plot_latency_distribution(axr, alpha=0.3, label=request_type_str, bins=50, log=True)
+
+    axl.legend()
+    axr.legend()
 
     plt.show()
 
