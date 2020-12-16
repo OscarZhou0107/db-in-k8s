@@ -88,11 +88,11 @@ perf
 #### Analyze the data
 Single run analysis
 ```sh
-python3 -m analyzer single ./perf/xx
+python3 -m analyzer single ./final_perf/xx
 ```
 Multi run analysis
 ```sh
-python3 -m analyzer multi ./perf
+python3 -m analyzer multi ./final_perf
 ```
 
 
