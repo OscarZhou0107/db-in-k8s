@@ -52,7 +52,7 @@ fn parse_args() -> ArgMatches<'static> {
                 .short("c")
                 .long("config")
                 .value_name("FILE")
-                .default_value("o2versioner/config.toml")
+                .default_value("o2versioner/conf.toml")
                 .help("Sets the config file")
                 .takes_value(true),
         )

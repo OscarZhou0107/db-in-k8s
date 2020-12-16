@@ -52,7 +52,7 @@ cargo test --release -- --nocapture
 
 
 #### For available configurations of o2versioner
-Refer to: [config.rs](o2versioner/src/util/config.rs)
+Refer to: [conf.rs](o2versioner/src/util/conf.rs)
 
 
 #### To check number of lines for Rust

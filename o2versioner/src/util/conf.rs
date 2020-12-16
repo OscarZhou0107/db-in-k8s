@@ -308,7 +308,7 @@ mod tests_config {
 
     #[test]
     fn test_from_file() {
-        let conf = Config::from_file("tests/config/conf1.toml");
+        let conf = Config::from_file("tests/conf/conf1.toml");
 
         assert_eq!(
             conf,
