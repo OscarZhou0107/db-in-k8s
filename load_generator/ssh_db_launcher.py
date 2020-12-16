@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     mock_db = ""
     if args.mock_db:
-        mock_db = "--mock_db"
+        mock_db = " --mock_db "
 
     # TODO: add all machine # with a db server
     host_abbr = ["212", "244", "243", "242", "241"]
