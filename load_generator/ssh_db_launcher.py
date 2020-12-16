@@ -35,7 +35,7 @@ if __name__ == "__main__":
     partial = "cargo run --release -- -c configug.toml --dbproxy "
     cmds = [partial + str(x) for x in range(host_num)]
     print(cmds)
-    cmds = [cmds + mock_db for _ in range(len(cmds))]
+    cmds = [cmd + mock_db for cmd in cmds]
 
     hosts = ["ug" + x + ".eecg.utoronto.ca" for x in host_abbr]
     print("host: {}".format(hosts[0]))
