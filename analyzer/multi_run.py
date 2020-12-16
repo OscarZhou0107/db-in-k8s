@@ -58,7 +58,8 @@ def plot_charts(args, database):
     fig.suptitle( 'Scalability of Throughput with varying Number of Clients and Dbproxies', fontsize=16)
     fig.set_tight_layout(True)
 
-    ax = fig.add_subplot()
+    axl = fig.add_subplot(1, 2, 1)
+    axr = fig.add_subplot(1, 2, 2)
     for num_dbproxy, dataset in database_by_num_dbproxy.items():
         print(num_dbproxy)
 
@@ -72,25 +73,28 @@ def plot_charts(args, database):
         dataset = sorted(dataset, key=lambda x: x[1])
 
         run_names, nums_clients, sr_throughputs_stats, latencies = list(zip(*dataset))[0:4]
-        median_throughputs = tuple(zip(*sr_throughputs_stats))[4]
-        mean_latencies = tuple(zip(*latencies))[3]
+        mean_throughputs, stddev_throughputs = tuple(zip(*sr_throughputs_stats))[1:3]
+        mean_latencies, stddev_latencies = tuple(zip(*latencies))[0:2]
         
         print('nums_clients', nums_clients)
-        print('median_throughputs', median_throughputs)
-        print('latencies (mean, stddev, geomean, median)', latencies)
+        print('mean_throughputs', mean_throughputs)
+        print('stddev_throughputs', stddev_throughputs)
+        print('mean_latencies', mean_latencies)
+        print('stddev_latencies', stddev_latencies)
         
         # Left y-axis for throughput
-        ax.plot(nums_clients, median_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='o')  # , picker=True, pickradius=2)
-        ax.set(xlabel='Number of Clients', ylabel='Median Throughput on Successful Queries (#queries/sec)')
-        ax.grid(axis='x', linestyle='--')
-        ax.grid(axis='y', linestyle='-')
-        ax.legend(loc='upper left')
+        axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='s', capsize=3)  # , picker=True, pickradius=2)
+        axl.set(xlabel='Number of Clients', ylabel='Average Throughput on Successful Queries (#queries/sec)')
+        axl.grid(axis='x', linestyle='--')
+        axl.grid(axis='y', linestyle='-')
+        axl.legend()
 
         # Right y-axis for latency
-        ax2 = ax.twinx()
-        ax2.set(ylabel='Median Latency on Successful Queries (sec)')
-        ax2.plot(nums_clients, mean_latencies, label=str(num_dbproxy) + ' dbproxies', linestyle=':', marker='^')
-        ax2.legend(loc='upper right')
+        axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies', marker='s', capsize=3)
+        axr.set(xlabel='Number of Clients', ylabel='Average Latency on Successful Queries (sec)')
+        axr.grid(axis='x', linestyle='--')
+        axr.grid(axis='y', linestyle='-')
+        axr.legend()
 
     if args.output:
         filename = os.path.join(args.output, figname)
