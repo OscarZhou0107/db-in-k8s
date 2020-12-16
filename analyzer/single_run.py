@@ -232,16 +232,11 @@ def print_perfdb_success_ratio_stats(perfdb):
         print('Info:', '{:<27} {:>7} Ok {:>7} Err {:>9.2f} %'.format(request_type, num_ok, num_err, (num_ok/(num_err+num_ok) if num_ok+num_err > 0 else 1) * 100.0))
 
 
-def init(parser):
-    parser.add_argument('log_dir', type=str, help='log file directory for single run')
-
-
-def main(args):
-    # Parse perf csv
-    perfdb = PerfDB(perf_csv_path=os.path.join(args.log_dir, 'perf.csv.gz'))
-
-    # Parse dbproxy stats csv
-    dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv.gz'))
+def print_stats(perfdb, dbproxy_stats_db, run_name=None):
+    print('Info: ==============================================================')
+    print('Info:')
+    print('Info:', 'Run:', str(run_name))
+    print('Info:')
 
     # Apply filter on perfdb
     sr_perfdb = perfdb.get_filtered(successful_request_filter)
@@ -249,6 +244,7 @@ def main(args):
     sr_throughput = sr_perfdb.get_throughput()
     # sr_throughput.print_detailed_trajectory()
     # sr_throughput.print_trajectory()
+
     print('Info:')
     print('Info:', 'Successful Request:', len(sr_perfdb))
     print('Info:')
@@ -272,6 +268,24 @@ def main(args):
 
     print('Info:')
     dbproxy_stats_db.print_data()
+
+    print('Info:')
+    print('Info: ==============================================================')
+
+
+def init(parser):
+    parser.add_argument('log_dir', type=str, help='log file directory for single run')
+
+
+def main(args):
+    # Parse perf csv
+    perfdb = PerfDB(perf_csv_path=os.path.join(args.log_dir, 'perf.csv.gz'))
+
+    # Parse dbproxy stats csv
+    dbproxy_stats_db = DbproxyStatsDB(os.path.join(args.log_dir, 'dbproxy_stats.csv.gz'))
+
+    # Print some stats
+    print_stats(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=os.path.basename(os.path.dirname(os.path.join(args.log_dir, ''))))
 
 
 if __name__ == '__main__':

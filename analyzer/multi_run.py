@@ -26,7 +26,7 @@ def parse_single_run_wrapper(single_arg):
 
 def parse_single_run(run_name, args):
     '''
-    (run_name, PerfDB, DbproxyStatsDB)
+    (run_name, (PerfDB, DbproxyStatsDB))
     '''
     if args.debug:
         print('Debug:', 'Parsing', run_name)
@@ -38,22 +38,22 @@ def parse_single_run(run_name, args):
     info_str = 'Info: Parsed {} with {} clients, {} dbproxies, {} unfiltered request datapoints'.format(run_name, perfdb.get_num_clients(), dbproxy_stats_db.get_num_dbproxy(), len(perfdb))
     print(info_str)
 
-    return (run_name, perfdb, dbproxy_stats_db)
+    return (run_name, (perfdb, dbproxy_stats_db))
 
 
 def plot_charts(args, database):
     '''
-    [(run_name, PerfDB, DbproxyStatsDB)]
+    {run_name: (PerfDB, DbproxyStatsDB)}
     '''
     # [(num_dbproxy, run_name, PerfDB)]
-    database = list(map(lambda x: (x[2].get_num_dbproxy(), x[0], x[1]), database))
+    database_list = list(map(lambda x: (x[1][1].get_num_dbproxy(), x[0], x[1][0]), database.items()))
     # {num_dbproxy: [(run_name, PerfDB)]}
     database_by_num_dbproxy = defaultdict(list)
-    for num_dbproxy, run_name, perfdb in database:
+    for num_dbproxy, run_name, perfdb in database_list:
         database_by_num_dbproxy[num_dbproxy].append((run_name, perfdb))
 
     figsize = (16, 8)
-    figname = 'scalability_' + str(len(database)) + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S')
+    figname = 'scalability_' + str(len(database_list)) + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S')
     fig = plt.figure(figname, figsize=figsize)
     fig.suptitle( 'Scalability of Throughput with varying Number of Clients and Dbproxies', fontsize=16)
     fig.set_tight_layout(True)
@@ -72,7 +72,8 @@ def plot_charts(args, database):
         # Sort by num_clients
         dataset = sorted(dataset, key=lambda x: x[1])
 
-        run_names, nums_clients, sr_throughputs_stats, latencies = list(zip(*dataset))[0:4]
+        # Final data, all are linked by their index
+        run_names, nums_clients, sr_throughputs_stats, latencies = tuple(zip(*dataset))[0:4]
         mean_throughputs, stddev_throughputs = tuple(zip(*sr_throughputs_stats))[1:3]
         mean_latencies, stddev_latencies = tuple(zip(*latencies))[0:2]
         
@@ -84,7 +85,7 @@ def plot_charts(args, database):
         
         # Left y-axis for throughput
         axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies',
-            marker='s', capsize=2, elinewidth=1)  # , picker=True, pickradius=2)
+            marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
         axl.set(xlabel='Number of Clients', ylabel='Average Throughput on Successful Queries (#queries/sec)')
         axl.grid(axis='x', linestyle='--')
         axl.grid(axis='y', linestyle='-')
@@ -92,11 +93,31 @@ def plot_charts(args, database):
 
         # Right y-axis for latency
         axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies',
-            marker='s', capsize=2, elinewidth=1)
+            marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
         axr.set(xlabel='Number of Clients', ylabel='Average Latency on Successful Queries (sec)')
         axr.grid(axis='x', linestyle='--')
         axr.grid(axis='y', linestyle='-')
         axr.legend()
+
+    def on_pick(event):
+        print('Info:')
+        artist = event.artist
+        xmouse, ymouse = event.mouseevent.xdata, event.mouseevent.ydata
+        x, y = artist.get_xdata(), artist.get_ydata()
+        ind = event.ind
+        indx = ind[0]
+        print('Info:', 'Clicked: {:.2f}, {:.2f}'.format(xmouse, ymouse))
+        print('Info:', 'Picked {} vertices: '.format(len(ind)), end='')
+        if len(ind) != 1:
+            print('Info:', 'Pick between vertices {} and {}'.format(min(ind), max(ind)+1))
+        else:
+            print('Info:', 'Picked vertice index:', indx)
+
+        print('Info:', 'Selected: {:.2f}, {:.2f}'.format(x[indx], y[indx]))
+        run_name = run_names[indx]
+        single_run.print_stats(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
+
+    fig.canvas.callbacks.connect('pick_event', on_pick)
 
     if args.output:
         filename = os.path.join(args.output, figname)
@@ -124,6 +145,7 @@ def main(args):
     print('Info:', 'Parsing in parallel...')
     start = time.time()
     database = multiprocessing.Pool().map(parse_single_run_wrapper, map(lambda run_name: (run_name, args), run_names))
+    database = dict(database)
     end = time.time()
     print('Info:')
     print('Info:', 'Parsing took', float_fmt(end - start), 'seconds')
