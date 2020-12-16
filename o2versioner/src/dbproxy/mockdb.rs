@@ -34,8 +34,9 @@ impl From<LatencyDistr> for MockLatencyProvider {
 impl MockLatencyProvider {
     async fn get_delay(&self) -> Duration {
         let mut randomness = self.randomness.lock().await;
-        let delay_ms = self.distr.sample(&mut randomness.deref_mut());
-        Duration::from_secs_f64(delay_ms / 1000.0)
+        let delay_ms = self.distr.sample(&mut randomness.deref_mut()).abs();
+        let delay_s = delay_ms / 1000.0;
+        Duration::from_secs_f64(delay_s)
     }
 
     async fn wait(&self) {
