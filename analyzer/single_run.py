@@ -12,6 +12,11 @@ try:
 except:
     print('Error:', 'pip install python-dateutil')
 
+try:
+    import matplotlib.pyplot as plt
+except:
+    print('Error:', 'pip install matplotlib')
+
 
 __help__ = 'Parsing for a single run'
 
