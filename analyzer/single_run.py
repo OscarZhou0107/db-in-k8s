@@ -323,7 +323,7 @@ def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
     request_types_oi = [['BeginTx', 'Commit', 'Rollback'], ['ReadOnly', 'ReadOnlyEarlyRelease'], ['WriteOnly', 'WriteOnlyEarlyRelease'], 'SingleReadOnly', 'SingleWriteOnly']
 
     for request_type in request_types_oi:
-        request_type_str = request_type if type(request_type) == str else ' & '.join(set(map(lambda t: 'ReadOnly' if t == 'ReadOnlyEarlyRelease' else t, request_type)))
+        request_type_str = request_type if type(request_type) == str else ' & '.join(sorted(set(map(lambda t: 'ReadOnly' if t == 'ReadOnlyEarlyRelease' else t, request_type))))
 
         # Get filtered
         filtered_perfdb = perfdb.get_filtered(construct_filter(request_type))
