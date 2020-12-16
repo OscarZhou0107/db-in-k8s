@@ -170,6 +170,7 @@ class ProcessManager:
             proc.terminate()
 
 
+# python load_generator/slave.py --name=dbproxy --cmd "cargo run -- --plain --dbproxy" --sweeps 0 1 --output=./logging 
 def main(args):
     print('Info:', args)
     print('Info:')
@@ -180,7 +181,7 @@ def main(args):
         if args.output: # files
             if not os.path.exists(args.output):
                 os.mkdir(args.output)
-            dir_name = 'slave_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S_%f')
+            dir_name = args.name + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S_%f')
             args.output = os.path.join(args.output, dir_name)
             if not os.path.exists(args.output):
                 os.mkdir(args.output)
@@ -216,6 +217,7 @@ def main(args):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='slave.py')
+    parser.add_argument('--name', type=str, default='slave', help='Description of the cmd')
     parser.add_argument('--cmd', type=str, help='Command to launch (common part)')
     parser.add_argument('--sweeps', type=str, nargs='+', help='Argument (single word) to command to launch (diverging part)')
 
