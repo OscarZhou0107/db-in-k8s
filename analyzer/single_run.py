@@ -162,19 +162,23 @@ class PerfDB(DB):
 
 class Throughput(list):
     '''
-    return [(len_after_first_group, rows)]
+    [(len_after_first_group, [row])]
     sorted by len_after_first_group, and len_after_first_group is unique throughout the list
     rows are also sorted based on final_timestamp
     '''
 
     def get_trajectory(self):
+        '''
+        [(len_after_first_group, nrows)]
+        or number of requests completed at len_after_first_group th group
+        '''
         return list(map(lambda id_rows: (id_rows[0], len(id_rows[1])), self))
 
     def get_stats(self):
         '''
         (peak, mean, stddev, geomean, median)
         '''
-        values = list(map(lambda kv: kv[1], self.get_trajectory()))
+        values = tuple(zip(*self.get_trajectory()))[1]
         return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
 
     def print_trajectory(self):
@@ -193,12 +197,15 @@ class Throughput(list):
             for row in group_of_rows:
                 DBRow(row).pretty_print_row()
 
+    # def plot_distribution(self, ax):
+    #     ax.hist
+
 
 class DbproxyStatsDB(DB):
     def __init__(self, dbproxy_stats_csv_path):
         super(DbproxyStatsDB, self).__init__(csv_path=dbproxy_stats_csv_path)
 
-    def get_num_dbproxy(self):
+    def get_num_dbproxies(self):
         return len(self)
 
     def print_data(self):
@@ -263,7 +270,7 @@ def print_stats(perfdb, dbproxy_stats_db, run_name=None):
 
     print('Info:')
     print('Info:', 'num_clients', sr_perfdb.get_num_clients())
-    print('Info:', 'num_dbproxy_db', dbproxy_stats_db.get_num_dbproxy())
+    print('Info:', 'num_dbproxy_db', dbproxy_stats_db.get_num_dbproxies())
 
     print('Info:')
     print_perfdb_latency_stats(perfdb)
@@ -276,6 +283,17 @@ def print_stats(perfdb, dbproxy_stats_db, run_name=None):
 
     print('Info:')
     print('Info: ==============================================================')
+
+
+def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
+    figsize = (16, 8)
+    figname = 'distribution_' + str(run_name)
+    fig = plt.figure(figname, figsize=figsize)
+    fig.suptitle( 'Distribution with' + str(perfdb.get_num_clients()) + ' Clients ' + str(dbproxy_stats_db.get_num_dbproxies()) + ' Dbproxies', fontsize=16)
+    fig.set_tight_layout(True)
+
+    axl = fig.add_subplot(1, 2, 1)
+    axr = fig.add_subplot(1, 2, 2)
 
 
 def init(parser):

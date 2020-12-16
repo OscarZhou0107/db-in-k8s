@@ -35,7 +35,7 @@ def parse_single_run(run_name, args):
 
     dbproxy_stats_db = single_run.DbproxyStatsDB(os.path.join(os.path.join(args.dir, run_name), 'dbproxy_stats.csv.gz'))
 
-    info_str = 'Info: Parsed {} with {} clients, {} dbproxies, {} unfiltered request datapoints'.format(run_name, perfdb.get_num_clients(), dbproxy_stats_db.get_num_dbproxy(), len(perfdb))
+    info_str = 'Info: Parsed {} with {} clients, {} dbproxies, {} unfiltered request datapoints'.format(run_name, perfdb.get_num_clients(), dbproxy_stats_db.get_num_dbproxies(), len(perfdb))
     print(info_str)
 
     return (run_name, (perfdb, dbproxy_stats_db))
@@ -46,7 +46,7 @@ def plot_charts(args, database):
     {run_name: (PerfDB, DbproxyStatsDB)}
     '''
     # [(num_dbproxy, run_name, PerfDB)]
-    database_list = list(map(lambda x: (x[1][1].get_num_dbproxy(), x[0], x[1][0]), database.items()))
+    database_list = list(map(lambda x: (x[1][1].get_num_dbproxies(), x[0], x[1][0]), database.items()))
     # {num_dbproxy: [(run_name, PerfDB)]}
     database_by_num_dbproxy = defaultdict(list)
     for num_dbproxy, run_name, perfdb in database_list:
