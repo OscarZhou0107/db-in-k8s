@@ -22,8 +22,8 @@ async fn test_double_s() {
 
     let scheduler_addr = "127.0.0.1:16379";
     let sequencer_max_connection = 2;
-    let conf = Config {
-        scheduler: SchedulerConfig {
+    let conf = Conf {
+        scheduler: SchedulerConf {
             addr: String::from(scheduler_addr),
             admin_addr: None,
             max_connection: Some(2),
@@ -35,7 +35,7 @@ async fn test_double_s() {
             disable_early_release: false,
             disable_single_read_optimization: false,
         },
-        sequencer: SequencerConfig {
+        sequencer: SequencerConf {
             addr: String::from("127.0.0.1:6379"),
             max_connection: Some(sequencer_max_connection),
         },
@@ -76,8 +76,8 @@ async fn run_double_s_limited() {
     let scheduler_addr = "127.0.0.1:56728";
     let dbproxy0_addr = "127.0.0.1:32223";
     let dbproxy1_addr = "127.0.0.1:32224";
-    let conf = Config {
-        scheduler: SchedulerConfig {
+    let conf = Conf {
+        scheduler: SchedulerConf {
             addr: String::from(scheduler_addr),
             admin_addr: Some(String::from("127.0.0.1:24251")),
             max_connection: None,
@@ -89,15 +89,15 @@ async fn run_double_s_limited() {
             disable_early_release: false,
             disable_single_read_optimization: false,
         },
-        sequencer: SequencerConfig {
+        sequencer: SequencerConf {
             addr: String::from("127.0.0.1:24212"),
             max_connection: None,
         },
         dbproxy: vec![
-            DbProxyConfig::new(dbproxy0_addr).set_sql_conf(Some(
+            DbProxyConf::new(dbproxy0_addr).set_sql_conf(Some(
                 "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
             )),
-            DbProxyConfig::new(dbproxy1_addr).set_sql_conf(Some(
+            DbProxyConf::new(dbproxy1_addr).set_sql_conf(Some(
                 "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
             )),
         ],
@@ -165,8 +165,8 @@ async fn run_double_s_unlimited() {
     let scheduler_addr = "127.0.0.1:40001";
     let dbproxy0_addr = "127.0.0.1:30001";
     let dbproxy1_addr = "127.0.0.1:30002";
-    let conf = Config {
-        scheduler: SchedulerConfig {
+    let conf = Conf {
+        scheduler: SchedulerConf {
             addr: String::from(scheduler_addr),
             admin_addr: Some(String::from("127.0.0.1:19999")),
             max_connection: None,
@@ -178,15 +178,15 @@ async fn run_double_s_unlimited() {
             disable_early_release: false,
             disable_single_read_optimization: false,
         },
-        sequencer: SequencerConfig {
+        sequencer: SequencerConf {
             addr: String::from("127.0.0.1:20001"),
             max_connection: None,
         },
         dbproxy: vec![
-            DbProxyConfig::new(dbproxy0_addr).set_sql_conf(Some(
+            DbProxyConf::new(dbproxy0_addr).set_sql_conf(Some(
                 "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
             )),
-            DbProxyConfig::new(dbproxy1_addr).set_sql_conf(Some(
+            DbProxyConf::new(dbproxy1_addr).set_sql_conf(Some(
                 "host=localhost port=5432 dbname=Test user=postgres password=Abc@123",
             )),
         ],

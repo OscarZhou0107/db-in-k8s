@@ -1,7 +1,7 @@
 use super::core::{DbVersion, PendingQueue};
 use super::dispatcher::Dispatcher;
 use super::transceiver;
-use crate::util::conf::DbProxyConfig;
+use crate::util::conf::DbProxyConf;
 use crate::util::executor::Executor;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use tracing::{field, info, instrument, Instrument, Span};
 
 /// Main entrance for the DbProxy
 #[instrument(name = "dbproxy", skip(conf), fields(message=field::Empty))]
-pub async fn main(conf: DbProxyConfig) {
+pub async fn main(conf: DbProxyConf) {
     Span::current().record("message", &&conf.addr[..]);
 
     // Map that holds all ongoing transactions

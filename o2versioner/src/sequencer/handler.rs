@@ -1,6 +1,6 @@
 use super::core::State;
 use crate::comm::scheduler_sequencer::*;
-use crate::util::conf::SequencerConfig;
+use crate::util::conf::SequencerConf;
 use crate::util::tcp;
 use futures::prelude::*;
 use std::sync::Arc;
@@ -21,7 +21,7 @@ use tracing::{field, info, info_span, instrument, trace, warn, Instrument, Span}
 /// to the admin port, which will then force to not accept any new
 /// connections.
 #[instrument(name = "sequencer", skip(conf))]
-pub async fn main(conf: SequencerConfig) {
+pub async fn main(conf: SequencerConf) {
     let state = Arc::new(Mutex::new(State::new()));
 
     let (stop_tx, stop_rx) = oneshot::channel();

@@ -1,7 +1,7 @@
 use std::env;
 
 use clap::{App, Arg, ArgGroup, ArgMatches};
-use o2versioner::util::conf::Config;
+use o2versioner::util::conf::Conf;
 use o2versioner::{dbproxy_main, scheduler_main, sequencer_main};
 use tracing::info;
 
@@ -29,7 +29,7 @@ async fn main() {
 
     // Parse config
     info!("current dir is: {}", env::current_dir().unwrap().to_str().unwrap());
-    let conf = Config::from_file(matches.value_of("config").unwrap());
+    let conf = Conf::from_file(matches.value_of("config").unwrap());
     info!("{:?}", conf);
 
     // Launch binary

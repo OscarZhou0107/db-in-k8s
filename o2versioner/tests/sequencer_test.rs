@@ -1,7 +1,7 @@
 use o2versioner::comm::scheduler_sequencer::Message;
 use o2versioner::core::*;
 use o2versioner::sequencer_main;
-use o2versioner::util::conf::SequencerConfig;
+use o2versioner::util::conf::SequencerConf;
 use o2versioner::util::tests_helper;
 use tokio::net::TcpStream;
 use tokio::time::{sleep, Duration};
@@ -12,7 +12,7 @@ async fn test_sequencer() {
     let _guard = tests_helper::init_logger();
 
     let sequencer_addr = "127.0.0.1:58111";
-    let conf = SequencerConfig {
+    let conf = SequencerConf {
         addr: String::from(sequencer_addr),
         max_connection: Some(2),
     };
@@ -104,7 +104,7 @@ async fn test_sequencer_block_unblock() {
     let _guard = tests_helper::init_logger();
 
     let sequencer_addr = "127.0.0.1:42920";
-    let conf = SequencerConfig {
+    let conf = SequencerConf {
         addr: String::from(sequencer_addr),
         max_connection: Some(2),
     };
@@ -178,7 +178,7 @@ async fn test_sequencer_stop() {
     let _guard = tests_helper::init_logger();
 
     let sequencer_addr = "127.0.0.1:52844";
-    let conf = SequencerConfig {
+    let conf = SequencerConf {
         addr: String::from(sequencer_addr),
         max_connection: None,
     };

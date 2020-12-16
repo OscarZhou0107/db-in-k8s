@@ -13,8 +13,8 @@ async fn test_scheduler() {
 
     let scheduler_addr = "127.0.0.1:16379";
     let sequencer_max_connection = 2;
-    let conf = Config {
-        scheduler: SchedulerConfig {
+    let conf = Conf {
+        scheduler: SchedulerConf {
             addr: String::from(scheduler_addr),
             admin_addr: None,
             max_connection: Some(2),
@@ -26,7 +26,7 @@ async fn test_scheduler() {
             disable_early_release: false,
             disable_single_read_optimization: false,
         },
-        sequencer: SequencerConfig {
+        sequencer: SequencerConf {
             addr: String::from("127.0.0.1:6379"),
             max_connection: Some(sequencer_max_connection),
         },
@@ -86,8 +86,8 @@ async fn test_scheduler_with_admin() {
     let scheduler_admin_addr = "127.0.0.1:39582";
     let sequencer_addr = "127.0.0.1:43279";
     let sequencer_max_connection = 2;
-    let conf = Config {
-        scheduler: SchedulerConfig {
+    let conf = Conf {
+        scheduler: SchedulerConf {
             addr: String::from(scheduler_addr),
             admin_addr: Some(String::from(scheduler_admin_addr)),
             max_connection: None,
@@ -99,7 +99,7 @@ async fn test_scheduler_with_admin() {
             disable_early_release: false,
             disable_single_read_optimization: false,
         },
-        sequencer: SequencerConfig {
+        sequencer: SequencerConf {
             addr: String::from(sequencer_addr),
             max_connection: Some(sequencer_max_connection),
         },
@@ -179,8 +179,8 @@ async fn test_scheduler_with_request_crash() {
     let scheduler_addr = "127.0.0.1:32523";
     let sequencer_addr = "127.0.0.1:43582";
     let sequencer_max_connection = 2;
-    let conf = Config {
-        scheduler: SchedulerConfig {
+    let conf = Conf {
+        scheduler: SchedulerConf {
             addr: String::from(scheduler_addr),
             admin_addr: None,
             max_connection: Some(2),
@@ -192,7 +192,7 @@ async fn test_scheduler_with_request_crash() {
             disable_early_release: false,
             disable_single_read_optimization: false,
         },
-        sequencer: SequencerConfig {
+        sequencer: SequencerConf {
             addr: String::from(sequencer_addr),
             max_connection: Some(sequencer_max_connection),
         },

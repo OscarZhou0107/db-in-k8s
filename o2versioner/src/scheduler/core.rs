@@ -18,11 +18,11 @@ use tracing::{info, warn};
 pub struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     client_records: ClientRecords,
-    conf: Arc<Config>,
+    conf: Arc<Conf>,
 }
 
 impl State {
-    pub fn new(dbvn_manager: DbVNManager, conf: Config) -> Self {
+    pub fn new(dbvn_manager: DbVNManager, conf: Conf) -> Self {
         Self {
             dbvn_manager: Arc::new(RwLock::new(dbvn_manager)),
             client_records: ClientRecords::new(conf.scheduler.detailed_logging.is_some()),
