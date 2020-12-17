@@ -32,7 +32,8 @@ except:
 
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
-        self._socket = socket.create_connection(scheduler_admin_addr)
+        self._socket = socket.create_connection((get_ip(scheduler_admin_addr), get_port(scheduler_admin_addr)))
+        print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
     
     def perf(self):
         self._socket.send(b'perf\n')
@@ -294,6 +295,9 @@ class SSHManager:
 def get_ip(addr):
     return addr.rpartition(':')[0]
 
+def get_port(addr):
+    return addr.rpartition(':')[1]
+
 
 class Conf:
     def __init__(self, conf_path):
@@ -329,6 +333,9 @@ class Conf:
 
     def get_scheduler_admin_ip(self):
         return get_ip(self.get_scheduler_admin_addr())
+
+    def get_scheduler_admin_port(self):
+        return get_port(self.get_scheduler_admin_addr())
 
     def set_scheduler_admin_addr(self, addr):
         self._conf['scheduler']['admin_addr'] = addr
