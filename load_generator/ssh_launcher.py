@@ -69,7 +69,8 @@ if __name__ == "__main__":
     cmds = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} {}launcher.py --mix {} --path {} --range {} {} {} --port {} --ip {}".format(python, args.path, mix, args.path, client_range_per_host[i], debug, mock_db, args.port, args.ip)
+            cmd = "{} {} --mix {} --path {} --range {} {} {} --port {} --ip {}".format(python, 
+                os.path.join(args.path, 'launcher.py'), mix, args.path, client_range_per_host[i], debug, mock_db, args.port, args.ip)
             cmds.append(cmd)
             print(cmd)
             #if DEBUG: 

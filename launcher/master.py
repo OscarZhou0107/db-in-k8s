@@ -83,7 +83,7 @@ class ControlPrompt(cmd.Cmd):
         for idx in range(num_machines):
             print('Info:', '    ' + self._ssh_manager.get_machine_name_str(idx), ':', 'Running' if self._ssh_manager.get_ioe(idx) is not None else 'Idling')
         print('Info:')
-        self.get_conf().print_addrs()
+        self.get_conf().print_summary()
         print('Info:')
 
     def do_talk(self, arg):
@@ -308,6 +308,20 @@ class Conf:
         with open(new_conf_path, 'w') as f:
             toml.dump(self._conf, f)
 
+    def get_performance_logging(self):
+        return self._conf['scheduler'].get('performance_logging')
+
+    def set_performance_logging(self, performance_logging):
+        self._conf['scheduler']['performance_logging'] = performance_logging
+
+    def clone_first_dbproxy(self, n):
+        first_dbproxy = self._conf['dbproxy'][0]
+        self._conf['dbproxy'] = [copy.deepcopy(first_dbproxy) for _ in range(n)]
+
+    def set_dbproxy_addr(self, idx, addr):
+        assert idx < len(self._conf['dbproxy'])
+        self._conf['dbproxy'][idx]['addr'] = addr
+
     def get_all_dbproxy_addrs(self):
         return list(map(lambda c: c['addr'], self._conf['dbproxy']))
 
@@ -319,13 +333,20 @@ class Conf:
 
     def get_scheduler_ip(self):
         return get_ip(self.get_scheduler_addr())
+    
+    def get_scheduler_port(self):
+        return get_port(self.get_scheduler_addr())
 
     def set_scheduler_addr(self, addr):
         self._conf['scheduler']['addr'] = addr
     
-    def update_scheduler_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_scheduler_addr().rpartition(':')
-        self.set_scheduler_addr(new_ip + separator + port)
+    def update_scheduler_addr(self, new_ip=None, new_port=None):
+        prev_ip, separator, prev_port = self.get_scheduler_addr().rpartition(':')
+        if new_ip is None:
+            new_ip = prev_ip
+        if new_port is None:
+            new_port = prev_port
+        self.set_scheduler_addr(str(new_ip) + separator + str(new_port))
 
     def get_scheduler_admin_addr(self):
         return self._conf['scheduler']['admin_addr']
@@ -339,9 +360,13 @@ class Conf:
     def set_scheduler_admin_addr(self, addr):
         self._conf['scheduler']['admin_addr'] = addr
 
-    def update_scheduler_admin_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_scheduler_admin_addr().rpartition(':')
-        self.set_scheduler_admin_addr(new_ip + separator + port)
+    def update_scheduler_admin_addr(self, new_ip=None, new_port=None):
+        prev_ip, separator, prev_port = self.get_scheduler_admin_addr().rpartition(':')
+        if new_ip is None:
+            new_ip = prev_ip
+        if new_port is None:
+            new_port = prev_port
+        self.set_scheduler_admin_addr(str(new_ip) + separator + str(new_port))
 
     def get_sequencer_addr(self):
         return self._conf['sequencer']['addr']
@@ -352,19 +377,20 @@ class Conf:
     def set_sequencer_addr(self, addr):
         self._conf['sequencer']['addr'] = addr
 
-    def update_sequencer_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_sequencer_addr().rpartition(':')
-        self.set_sequencer_addr(new_ip + separator + port)
+    def update_sequencer_addr(self, new_ip=None, new_port=None):
+        prev_ip, separator, prev_port = self.get_sequencer_addr().rpartition(':')
+        if new_ip is None:
+            new_ip = prev_ip
+        if new_port is None:
+            new_port = prev_port
+        self.set_sequencer_addr(str(new_ip) + separator + str(new_port))
 
-    def print_addrs(self):
-        scheduler = self.get_scheduler_addr()
-        print('Info:', 'Scheduler:', scheduler)
-        scheduler_admin = self.get_scheduler_admin_addr()
-        print('Info:', 'Scheduler Admin:', scheduler_admin)
-        sequencer = self.get_sequencer_addr()
-        print('Info:', 'Sequencer:', sequencer)
-        dbproxies = self.get_all_dbproxy_addrs()
-        print('Info:', 'Dbproxies:', dbproxies)
+    def print_summary(self):
+        print('Info:', 'Scheduler:', self.get_scheduler_addr())
+        print('Info:', 'performance_logging:', self.get_performance_logging())
+        print('Info:', 'Scheduler Admin:', self.get_scheduler_admin_addr())
+        print('Info:', 'Sequencer:', self.get_sequencer_addr())
+        print('Info:', 'Dbproxies:', self.get_all_dbproxy_addrs())
 
 
 def prepare_conf(conf, args):
@@ -374,27 +400,29 @@ def prepare_conf(conf, args):
     # Existing Settings
     print('Info:')
     print('Info:', 'Existing Setting:')
-    conf.print_addrs()
+    conf.print_summary()
 
     if args.follow_conf:
         args.new_conf = args.conf
         print('Info:', '--follow_conf. Will use the existing setting at', args.new_conf)
         return
 
+
+    conf.set_performance_logging(args.perf_logging)
     # Set scheduler, scheduler_admin, and sequencer
     # to current machine using current machine's ip address,
     # instead of localhost. Ports are not modified
-    conf.update_scheduler_addr(cur_ip)
-    conf.update_scheduler_admin_addr(cur_ip)
-    conf.update_sequencer_addr(cur_ip)
+    conf.update_scheduler_addr(new_ip=cur_ip)
+    conf.update_scheduler_admin_addr(new_ip=cur_ip)
+    conf.update_sequencer_addr(new_ip=cur_ip)
     # New Settings
     print('Info:')
     print('Info:', 'New Setting:')
-    conf.print_addrs()
+    conf.print_summary()
 
     # Write to file
     splitted = os.path.splitext(args.conf)
-    args.new_conf = splitted[0] + '._ttmmpp_' + splitted[1]
+    args.new_conf = splitted[0] + '._ttmmpp_master_' + splitted[1]
     conf.write(args.new_conf)
 
 
@@ -411,16 +439,19 @@ def generate_cargo_run(which, conf_path, verbose=None, release=True):
     return commands
 
 
-def construct_launcher(args, machine_idx, verbose=None, release=True):
-    # machines[0] == scheduler
-    # machines[1] == sequencer
-    # machines[2..] == dbproxies
+def construct_cargo_launcher(args, machine_idx, verbose=None, release=True):
+    # machines[0] == client_launcher
+    # machines[1] == scheduler
+    # machines[2] == sequencer
+    # machines[3..] == dbproxies
     if machine_idx == 0:
-        which = 'scheduler'
+        assert 'machine_idx should not use this launcher'
     elif machine_idx == 1:
+        which = 'scheduler'
+    elif machine_idx == 2:
         which = 'sequencer'
     else:
-        which = 'dbproxy ' + str(machine_idx - 2)
+        which = 'dbproxy ' + str(machine_idx - 3)
 
     cargo_commands = generate_cargo_run(which='--' + which, conf_path=args.new_conf, verbose=verbose, release=release)
     cargo_command = '"' + ' '.join(cargo_commands) + '"'
@@ -442,8 +473,6 @@ def construct_launcher(args, machine_idx, verbose=None, release=True):
 
 
 # python3 launcher/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx --duration=50
-# TODO:
-# 1. Hook ssh_launcher, need it to be hard-code free
 def main(args):
     print('Info:')
 
@@ -462,19 +491,57 @@ def main(args):
     print('Info:', 'Sequencer:', sequencer)
     dbproxies = conf.get_all_dbproxy_ips()
     print('Info:', 'Dbproxies:', dbproxies)
-    # machines[0] == scheduler
-    # machines[1] == sequencer
-    # machines[2..] == dbproxies
-    machines = [scheduler, sequencer] + dbproxies
+    client_launcher = scheduler
+    print('Info:', 'Client Launcher:', client_launcher)
+    # machines[0] == client_launcher
+    # machines[1] == scheduler
+    # machines[2] == sequencer
+    # machines[3..] == dbproxies
+    machines = [client_launcher, scheduler, sequencer] + dbproxies
+
+
+    print('Info:')
+    print('Info:', 'duration:', args.duration)
+    print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:')
+
+
+    # Double check from stupid caller
+    if args.bypass_stupid_check:
+        print('Info:', 'Bypassing stupidness check')
+    else:
+        prompt = ' '.join(['\n!!!!:', 'Is the setting correct? Run "cargo build --release" in', args.remote_dv, '?', '[y/n] > '])
+        answer = input(prompt).lower()
+        if answer != 'y':
+            print('Error:', 'Go fix your stupid mistakes')
+            exit()
 
     # Launch ssh
     print('Info:')
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     print('Info:')
-    # Cannot launch scheduler first!
-    for machine_idx in reversed(range(ssh_manager.get_num_machines())):
-        ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
+    # Launch cargos, cannot launch scheduler first!
+    for machine_idx in reversed(range(1, ssh_manager.get_num_machines())):
+        ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
         time.sleep(args.delay)
+    # Launch client launcher last
+    def client_launcher_launcher(idx, machine, machine_name):
+        assert idx == 0
+        client_launcher_commands = [args.python, os.path.join(args.remote_dv, 'load_generator/ssh_launcher.py'), '--username', args.username,
+            '--password', args.password, '--client_num', args.client_num, '--mix', args.client_mix,
+            '--port', conf.get_scheduler_port(), '--ip', conf.get_scheduler_ip(), '--mock_db',
+            '--path', os.path.join(args.remote_dv, 'load_generator')
+            ]
+        command = ' '.join(map(lambda x: str(x), client_launcher_commands))
+        print('Info:', 'Launching:')
+        print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
+        print('Info:', '    ' + command)
+        return command
+    ssh_manager.launch_task_on_machine(0, client_launcher_launcher)
+
+    print('Info:')
+    print('Info:', 'Waiting for start up')
+    time.sleep(args.delay * 10)
 
     # Launch scheduler admin
     print('Info:')
@@ -517,14 +584,20 @@ def init(parser):
     parser.add_argument('--remote_dv', type=str, required=True, help='Remote full absolute path for dv-in-rust directory')
     parser.add_argument('--username', type=str, required=True, help='Username for SSH')
     parser.add_argument('--password', type=str, required=True, help='Password for SSH')
+    parser.add_argument('--client_num', type=int, required=True, help='Total number of clients to launch')
+    parser.add_argument('--client_mix', type=int, required=True, help='The workload mode for the client')
 
+    # Optional args, important ones
+    parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
+    parser.add_argument('--perf_logging', type=str, default='./perf', help='Dir to dump perf logging. Either absolute path, or relative path to --remote_dv!')
+
+    # Optional args, not important
     parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
     parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
     parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
-    parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
-
     parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
+    parser.add_argument('--bypass_stupid_check', action='store_true', help='Bypass the stupidness check')
 
 
 if __name__ == '__main__':
