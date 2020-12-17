@@ -17,7 +17,7 @@ import warnings
 
 import slave
 
-warnings.filterwarnings(action='ignore',module='.*paramiko.*')
+#warnings.filterwarnings(action='ignore',module='.*paramiko.*')
 
 try:
     import paramiko
@@ -113,6 +113,14 @@ class ControlPrompt(cmd.Cmd):
         o.channel.settimeout(1.5)
         try:
             for line in o:
+                print('        >', line.strip('\n'))
+        except:
+            pass
+
+        # Print stderr before forwarding to stdin
+        e.channel.settimeout(1.5)
+        try:
+            for line in e:
                 print('        >', line.strip('\n'))
         except:
             pass
@@ -402,8 +410,7 @@ def main(args):
             print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
             print('Info:', '    ' + command)
             return machine.exec_command(command, get_pty=True)
-            #return machine.exec_command('bash;top', get_pty=True)
-        return None
+        return launcher
 
     # Launch ssh
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
