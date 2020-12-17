@@ -10,6 +10,8 @@ use crate::util::conf::*;
 use crate::util::executor::Executor;
 use crate::util::tcp;
 use bb8::Pool;
+use futures::future::Either;
+use futures::pin_mut;
 use futures::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -17,6 +19,7 @@ use std::iter::FromIterator;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio::signal;
 use tokio::sync::oneshot;
 use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
@@ -27,13 +30,18 @@ use unicase::UniCase;
 
 /// Main entrance for the Scheduler
 ///
-/// Three flavors:
+/// # Modes
 /// 1. Unlimited, the server will keep running forever.
 /// 2. Limit the total maximum number of input connections,
 /// once reaching that limit, no new connections are accepted.
 /// 3. Admin port, can send `kill`, `exit` or `quit` in raw bytes
 /// to the admin port, which will then force to not accept any new
 /// connections.
+///
+/// # Notes
+/// Upon receiving CTRL-C signal, scheduler will shutdown with
+/// possible *INCONSISTEN* state. Please use the above mentioned modes
+/// to properly stop the scheduler
 #[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Conf) {
     // Create the main state
@@ -117,6 +125,18 @@ pub async fn main(conf: Conf) {
 
     // Combine the dispatcher handle and main handler handle into a main_handle
     let main_handle = future::try_join3(transceiver_handle, dispatcher_handle, handler_handle);
+    let ctrl_c_handle = signal::ctrl_c();
+
+    pin_mut!(ctrl_c_handle);
+    // Exit when either main_handle finishes or ctrl_c signal is received
+    let main_handle_with_signal = future::select(main_handle, ctrl_c_handle).map(|res| match res {
+        Either::Left((main_res, _)) => main_res
+            .map(|_| info!("main_handle finished"))
+            .map_err(|e| e.to_string()),
+        Either::Right((ctrl_c_res, _)) => ctrl_c_res
+            .map(|_| info!("Received CTRL_C, terminating main_handle"))
+            .map_err(|e| e.to_string()),
+    });
 
     // Allow scheduler to be terminated by admin
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
@@ -132,7 +152,7 @@ pub async fn main(conf: Conf) {
 
         // main_handle can either run to finish or be the result
         // of the above stop_tx.send()
-        main_handle.await.expect("main_handle crashed");
+        main_handle_with_signal.await.unwrap();
 
         // At this point, we just want to cancel the admin_handle
         tokio::select! {
@@ -140,7 +160,7 @@ pub async fn main(conf: Conf) {
             _ = admin_handle => {}
         };
     } else {
-        main_handle.await.unwrap();
+        main_handle_with_signal.await.unwrap();
     }
 
     // Dump logging files
