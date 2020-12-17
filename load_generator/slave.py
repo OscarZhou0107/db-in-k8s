@@ -191,7 +191,7 @@ def main(args):
         if args.output: # files
             if not os.path.exists(args.output):
                 os.mkdir(args.output)
-            dir_name = args.name + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S_%f')
+            dir_name = args.name.replace(' ', '') + '_' + datetime.datetime.now().strftime('%y%m%d_%H%M%S_%f')
             args.output = os.path.join(args.output, dir_name)
             if not os.path.exists(args.output):
                 os.mkdir(args.output)
