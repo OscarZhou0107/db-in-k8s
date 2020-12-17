@@ -492,7 +492,7 @@ def main(args):
             '--port', conf.get_scheduler_port(), '--ip', conf.get_scheduler_ip(), '--mock_db',
             '--path', os.path.join(args.remote_dv, 'load_generator')
             ]
-        command = ' '.join(client_launcher_commands)
+        command = ' '.join(map(lambda x: str(x), client_launcher_commands))
         print('Info:', 'Launching:')
         print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
         print('Info:', '    ' + command)
