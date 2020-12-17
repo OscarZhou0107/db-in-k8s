@@ -548,7 +548,7 @@ except:
 #     return parser.parse_args()
 
 class SSHManager:
-    def __init__(self, machines, username=None, password=None):
+    def __init__(self, machines, username, password):
         def connect_client(machine, username, password):
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -752,7 +752,7 @@ def main(args):
     print('Info:')
     print('Info:', 'SSH to:', machines)
 
-    ssh_manager = SSHManager(machines=machines)
+    ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
 
 
 def init(parser):
@@ -763,6 +763,9 @@ def init(parser):
     '''
     parser.add_argument('--conf', type=str, required=True, help='Location of the conf in toml format')
     parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
+
+    parser.add_argument('--username', type=str, required=True, help='Username for SSH')
+    parser.add_argument('--password', type=str, required=True, help='Password for SSH')
 
 
     parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Be aware of concurrent file writing!')
