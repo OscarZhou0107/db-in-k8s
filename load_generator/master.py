@@ -30,22 +30,48 @@ except:
     print('toml is not installed. Try "pip install toml"')
 
 
+class SchedulerAdmin:
+    def __init__(self, scheduler_admin_addr):
+        self._socket = socket.create_connection(scheduler_admin_addr)
+    
+    def perf(self):
+        self._socket.send(b'perf\n')
+        
+
 class ControlPrompt(cmd.Cmd):
-    def __init__(self, time, ssh_manager):
+    def __init__(self, time, ssh_manager, conf, scheduler_admin):
         '''
         ssh_manager is SSHManager
         time = (launch_time, termination_time=None)
+        conf is Conf
         '''
         assert isinstance(ssh_manager, SSHManager)
+        assert isinstance(conf, Conf)
+        assert isinstance(scheduler_admin, SchedulerAdmin)
         super(ControlPrompt, self).__init__()
         self._time = time
         self._ssh_manager = ssh_manager
+        self._conf = conf
+        self._scheduler_admin = scheduler_admin
     
     def get_time(self):
         return self._time
     
     def get_ssh_manager(self):
         return self._ssh_manager
+
+    def get_conf(self):
+        return self._conf
+
+    def get_scheduler_admin(self):
+        return self._scheduler_admin
+
+    def do_perf(self, arg=None):
+        print('Info:', 'Perf..')
+        try:
+            self._scheduler_admin.perf()
+        except:
+            pass
 
     def do_list(self, arg=None):
         self._ssh_manager.refresh_ioe()
@@ -54,6 +80,7 @@ class ControlPrompt(cmd.Cmd):
         for idx in range(num_machines):
             print('Info:', '    ' + self._ssh_manager.get_machine_name_str(idx), ':', 'Running' if self._ssh_manager.get_ioe(idx) is not None else 'Idling')
         print('')
+        self.get_conf().print_addrs()
 
     def do_talk(self, arg):
         '''
@@ -134,6 +161,12 @@ class ControlPrompt(cmd.Cmd):
         print('Info:')
 
     def do_exit(self, arg=None):
+        try:
+            print('Info:', 'Perf..')
+            self._scheduler_admin.perf()
+            time.sleep(10)
+        except:
+            pass
         print('Info:', 'Closing connections to', self._ssh_manager.get_num_machines(), 'machines')
         self._ssh_manager.close_all()
         print('Info: Done. Exiting')
@@ -162,11 +195,18 @@ def print_time(launch_time, termination_time=None, show_elapsed=False):
 
 # Process tombstone endpoint 2
 class SignalHandler():
-    def __init__(self, ssh_manager):
+    def __init__(self, ssh_manager, scheduler_admin):
         self._ssh_manager = ssh_manager
+        self._scheduler_admin = scheduler_admin
         signal.signal(signal.SIGINT, self.exit_gracefully)
 
     def exit_gracefully(self, signum, frame):
+        try:
+            print('Info:', 'Perf..')
+            self._scheduler_admin.perf()
+            time.sleep(10)
+        except:
+            pass
         self._ssh_manager.__del__()
         exit(0)
 
@@ -429,8 +469,11 @@ def main(args):
         ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
         time.sleep(args.delay)
 
+    # Launch scheduler admin
+    scheduler_admin = SchedulerAdmin(conf.get_scheduler_admin_addr())
+
     # Register the signal handler
-    sh = SignalHandler(ssh_manager)
+    sh = SignalHandler(ssh_manager, scheduler_admin)
 
     # Get the timer working
     print('Info:')
@@ -448,7 +491,7 @@ def main(args):
 
     # Command loop
     print('Info:')
-    ControlPrompt((launch_time, termination_time), ssh_manager).cmdloop('DO NOT CTRL-C!')
+    ControlPrompt((launch_time, termination_time), ssh_manager, conf, scheduler_admin).cmdloop('DO NOT CTRL-C!')
     sh.exit_gracefully(None, None)
 
 
