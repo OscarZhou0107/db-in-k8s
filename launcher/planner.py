@@ -74,7 +74,8 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     master_cmds = ['--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
         '--duration', args.duration, '--client_num', client_num, '--client_mix', client_mix, '--perf_logging', args.perf_logging,
         '--output', args.output, '--bypass_stupid_check']
-    print('Info:', 'RUN:', ' '.join(map(lambda x: str(x), master_cmds)))
+    master_cmd = ' '.join(map(lambda x: str(x), master_cmds))
+    print('Info:', 'RUN:', master_cmd)
     master_parser = argparse.ArgumentParser(description='master.py')
     master.init(master_parser)
     master.main(master_parser.parse_args(master_cmds))
