@@ -222,6 +222,7 @@ class SSHManager:
         assert idx < self.get_num_machines()
         assert task_launcher is not None
         self._ioe[idx] = task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))
+        print('launch_task_on_machine')
 
     def close_machine(self, idx):
         assert idx < self.get_num_machines()
