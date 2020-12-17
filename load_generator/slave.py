@@ -172,10 +172,18 @@ class ProcessManager:
             proc.terminate()
 
 
-# python load_generator/slave.py --name=dbproxy --cmd "cargo run -- --plain --dbproxy" --sweeps 0 1 --output=./logging 
+# python load_generator/slave.py --name=sequencer --cmd "cargo run -- --plain --sequencer" --output=./logging  --wd=./
 def main(args):
     print('Info:', args)
     print('Info:')
+
+    print('Info:')
+    # cd into working directory
+    os.chdir(args.wd)
+    print('Info:', 'cd', args.wd)
+
+    if args.sweeps is None or len(args.sweeps) == 0:
+        args.sweeps = ['']
     
     if args.stdout: # stdout
         out_place_str = 'redirected into stdout'
@@ -193,9 +201,8 @@ def main(args):
 
     print('Info:', 'All output of running processes are', out_place_str)
 
-
+    # Launch jobs
     command = args.cmd.split()
-
     print('Info:')
     print('Info:', 'Launching', len(args.sweeps), "processes '" + ' '.join(command) + "'")
     def launch_job(idx):
@@ -207,7 +214,6 @@ def main(args):
                 output = open(os.path.join(args.output, str(args.sweeps[idx]) + '.log'), mode='w')
             else: # devnull
                 output = subprocess.DEVNULL
-
         return subprocess.Popen(command + [args.sweeps[idx]], stdout=output, stderr=output)
 
     pm = ProcessManager(launch_job)
@@ -218,9 +224,10 @@ def main(args):
 
 
 def init(parser):
-    parser.add_argument('--name', type=str, default='slave', help='Description of the cmd')
+    parser.add_argument('--name', type=str, default='slave', help='Description of the command')
+    parser.add_argument('--wd', default='./', help='The working director for this command to run')
     parser.add_argument('--cmd', type=str, help='Command to launch (common part)')
-    parser.add_argument('--sweeps', type=str, nargs='+', help='Argument (single word) to command to launch (diverging part)')
+    parser.add_argument('--sweeps', type=str, nargs='*', help='Argument (single word) to command to launch (diverging part)')
 
     parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Be aware of concurrent file writing!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
