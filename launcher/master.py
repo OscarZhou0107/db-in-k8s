@@ -425,7 +425,7 @@ def construct_launcher(args, machine_idx, verbose=None, release=True):
     cargo_commands = generate_cargo_run(which='--' + which, conf_path=args.new_conf, verbose=verbose, release=release)
     cargo_command = '"' + ' '.join(cargo_commands) + '"'
 
-    slave_path = os.path.join(args.remote_dv, 'load_generator/slave.py')
+    slave_path = os.path.join(args.remote_dv, 'launcher/slave.py')
     commands = [args.python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', args.remote_dv]
     if args.stdout:
         commands.append('--stdout')
@@ -441,7 +441,7 @@ def construct_launcher(args, machine_idx, verbose=None, release=True):
     return launcher
 
 
-# python3 load_generator/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx --duration=50
+# python3 launcher/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx --duration=50
 # TODO:
 # 1. Hook ssh_launcher, need it to be hard-code free
 def main(args):

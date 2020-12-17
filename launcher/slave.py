@@ -175,7 +175,7 @@ class ProcessManager:
             #proc.terminate()
 
 
-# python load_generator/slave.py --name=sequencer --cmd "cargo run -- --plain --sequencer" --output=./logging  --wd=./
+# python launcher/slave.py --name=sequencer --cmd "cargo run -- --plain --sequencer" --output=./logging  --wd=./
 def main(args):
     print('Info:', args)
     print('Info:')
