@@ -474,6 +474,12 @@ def main(args):
     # machines[3..] == dbproxies
     machines = [client_launcher, scheduler, sequencer] + dbproxies
 
+
+    # Double check from stupid caller
+    answer = input('!!!!:', 'Is the above setting correct? Have you run cargo build --release?', '[y/n]' , '!!!!').lower()
+    if answer != 'y':
+        exit()
+
     # Launch ssh
     print('Info:')
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
