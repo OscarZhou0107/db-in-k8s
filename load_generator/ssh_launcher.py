@@ -14,6 +14,8 @@ if __name__ == "__main__":
     parser.add_argument("--username", type=str, default="qinsinin")
     parser.add_argument("--password", type=str)
     parser.add_argument("--client_num", type=int, required=True)
+    parser.add_argument("--port", type=int, default=2077)
+    parser.add_argument("--ip", type=str, default='128.100.13.240')
 
     parser.add_argument("--mix", type=int, required=True)
     parser.add_argument("--python", type=str, default="python3", help="Python alias to use")
@@ -66,7 +68,7 @@ if __name__ == "__main__":
     cmds = []
     for i in range(host_num):
         if conns[i]:
-            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {}".format(python, mix, client_range_per_host[i], debug, mock_db)
+            cmd = "{} /groups/qlhgrp/dv-in-rust/load_generator/launcher.py --mix {} --ssh --range {} {} {} --port {} --ip {}".format(python, mix, client_range_per_host[i], debug, mock_db, args.port, args.ip)
             cmds.append(cmd)
             print(cmd)
             #if DEBUG: 
