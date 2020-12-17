@@ -29,84 +29,6 @@ try:
 except:
     print('toml is not installed. Try "pip install toml"')
 
-# class SSHManager:
-#     def __init__(self, machines, username, password):
-#         def connect_client(machine, username, password):
-#             client = paramiko.SSHClient()
-#             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#             try:
-#                 client.connect(machine, username=username, password=password)
-#                 print('Info:', 'Connected to', machine, 'successfully')
-#                 return client
-#             except:
-#                 print('Error:', 'Could not connect to', machine)
-#                 return None
-
-#         machines_connected = [(machine, connect_client(machine, username, password)) for machine in machines]
-#         machines_connected = list(filter(lambda x: x[1] is not None, machines_connected))
-        
-#         self.__machine_names = None
-#         self.__machines = None
-#         self.__ioe = None
-    
-#         if len(machines_connected) > 0:
-#             self.__machine_names, self.__machines = zip(*machines_connected)
-#             self.__ioe = [None] * len(self.__machines)
-
-#     def get_num_machines(self):
-#         return len(self.__machines)
-    
-#     def get_machine(self, idx):
-#         assert idx < self.get_num_machines()
-#         return self.__machines[idx]
-
-#     def get_ioe(self, idx):
-#         assert idx < self.get_num_machines()
-#         return self.__ioe[idx]
-
-#     def refresh_ioe(self):
-#         def check_alive(ioe):
-#             if ioe is not None:
-#                 if not ioe[2].channel.closed:
-#                     return ioe
-#             else:
-#                 return None
-#         self.__ioe = list(map(check_alive, self.__ioe))
-
-#     def get_machine_name(self, idx):
-#         assert idx < self.get_num_machines()
-#         return self.__machine_names[idx]
-
-#     def get_machine_name_str(self, idx):
-#         assert idx < self.get_num_machines()
-#         return '[' + str(idx) + ']' + ' ' + self.__machine_names[idx]
-
-#     def launch_task_on_machine(self, idx, task_launcher):
-#         '''
-#         (stdin, stdout, stderr) = task_launcher(idx, machine, machine_name)
-#         '''
-#         assert idx < self.get_num_machines()
-#         assert task_launcher is not None
-#         self.__ioe[idx] = task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))
-
-#     def close_machine(self, idx):
-#         assert idx < self.get_num_machines()
-#         self.__machines[idx].close()
-#         print('Info:', '    Closed', self.get_machine_name(idx))
-
-#     def close_all(self):
-#         if self.__machines is not None:
-#             for idx in range(self.get_num_machines()):
-#                 self.close_machine(idx)
-    
-#             self.__machine_names = None
-#             self.__machines = None
-#             self.__ioe = None
-    
-#     def __del__(self):
-#         self.close_all()
-
-
 # class ControlPrompt(cmd.Cmd):
 #     def __init__(self, time, ssh_manager):
 #         '''
@@ -625,6 +547,83 @@ except:
     
 #     return parser.parse_args()
 
+class SSHManager:
+    def __init__(self, machines, username=None, password=None):
+        def connect_client(machine, username, password):
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            try:
+                client.connect(machine, username=username, password=password)
+                print('Info:', 'Connected to', machine, 'successfully')
+                return client
+            except:
+                print('Error:', 'Could not connect to', machine)
+                return None
+
+        machines_connected = [(machine, connect_client(machine, username, password)) for machine in machines]
+        machines_connected = list(filter(lambda x: x[1] is not None, machines_connected))
+        
+        self._machine_names = None
+        self._machines = None
+        self._ioe = None
+    
+        if len(machines_connected) > 0:
+            self._machine_names, self._machines = zip(*machines_connected)
+            self._ioe = [None] * len(self._machines)
+
+    def get_num_machines(self):
+        return len(self._machines)
+    
+    def get_machine(self, idx):
+        assert idx < self.get_num_machines()
+        return self._machines[idx]
+
+    def get_ioe(self, idx):
+        assert idx < self.get_num_machines()
+        return self._ioe[idx]
+
+    def refresh_ioe(self):
+        def check_alive(ioe):
+            if ioe is not None:
+                if not ioe[2].channel.closed:
+                    return ioe
+            else:
+                return None
+        self._ioe = list(map(check_alive, self._ioe))
+
+    def get_machine_name(self, idx):
+        assert idx < self.get_num_machines()
+        return self._machine_names[idx]
+
+    def get_machine_name_str(self, idx):
+        assert idx < self.get_num_machines()
+        return '[' + str(idx) + ']' + ' ' + self._machine_names[idx]
+
+    def launch_task_on_machine(self, idx, task_launcher):
+        '''
+        (stdin, stdout, stderr) = task_launcher(idx, machine, machine_name)
+        '''
+        assert idx < self.get_num_machines()
+        assert task_launcher is not None
+        self._ioe[idx] = task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))
+
+    def close_machine(self, idx):
+        assert idx < self.get_num_machines()
+        self._machines[idx].close()
+        print('Info:', '    Closed', self.get_machine_name(idx))
+
+    def close_all(self):
+        if self._machines is not None:
+            for idx in range(self.get_num_machines()):
+                self.close_machine(idx)
+    
+            self._machine_names = None
+            self._machines = None
+            self._ioe = None
+    
+    def __del__(self):
+        self.close_all()
+
 def get_ip(addr):
     return addr.rpartition(':')[0]
 
@@ -745,6 +744,13 @@ def main(args):
     dbproxies = conf.get_all_dbproxy_ips()
     print('Info:', 'Dbproxies:', dbproxies)
 
+    # machines[0] == scheduler
+    # machines[1] == scheduler_admin
+    # machines[2] == sequencer
+    # machines[3..] == dbproxies
+    machines = [scheduler, scheduler_admin, sequencer] + dbproxies
+
+    ssh_manager = SSHManager(machines=machines)
 
 
 def init(parser):
