@@ -235,13 +235,7 @@ class SSHManager:
 
     def close_machine(self, idx):
         assert idx < self.get_num_machines()
-        ioe = self.get_ioe(idx)
-        if ioe is None:
-            self._machines[idx].close()
-        else:
-            # SIGINT
-            ioe[0].write('\x03')
-            ioe[0].flush()
+        self._machines[idx].close()
         print('Info:', '    Closed', self.get_machine_name(idx))
 
     def close_all(self):
