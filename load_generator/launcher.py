@@ -10,7 +10,7 @@ import multiprocessing
 DEBUG = 0
 
 def launch_client(cids, mix, pid, python, debug, mock_db, path, port, ip):
-    script = path+"client.py"
+    script = os.path.join(path, "client.py")
     if DEBUG:
         script = "test.py"
 

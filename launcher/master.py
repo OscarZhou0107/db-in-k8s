@@ -319,6 +319,9 @@ class Conf:
 
     def get_scheduler_ip(self):
         return get_ip(self.get_scheduler_addr())
+    
+    def get_scheduler_port(self):
+        return get_port(self.get_scheduler_addr())
 
     def set_scheduler_addr(self, addr):
         self._conf['scheduler']['addr'] = addr
@@ -411,16 +414,19 @@ def generate_cargo_run(which, conf_path, verbose=None, release=True):
     return commands
 
 
-def construct_launcher(args, machine_idx, verbose=None, release=True):
-    # machines[0] == scheduler
-    # machines[1] == sequencer
-    # machines[2..] == dbproxies
+def construct_cargo_launcher(args, machine_idx, verbose=None, release=True):
+    # machines[0] == client_launcher
+    # machines[1] == scheduler
+    # machines[2] == sequencer
+    # machines[3..] == dbproxies
     if machine_idx == 0:
-        which = 'scheduler'
+        assert 'machine_idx should not use this launcher'
     elif machine_idx == 1:
+        which = 'scheduler'
+    elif machine_idx == 2:
         which = 'sequencer'
     else:
-        which = 'dbproxy ' + str(machine_idx - 2)
+        which = 'dbproxy ' + str(machine_idx - 3)
 
     cargo_commands = generate_cargo_run(which='--' + which, conf_path=args.new_conf, verbose=verbose, release=release)
     cargo_command = '"' + ' '.join(cargo_commands) + '"'
@@ -462,19 +468,40 @@ def main(args):
     print('Info:', 'Sequencer:', sequencer)
     dbproxies = conf.get_all_dbproxy_ips()
     print('Info:', 'Dbproxies:', dbproxies)
-    # machines[0] == scheduler
-    # machines[1] == sequencer
-    # machines[2..] == dbproxies
-    machines = [scheduler, sequencer] + dbproxies
+    client_launcher = scheduler
+    print('Info:', 'Client Launcher:', client_launcher)
+    # machines[0] == client_launcher
+    # machines[1] == scheduler
+    # machines[2] == sequencer
+    # machines[3..] == dbproxies
+    machines = [client_launcher, scheduler, sequencer] + dbproxies
 
     # Launch ssh
     print('Info:')
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     print('Info:')
-    # Cannot launch scheduler first!
-    for machine_idx in reversed(range(ssh_manager.get_num_machines())):
-        ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
+    # Launch cargos, cannot launch scheduler first!
+    for machine_idx in reversed(range(1, ssh_manager.get_num_machines())):
+        ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
         time.sleep(args.delay)
+    # Launch client launcher last
+    def client_launcher_launcher(idx, machine, machine_name):
+        assert idx == 0
+        client_launcher_commands = [args.python, os.path.join(args.remote_dv, 'load_generator/ssh_launcher.py'), '--username', args.username,
+            '--password', args.password, '--client_num', args.client_num, '--mix', args.client_mix,
+            '--port', conf.get_scheduler_port(), '--ip', conf.get_scheduler_ip(), '--mock_db',
+            '--path', os.path.join(args.remote_dv, 'load_generator')
+            ]
+        command = ' '.join(client_launcher_commands)
+        print('Info:', 'Launching:')
+        print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
+        print('Info:', '    ' + command)
+        return command
+    ssh_manager.launch_task_on_machine(0, client_launcher_launcher)
+
+    print('Info:')
+    print('Info:', 'Waiting for start up')
+    time.sleep(args.delay * 10)
 
     # Launch scheduler admin
     print('Info:')
@@ -517,12 +544,16 @@ def init(parser):
     parser.add_argument('--remote_dv', type=str, required=True, help='Remote full absolute path for dv-in-rust directory')
     parser.add_argument('--username', type=str, required=True, help='Username for SSH')
     parser.add_argument('--password', type=str, required=True, help='Password for SSH')
+    parser.add_argument('--client_num', type=int, required=True, help='Total number of clients to launch')
+    parser.add_argument('--client_mix', type=int, reqiured=True, help='The workload mode for the client')
 
+    # Optional args, important ones
+    parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
+
+    # Optional args, not important
     parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
     parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
     parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
-    parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
-
     parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
 
