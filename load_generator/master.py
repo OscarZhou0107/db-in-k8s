@@ -625,21 +625,99 @@ except:
     
 #     return parser.parse_args()
 
-def parse_conf(conf_path):
-    conf = toml.load(conf_path)
-    return conf
+class Conf(dict):
+    def __init__(self, conf_path):
+        self._conf_path = conf_path
+        self._conf = toml.load(conf_path)
 
-def get_all_dbproxy_addrs(conf):
-    print(list(map(lambda c: c['addr'], conf['dbproxy'])))
+    def get_all_dbproxy_addrs(self):
+        return list(map(lambda c: c['addr'], self._conf['dbproxy']))
+
+    def get_scheduler_addr_port(self):
+        return self._conf['scheduler']['addr']
+
+    def set_scheduler_addr_port(self, addr):
+        self._conf['scheduler']['addr'] = addr
+    
+    def update_scheduler_addr(self, new_ip):
+        _prev_ip, separator, port = self.get_scheduler_addr_port().rpartition(':')
+        self.set_scheduler_addr_port(new_ip + separator + port)
+
+    def get_scheduler_admin_addr(self):
+        return self._conf['scheduler']['admin_addr']
+
+    def set_scheduler_admin_addr(self, addr):
+        self._conf['scheduler']['admin_addr'] = addr
+
+    def update_scheduler_admin_addr(self, new_ip):
+        _prev_ip, separator, port = self.get_scheduler_admin_addr().rpartition(':')
+        self.set_scheduler_admin_addr(new_ip + separator + port)
+
+    def get_sequencer_addr(self):
+        return self._conf['sequencer']['addr']
+
+    def set_sequencer_addr(self, addr):
+        self._conf['sequencer']['addr'] = addr
+
+    def update_sequencer_addr(self, new_ip):
+        _prev_ip, separator, port = self.get_sequencer_addr().rpartition(':')
+        self.set_sequencer_addr(new_ip + separator + port)
+
+    def print_addrs(self):
+        print('Info:', 'Addrs Settings:')
+        scheduler = self.get_scheduler_addr_port()
+        print('Info:', 'Scheduler:', scheduler)
+        scheduler_admin = self.get_scheduler_admin_addr()
+        print('Info:', 'Scheduler Admin:', scheduler_admin)
+        sequencer = self.get_sequencer_addr()
+        print('Info:', 'Sequencer:', sequencer)
+        dbproxies = self.get_all_dbproxy_addrs()
+        print('Info:', 'Dbproxies:', dbproxies)
+
+
+def prepare_conf(conf, args):
+    cur_ip = socket.gethostbyname(socket.gethostname())
+    print('Info:', 'Current IP:', cur_ip)
+    
+    # Existing Settings
+    print('Info:')
+    print('Info:', 'Existing Setting:')
+    conf.print_addrs()
+
+    if args.follow_conf:
+        print('Info:', '--follow_conf. Will use the existing setting!')
+        return
+
+    # Set scheduler, scheduler_admin, and sequencer
+    # to current machine using current machine's ip address,
+    # instead of localhost. Ports are not modified
+    conf.update_scheduler_addr(cur_ip)
+    conf.update_scheduler_admin_addr(cur_ip)
+    conf.update_sequencer_addr(cur_ip)
+    # New Settings
+    print('Info:')
+    print('Info:', 'New Setting:')
+    conf.print_addrs()
 
 
 def main(args):
-    conf = parse_conf(args.conf)
-    get_all_dbproxy_addrs(conf)
+    print('Info:')
+
+    cur_ip = socket.gethostbyname(socket.gethostname())
+    print('Info:', 'Current IP:', cur_ip)
+
+    conf = Conf(args.conf)
+    prepare_conf(conf, args)
 
 
 def init(parser):
+    parser.description = '''
+    Launches and deploys all components according to the --conf configuration.
+    By default, will launch Scheduler, Scheduler Admin and Sequencer to current machine
+    using its public IP (rather than localhost or 127.0.0.1).
+    '''
     parser.add_argument('--conf', type=str, required=True, help='Location of the conf in toml format')
+    parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
 
     parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Be aware of concurrent file writing!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
