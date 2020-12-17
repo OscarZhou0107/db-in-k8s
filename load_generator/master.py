@@ -356,32 +356,6 @@ def generate_cargo_run(which, conf_path, verbose=None, release=True):
     return commands
 
 
-def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, release=True):
-    # machines[0] == scheduler
-    # machines[1] == sequencer
-    # machines[2..] == dbproxies
-    if machine_idx == 0:
-        which = 'scheduler'
-    elif machine_idx == 1:
-        which = 'sequencer'
-    else:
-        which = 'dbproxy ' + str(machine_idx - 2)
-
-    cargo_commands = generate_cargo_run(which='--' + which, conf_path=conf_path, verbose=verbose, release=release)
-    cargo_command = '"' + ' '.join(cargo_commands) + '"'
-
-    slave_path = os.path.join(remote_dv, 'load_generator/slave.py')
-    commands = [python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', remote_dv, '--stdout'] #'--output', './logging']
-    def launcher(idx, machine, machine_name):
-        command = ' '.join(commands)
-        print('Info:', 'Launching:')
-        print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
-        print('Info:', '    ' + command)
-        #return machine.exec_command(command, get_pty=True)
-        return machine.exec_command('bash;top', get_pty=True)
-    return launcher
-
-
 #  python3 load_generator/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx
 def main(args):
     print('Info:')
@@ -406,6 +380,31 @@ def main(args):
     # machines[2..] == dbproxies
     machines = [scheduler, sequencer] + dbproxies
     
+    def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, release=True):
+        # machines[0] == scheduler
+        # machines[1] == sequencer
+        # machines[2..] == dbproxies
+        if machine_idx == 0:
+            which = 'scheduler'
+        elif machine_idx == 1:
+            which = 'sequencer'
+        else:
+            which = 'dbproxy ' + str(machine_idx - 2)
+
+        cargo_commands = generate_cargo_run(which='--' + which, conf_path=conf_path, verbose=verbose, release=release)
+        cargo_command = '"' + ' '.join(cargo_commands) + '"'
+
+        slave_path = os.path.join(remote_dv, 'load_generator/slave.py')
+        commands = [python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', remote_dv, '--stdout'] #'--output', './logging']
+        def launcher(idx, machine, machine_name):
+            command = ' '.join(commands)
+            print('Info:', 'Launching:')
+            print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
+            print('Info:', '    ' + command)
+            #return machine.exec_command(command, get_pty=True)
+            return machine.exec_command('bash;top', get_pty=True)
+        return launcher
+
     # Launch ssh
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     # Cannot launch scheduler first!
