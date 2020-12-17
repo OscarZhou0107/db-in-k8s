@@ -314,6 +314,14 @@ class Conf:
     def set_performance_logging(self, performance_logging):
         self._conf['scheduler']['performance_logging'] = performance_logging
 
+    def clone_first_dbproxy(self, n):
+        first_dbproxy = self._conf['dbproxy'][0]
+        self._conf['dbproxy'] = [copy.deepcopy(first_dbproxy) for _ in range(n)]
+
+    def set_dbproxy_addr(self, idx, addr):
+        assert idx < len(self._conf['dbproxy'])
+        self._conf['dbproxy'][idx]['addr'] = addr
+
     def get_all_dbproxy_addrs(self):
         return list(map(lambda c: c['addr'], self._conf['dbproxy']))
 
@@ -332,9 +340,13 @@ class Conf:
     def set_scheduler_addr(self, addr):
         self._conf['scheduler']['addr'] = addr
     
-    def update_scheduler_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_scheduler_addr().rpartition(':')
-        self.set_scheduler_addr(new_ip + separator + port)
+    def update_scheduler_addr(self, new_ip=None, new_port=None):
+        prev_ip, separator, prev_port = self.get_scheduler_addr().rpartition(':')
+        if new_ip is None:
+            new_ip = prev_ip
+        if new_port is None:
+            new_port = prev_port
+        self.set_scheduler_addr(new_ip + separator + new_port)
 
     def get_scheduler_admin_addr(self):
         return self._conf['scheduler']['admin_addr']
@@ -348,9 +360,13 @@ class Conf:
     def set_scheduler_admin_addr(self, addr):
         self._conf['scheduler']['admin_addr'] = addr
 
-    def update_scheduler_admin_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_scheduler_admin_addr().rpartition(':')
-        self.set_scheduler_admin_addr(new_ip + separator + port)
+    def update_scheduler_admin_addr(self, new_ip=None, new_port=None):
+        prev_ip, separator, prev_port = self.get_scheduler_admin_addr().rpartition(':')
+        if new_ip is None:
+            new_ip = prev_ip
+        if new_port is None:
+            new_port = prev_port
+        self.set_scheduler_admin_addr(new_ip + separator + new_port)
 
     def get_sequencer_addr(self):
         return self._conf['sequencer']['addr']
@@ -361,9 +377,13 @@ class Conf:
     def set_sequencer_addr(self, addr):
         self._conf['sequencer']['addr'] = addr
 
-    def update_sequencer_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_sequencer_addr().rpartition(':')
-        self.set_sequencer_addr(new_ip + separator + port)
+    def update_sequencer_addr(self, new_ip=None, new_port=None):
+        prev_ip, separator, prev_port = self.get_sequencer_addr().rpartition(':')
+        if new_ip is None:
+            new_ip = prev_ip
+        if new_port is None:
+            new_port = prev_port
+        self.set_sequencer_addr(new_ip + separator + new_port)
 
     def print_summary(self):
         print('Info:', 'Scheduler:', self.get_scheduler_addr())
@@ -392,9 +412,9 @@ def prepare_conf(conf, args):
     # Set scheduler, scheduler_admin, and sequencer
     # to current machine using current machine's ip address,
     # instead of localhost. Ports are not modified
-    conf.update_scheduler_addr(cur_ip)
-    conf.update_scheduler_admin_addr(cur_ip)
-    conf.update_sequencer_addr(cur_ip)
+    conf.update_scheduler_addr(new_ip=cur_ip)
+    conf.update_scheduler_admin_addr(new_ip=cur_ip)
+    conf.update_sequencer_addr(new_ip=cur_ip)
     # New Settings
     print('Info:')
     print('Info:', 'New Setting:')
@@ -402,7 +422,7 @@ def prepare_conf(conf, args):
 
     # Write to file
     splitted = os.path.splitext(args.conf)
-    args.new_conf = splitted[0] + '._ttmmpp_' + splitted[1]
+    args.new_conf = splitted[0] + '._ttmmpp_master_' + splitted[1]
     conf.write(args.new_conf)
 
 
@@ -480,12 +500,21 @@ def main(args):
     machines = [client_launcher, scheduler, sequencer] + dbproxies
 
 
+    print('Info:')
+    print('Info:', 'duration:', args.duration)
+    print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:')
+
+
     # Double check from stupid caller
-    prompt = ' '.join(['\n!!!!:', 'Is the setting correct? Run "cargo build --release" in', args.remote_dv , '?', '[y/n] > '])
-    answer = input(prompt).lower()
-    if answer != 'y':
-        print('Error:', 'Go fix your stupid mistakes')
-        exit()
+    if args.bypass_stupid_check:
+        print('Info:', 'Bypassing stupidness check')
+    else:
+        prompt = ' '.join(['\n!!!!:', 'Is the setting correct? Run "cargo build --release" in', args.remote_dv, '?', '[y/n] > '])
+        answer = input(prompt).lower()
+        if answer != 'y':
+            print('Error:', 'Go fix your stupid mistakes')
+            exit()
 
     # Launch ssh
     print('Info:')
@@ -568,6 +597,7 @@ def init(parser):
     parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
     parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
+    parser.add_argument('--bypass_stupid_check', action='store_true', help='Bypass the stupidness check')
 
 
 if __name__ == '__main__':
