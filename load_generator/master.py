@@ -363,7 +363,7 @@ def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, 
     cargo_command = '"' + ' '.join(cargo_commands) + '"'
 
     slave_path = os.path.join(remote_dv, 'load_generator/slave.py')
-    commands = [python, slave_path,'--name', which, '--cmd', cargo_command, '--wd', remote_dv, '--stdout'] #'--output', './logging']
+    commands = [python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', remote_dv, '--stdout'] #'--output', './logging']
     def launcher(idx, machine, machine_name):
         command = ' '.join(commands)
         print('Info:', 'Launching:')
