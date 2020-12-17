@@ -212,7 +212,7 @@ def main(args):
         else:
             if args.output: # file
                 if args.sweeps[idx] is None:
-                    sweep_str = ''
+                    sweep_str = 'run'
                 else:
                     sweep_str = str(args.sweeps[idx])
                 output = open(os.path.join(args.output, sweep_str + '.log'), mode='w')
