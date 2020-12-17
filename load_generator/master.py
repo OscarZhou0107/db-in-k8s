@@ -37,8 +37,9 @@ class SchedulerAdmin:
         print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
     
     def perf(self):
+        print('Info:', 'Send Perf request..')
         self._tn.write(b'perf\n')
-        print('Info:', self._tn.read_until(b'\n'))
+        print('Info:', '..', self._tn.read_until(b'\n'))
         
 
 class ControlPrompt(cmd.Cmd):
@@ -70,7 +71,6 @@ class ControlPrompt(cmd.Cmd):
         return self._scheduler_admin
 
     def do_perf(self, arg=None):
-        print('Info:', 'Perf..')
         try:
             self._scheduler_admin.perf()
         except:
@@ -165,7 +165,6 @@ class ControlPrompt(cmd.Cmd):
 
     def do_exit(self, arg=None):
         try:
-            print('Info:', 'Perf..')
             self._scheduler_admin.perf()
         except:
             pass
@@ -204,7 +203,6 @@ class SignalHandler():
 
     def exit_gracefully(self, signum, frame):
         try:
-            print('Info:', 'Perf..')
             self._scheduler_admin.perf()
         except:
             pass
