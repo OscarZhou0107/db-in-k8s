@@ -204,7 +204,7 @@ def main(args):
     # Launch jobs
     command = args.cmd.split()
     print('Info:')
-    print('Info:', 'Launching', len(args.sweeps), "processes '" + ' '.join(command) + "'")
+    print('Info:', 'Launching', len(args.sweeps), 'processes "' + ' '.join(command) + '"')
     def launch_job(idx):
         print('Info:', '    Launching process', idx)
         if args.stdout: # stdout
