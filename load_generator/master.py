@@ -17,7 +17,7 @@ import warnings
 
 import slave
 
-#warnings.filterwarnings(action='ignore',module='.*paramiko.*')
+warnings.filterwarnings(action='ignore',module='.*paramiko.*')
 
 try:
     import paramiko
