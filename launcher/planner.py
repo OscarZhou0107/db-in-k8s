@@ -78,7 +78,7 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     print('Info:', 'RUN:', master_cmd)
     master_parser = argparse.ArgumentParser(description='master.py')
     master.init(master_parser)
-    master.main(master_parser.parse_args(master_cmds))
+    master.main(master_parser.parse_args(master_cmd))
 
     print('Info:', 'Done', 'client_num:', client_num, 'client_mix:', client_mix, 'dbproxy_num:', dbproxy_num)
     print('Info:')
