@@ -211,14 +211,14 @@ def main(args):
             output = sys.stdout
         else:
             if args.output: # file
-                if args.sweep[idx] is None:
+                if args.sweeps[idx] is None:
                     sweep_str = ''
                 else:
-                    sweep_str = str(args.sweep[idx])
+                    sweep_str = str(args.sweeps[idx])
                 output = open(os.path.join(args.output, sweep_str + '.log'), mode='w')
             else: # devnull
                 output = subprocess.DEVNULL
-        if args.sweep[idx] is None:
+        if args.sweeps[idx] is None:
             cmds = command
         else:
             cmds = command + [args.sweeps[idx]]
