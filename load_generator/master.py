@@ -356,7 +356,6 @@ class Conf:
         self.set_sequencer_addr(new_ip + separator + port)
 
     def print_addrs(self):
-        print('Info:', 'Addrs Settings:')
         scheduler = self.get_scheduler_addr()
         print('Info:', 'Scheduler:', scheduler)
         scheduler_admin = self.get_scheduler_admin_addr()
@@ -411,6 +410,36 @@ def generate_cargo_run(which, conf_path, verbose=None, release=True):
     return commands
 
 
+def construct_launcher(args, machine_idx, verbose=None, release=True):
+    # machines[0] == scheduler
+    # machines[1] == sequencer
+    # machines[2..] == dbproxies
+    if machine_idx == 0:
+        which = 'scheduler'
+    elif machine_idx == 1:
+        which = 'sequencer'
+    else:
+        which = 'dbproxy ' + str(machine_idx - 2)
+
+    cargo_commands = generate_cargo_run(which='--' + which, conf_path=args.new_conf, verbose=verbose, release=release)
+    cargo_command = '"' + ' '.join(cargo_commands) + '"'
+
+    slave_path = os.path.join(args.remote_dv, 'load_generator/slave.py')
+    commands = [args.python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', args.remote_dv]
+    if args.stdout:
+        commands.append('--stdout')
+    if args.output is not None:
+        commands.extend(['--output', args.output])
+
+    def launcher(idx, machine, machine_name):
+        command = ' '.join(commands)
+        print('Info:', 'Launching:')
+        print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
+        print('Info:', '    ' + command)
+        return command
+    return launcher
+
+
 # python3 load_generator/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx --duration=50
 # TODO:
 # 1. Hook ssh_launcher, need it to be hard-code free
@@ -436,66 +465,36 @@ def main(args):
     # machines[1] == sequencer
     # machines[2..] == dbproxies
     machines = [scheduler, sequencer] + dbproxies
-    
-    def construct_launcher(args, machine_idx, verbose=None, release=True):
-        # machines[0] == scheduler
-        # machines[1] == sequencer
-        # machines[2..] == dbproxies
-        if machine_idx == 0:
-            which = 'scheduler'
-        elif machine_idx == 1:
-            which = 'sequencer'
-        else:
-            which = 'dbproxy ' + str(machine_idx - 2)
-
-        cargo_commands = generate_cargo_run(which='--' + which, conf_path=args.new_conf, verbose=verbose, release=release)
-        cargo_command = '"' + ' '.join(cargo_commands) + '"'
-
-        slave_path = os.path.join(args.remote_dv, 'load_generator/slave.py')
-        commands = [args.python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', args.remote_dv]
-        if args.stdout:
-            commands.append('--stdout')
-        if args.output is not None:
-            commands.extend(['--output', args.output])
-
-        def launcher(idx, machine, machine_name):
-            command = ' '.join(commands)
-            print('Info:', 'Launching:')
-            print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
-            print('Info:', '    ' + command)
-            return command
-        return launcher
 
     # Launch ssh
+    print('Info:')
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
+    print('Info:')
     # Cannot launch scheduler first!
     for machine_idx in reversed(range(ssh_manager.get_num_machines())):
         ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
         time.sleep(args.delay)
 
     # Launch scheduler admin
+    print('Info:')
     scheduler_admin = SchedulerAdmin(conf.get_scheduler_admin_addr())
 
     # Register the signal handler
     sh = SignalHandler(ssh_manager, scheduler_admin)
 
-    # Get the timer working
-    print('Info:')
+    # Timer and auto terminator
+    print('Info:') 
     launch_time = datetime.datetime.now()
-    print_time(launch_time)
-
-    # Auto terminator
-    print('Info:')
     termination_time = None
     if args.duration is not None:
         print('Info:', 'Will terminate in', '{:.2f}'.format(args.duration), 'seconds')
         termination_time = datetime.datetime.now() + datetime.timedelta(seconds=args.duration)
-        print_time(launch_time, termination_time)
         multiprocessing.Process(target=killer_process, args=(args.duration,), daemon=True).start()
+    print_time(launch_time, termination_time)
 
     # Command loop
     print('Info:')
-    ControlPrompt((launch_time, termination_time), ssh_manager, conf, scheduler_admin).cmdloop('DO NOT CTRL-C!')
+    ControlPrompt((launch_time, termination_time), ssh_manager, conf, scheduler_admin).cmdloop('DO NOT CTRL-C! Check <help>')
     sh.exit_gracefully(None, None)
 
 
