@@ -83,6 +83,7 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     print('Info:')
 
 
+# python3 launcher/planner.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username= --password= --duration=60 --client_nums 100 200 --client_mixes 2 3 --dbproxy_nums 2 3
 def main(args):
     print('Info:')
     print('Info:', 'client_nums:', args.client_nums)
