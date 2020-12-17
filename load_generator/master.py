@@ -625,10 +625,15 @@ except:
     
 #     return parser.parse_args()
 
-class Conf(dict):
+class Conf:
     def __init__(self, conf_path):
         self._conf_path = conf_path
         self._conf = toml.load(conf_path)
+
+    def write(self, new_conf_path):
+        print('Warning:', 'Write updated conf to', new_conf_path)
+        with open(new_conf_path, 'w') as f:
+            toml.dump(self._conf, f)
 
     def get_all_dbproxy_addrs(self):
         return list(map(lambda c: c['addr'], self._conf['dbproxy']))
@@ -685,6 +690,7 @@ def prepare_conf(conf, args):
     conf.print_addrs()
 
     if args.follow_conf:
+        args.new_conf = args.conf
         print('Info:', '--follow_conf. Will use the existing setting!')
         return
 
@@ -699,12 +705,14 @@ def prepare_conf(conf, args):
     print('Info:', 'New Setting:')
     conf.print_addrs()
 
+    # Write to file
+    splitted = os.path.splitext(args.conf)
+    args.new_conf = splitted[0] + '._ttmmpp_' + splitted[1]
+    conf.write(args.new_conf)
+
 
 def main(args):
     print('Info:')
-
-    cur_ip = socket.gethostbyname(socket.gethostname())
-    print('Info:', 'Current IP:', cur_ip)
 
     conf = Conf(args.conf)
     prepare_conf(conf, args)
@@ -718,6 +726,7 @@ def init(parser):
     '''
     parser.add_argument('--conf', type=str, required=True, help='Location of the conf in toml format')
     parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
+
 
     parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Be aware of concurrent file writing!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
