@@ -97,7 +97,7 @@ class ControlPrompt(cmd.Cmd):
                 pass
             
             # Print stderr before forwarding to stdin
-            e.channel.settimeout(1)
+            e.channel.settimeout(0.5)
             try:
                 for line in e:
                     print('        >', line.strip('\n'))
@@ -118,7 +118,7 @@ class ControlPrompt(cmd.Cmd):
             pass
 
         # Print stderr before forwarding to stdin
-        e.channel.settimeout(1.5)
+        e.channel.settimeout(0.5)
         try:
             for line in e:
                 print('        >', line.strip('\n'))
