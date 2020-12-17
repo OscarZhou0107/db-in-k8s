@@ -420,7 +420,7 @@ def main(args):
         time.sleep(args.delay)
 
     # Register the signal handler
-    #sh = SignalHandler(ssh_manager)
+    sh = SignalHandler(ssh_manager)
 
     # Get the timer working
     print('Info:')
@@ -439,7 +439,7 @@ def main(args):
     # Command loop
     print('Info:')
     ControlPrompt((launch_time, termination_time), ssh_manager).cmdloop('DO NOT CTRL-C!')
-    #sh.exit_gracefully(None, None)
+    sh.exit_gracefully(None, None)
 
 
 def killer_process(wait_time):
