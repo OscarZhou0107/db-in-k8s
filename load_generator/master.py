@@ -348,7 +348,7 @@ def generate_cargo_run(which, conf_path, verbose=None, release=True):
     return commands
 
 
-def construct_launcher(remote_dv, machine_idx, conf_path, verbose=None, release=True):
+def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, release=True):
     # machines[0] == scheduler
     # machines[1] == sequencer
     # machines[2..] == dbproxies
@@ -362,7 +362,7 @@ def construct_launcher(remote_dv, machine_idx, conf_path, verbose=None, release=
     cargo_commands = generate_cargo_run(which='--' + which, conf_path=conf_path, verbose=verbose, release=release)
     cargo_command = '"' + ' '.join(cargo_commands) + '"'
 
-    commands = ['python', 'load_generator/slave.py','--name', which, '--cmd', cargo_command, '--output', './logging', '--wd', remote_dv]
+    commands = [python, 'load_generator/slave.py','--name', which, '--cmd', cargo_command, '--output', './logging', '--wd', remote_dv]
     def launcher(idx, machine, machine_name):
         command = ' '.join(commands)
         print('Info:', 'Launching:')
@@ -398,7 +398,7 @@ def main(args):
     # Launch ssh
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     for machine_idx in range(ssh_manager.get_num_machines()):
-        ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(remote_dv=args.remote_dv, machine_idx=machine_idx, conf_path=args.new_conf, verbose=None, release=True))
+        ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(python=args.python, remote_dv=args.remote_dv, machine_idx=machine_idx, conf_path=args.new_conf, verbose=None, release=True))
         time.sleep(args.delay)
 
     # Register the signal handler
@@ -439,10 +439,11 @@ def init(parser):
     '''
     # Required args
     parser.add_argument('--conf', type=str, required=True, help='Location of the conf in toml format')
-    parser.add_argument('--remote_dv', type=str, required=True, help='Remote path for dv-in-rust directory')
+    parser.add_argument('--remote_dv', type=str, required=True, help='Remote full absolute path for dv-in-rust directory')
     parser.add_argument('--username', type=str, required=True, help='Username for SSH')
     parser.add_argument('--password', type=str, required=True, help='Password for SSH')
 
+    parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
     parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
     parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
     parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
