@@ -1293,7 +1293,6 @@ if __name__ == "__main__":
     parser.add_argument("--mix", type=int, default=0)
     parser.add_argument("--debug", type=int, default=0)
     parser.add_argument("--mock_db", type=int, default=0)
-    parser.add_argument("--ssh", type=int, default=0)
     parser.add_argument("--ip", type=str, default='128.100.13.240')
 
     args = parser.parse_args()
