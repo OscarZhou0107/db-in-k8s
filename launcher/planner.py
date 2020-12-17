@@ -32,6 +32,9 @@ def check_alive(ip):
 
 
 def single_run(args, client_num, client_mix, dbproxy_num):
+    print('Info:')
+    print('Info:', '=============================================================================================')
+    print('Info:')
     print('Info:', 'Launching', 'client_num:', client_num, 'client_mix:', client_mix, 'dbproxy_num:', dbproxy_num)
 
     # Read in the conf
@@ -81,6 +84,8 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     master.main(master_parser.parse_args(master_cmds))
 
     print('Info:', 'Done', 'client_num:', client_num, 'client_mix:', client_mix, 'dbproxy_num:', dbproxy_num)
+    print('Info:')
+    print('Info:', '=============================================================================================')
     print('Info:')
 
 
