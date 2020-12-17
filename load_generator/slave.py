@@ -237,7 +237,7 @@ def init(parser):
     parser.add_argument('--cmd', type=str, help='Command to launch (common part)')
     parser.add_argument('--sweeps', type=str, nargs='*', help='Argument (single word) to command to launch (diverging part)')
 
-    parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Be aware of concurrent file writing!')
+    parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --wd!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
 
 

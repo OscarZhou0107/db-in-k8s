@@ -390,7 +390,7 @@ def main(args):
     # machines[2..] == dbproxies
     machines = [scheduler, sequencer] + dbproxies
     
-    def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, release=True):
+    def construct_launcher(args, machine_idx, verbose=None, release=True):
         # machines[0] == scheduler
         # machines[1] == sequencer
         # machines[2..] == dbproxies
@@ -401,11 +401,16 @@ def main(args):
         else:
             which = 'dbproxy ' + str(machine_idx - 2)
 
-        cargo_commands = generate_cargo_run(which='--' + which, conf_path=conf_path, verbose=verbose, release=release)
+        cargo_commands = generate_cargo_run(which='--' + which, conf_path=args.new_conf, verbose=verbose, release=release)
         cargo_command = '"' + ' '.join(cargo_commands) + '"'
 
-        slave_path = os.path.join(remote_dv, 'load_generator/slave.py')
-        commands = [python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', remote_dv, '--stdout'] #'--output', './logging']
+        slave_path = os.path.join(args.remote_dv, 'load_generator/slave.py')
+        commands = [args.python, slave_path,'--name', '"' + which + '"', '--cmd', cargo_command, '--wd', args.remote_dv]
+        if args.stdout:
+            commands.append('--stdout')
+        if args.output is not None:
+            commands.extend(['--output', args.output])
+
         def launcher(idx, machine, machine_name):
             command = ' '.join(commands)
             print('Info:', 'Launching:')
@@ -418,7 +423,7 @@ def main(args):
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     # Cannot launch scheduler first!
     for machine_idx in reversed(range(ssh_manager.get_num_machines())):
-        ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(python=args.python, remote_dv=args.remote_dv, machine_idx=machine_idx, conf_path=args.new_conf, verbose=None, release=True))
+        ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
         time.sleep(args.delay)
 
     # Register the signal handler
@@ -468,7 +473,7 @@ def init(parser):
     parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
     parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
 
-    parser.add_argument('--output', type=str, help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Be aware of concurrent file writing!')
+    parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
 
 
