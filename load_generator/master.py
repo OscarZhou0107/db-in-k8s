@@ -38,21 +38,21 @@ class ControlPrompt(cmd.Cmd):
         '''
         assert isinstance(ssh_manager, SSHManager)
         super(ControlPrompt, self).__init__()
-        self.__time = time
-        self.__ssh_manager = ssh_manager
+        self._time = time
+        self._ssh_manager = ssh_manager
     
     def get_time(self):
-        return self.__time
+        return self._time
     
     def get_ssh_manager(self):
-        return self.__ssh_manager
+        return self._ssh_manager
 
     def do_list(self, arg=None):
-        self.__ssh_manager.refresh_ioe()
-        num_machines = self.__ssh_manager.get_num_machines()
+        self._ssh_manager.refresh_ioe()
+        num_machines = self._ssh_manager.get_num_machines()
         print('Info:', 'List of', num_machines, 'connected machines:')
         for idx in range(num_machines):
-            print('Info:', '    ' + self.__ssh_manager.get_machine_name_str(idx), ':', 'Running' if self.__ssh_manager.get_ioe(idx) is not None else 'Idling')
+            print('Info:', '    ' + self._ssh_manager.get_machine_name_str(idx), ':', 'Running' if self._ssh_manager.get_ioe(idx) is not None else 'Idling')
         print('')
 
     def do_talk(self, arg):
@@ -75,10 +75,10 @@ class ControlPrompt(cmd.Cmd):
             return
 
         if forward_arg is not None:
-            print('Info:', 'Forwarding', '"' + str(forward_arg) + '"', 'to', self.__ssh_manager.get_machine_name_str(idx))
+            print('Info:', 'Forwarding', '"' + str(forward_arg) + '"', 'to', self._ssh_manager.get_machine_name_str(idx))
 
         # Get stdin, stdout, stderr
-        ioe = self.__ssh_manager.get_ioe(idx)
+        ioe = self._ssh_manager.get_ioe(idx)
         if ioe is None:
             print('Warning:', 'Machine', idx, 'is not running any jobs')
             return
@@ -92,6 +92,14 @@ class ControlPrompt(cmd.Cmd):
             o.channel.settimeout(1)
             try:
                 for line in o:
+                    print('        >', line.strip('\n'))
+            except:
+                pass
+            
+            # Print stderr before forwarding to stdin
+            e.channel.settimeout(1)
+            try:
+                for line in e:
                     print('        >', line.strip('\n'))
             except:
                 pass
@@ -114,19 +122,19 @@ class ControlPrompt(cmd.Cmd):
         o.channel.settimeout(None)
     
     def do_time(self, arg=None):
-        print_time(*self.__time, True)
+        print_time(*self._time, True)
         print('Info:')
 
     def do_exit(self, arg=None):
-        print('Info:', 'Closing connections to', self.__ssh_manager.get_num_machines(), 'machines')
-        self.__ssh_manager.close_all()
+        print('Info:', 'Closing connections to', self._ssh_manager.get_num_machines(), 'machines')
+        self._ssh_manager.close_all()
         print('Info: Done. Exiting')
         print('Info:')
 
         return True
 
     def check_machine_existance(self, idx):
-        if idx >= self.__ssh_manager.get_num_machines():
+        if idx >= self._ssh_manager.get_num_machines():
             print('Error:', idx, 'is not a valid Machine ID')
             return False
         return True
