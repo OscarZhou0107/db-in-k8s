@@ -545,7 +545,7 @@ def init(parser):
     parser.add_argument('--username', type=str, required=True, help='Username for SSH')
     parser.add_argument('--password', type=str, required=True, help='Password for SSH')
     parser.add_argument('--client_num', type=int, required=True, help='Total number of clients to launch')
-    parser.add_argument('--client_mix', type=int, reqiured=True, help='The workload mode for the client')
+    parser.add_argument('--client_mix', type=int, required=True, help='The workload mode for the client')
 
     # Optional args, important ones
     parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
