@@ -7,6 +7,7 @@ import os
 import socket
 import subprocess
 import sys
+import signal
 
 try:
     import psutil
@@ -59,10 +60,10 @@ class ControlPrompt(cmd.Cmd):
         '''
         assert isinstance(process_manager, ProcessManager)
         super(ControlPrompt, self).__init__()
-        self.__process_manager = process_manager
+        self._process_manager = process_manager
 
     def do_list(self, arg=None):
-        cur, prev = self.__process_manager.list_process()
+        cur, prev = self._process_manager.list_process()
         diff = sorted(set(prev).difference(cur))
         diff_len = len(diff)
         if diff_len != 0:
@@ -85,10 +86,10 @@ class ControlPrompt(cmd.Cmd):
 
     def do_exit(self, arg=None):
         print('Warning:', 'Stopping running processes.. ALL')
-        cur, _ = self.__process_manager.list_process()
+        cur, _ = self._process_manager.list_process()
 
         for idx in cur:
-            self.__process_manager.stop_process(idx)
+            self._process_manager.stop_process(idx)
             print('Warning:', '    Stopped process', idx)
         
         return self.do_list()
@@ -97,13 +98,13 @@ class ControlPrompt(cmd.Cmd):
         request_to_stop = sorted(map(int, arg.split()))
         print('Info:', 'To Stop:', *request_to_stop)
 
-        cur, _ = self.__process_manager.list_process()
+        cur, _ = self._process_manager.list_process()
 
         to_stop = sorted(set(cur).intersection(request_to_stop))
         print('Warning:', 'Stopping running processes..', *to_stop)
 
         for idx in to_stop:
-            self.__process_manager.stop_process(idx)
+            self._process_manager.stop_process(idx)
             print('Warning:', '    Stopped process', idx)
 
         return self.do_list()
@@ -117,35 +118,36 @@ class ProcessManager:
         '''
         proc = process_creater(idx)
         '''
-        self.__process_creater = process_creater
-        self.__processes = list()
+        self._process_creater = process_creater
+        self._processes = list()
 
     def get_processes(self):
-        return self.__processes
+        return self._processes
 
     def launch_process(self):
-        idx = len(self.__processes)
-        proc = self.__process_creater(idx)
+        idx = len(self._processes)
+        proc = self._process_creater(idx)
         assert isinstance(proc, subprocess.Popen)
-        self.__processes.append(proc)
-        assert len(self.__processes) == (idx+1)
+        self._processes.append(proc)
+        assert len(self._processes) == (idx+1)
         return idx
 
     def stop_process(self, idx):
-        assert idx < len(self.__processes)
-        assert self.__processes[idx] is not None
-        self.__processes[idx].terminate()
-        self.__processes[idx] = None
+        assert idx < len(self._processes)
+        assert self._processes[idx] is not None
+        os.kill(self._processes[idx].pid, signal.SIGINT)
+        #self._processes[idx].terminate()
+        self._processes[idx] = None
 
     def wait_process(self, idx):
-        assert idx < len(self.__processes)
-        assert self.__processes[idx] is not None
-        self.__processes[idx].wait()
-        self.__processes[idx] = None
+        assert idx < len(self._processes)
+        assert self._processes[idx] is not None
+        self._processes[idx].wait()
+        self._processes[idx] = None
 
     def wait_all(self):
-        for idx in range(len(self.__processes)):
-            if self.__processes[idx] is not None:
+        for idx in range(len(self._processes)):
+            if self._processes[idx] is not None:
                 self.wait_process(idx)
 
     def list_process(self):
@@ -153,7 +155,7 @@ class ProcessManager:
         Update and return the list of processes still running
         (latest_running_process_idxs, previously_running_process_idxs)
         '''
-        prev_idxs = sorted(map(lambda idx_proc: idx_proc[0], filter(lambda idx_proc: idx_proc[1] is not None, enumerate(self.__processes))))
+        prev_idxs = sorted(map(lambda idx_proc: idx_proc[0], filter(lambda idx_proc: idx_proc[1] is not None, enumerate(self._processes))))
         
         def check_alive(proc):
             if proc is not None:
@@ -161,15 +163,16 @@ class ProcessManager:
                     return proc
             else:
                 return None
-        self.__processes = list(map(check_alive, self.__processes))
+        self._processes = list(map(check_alive, self._processes))
         
-        cur_idxs = sorted(map(lambda idx_proc: idx_proc[0], filter(lambda idx_proc: idx_proc[1] is not None, enumerate(self.__processes))))
+        cur_idxs = sorted(map(lambda idx_proc: idx_proc[0], filter(lambda idx_proc: idx_proc[1] is not None, enumerate(self._processes))))
 
         return (cur_idxs, prev_idxs)
 
     def __del__(self):
-        for proc in filter(None, self.__processes):
-            proc.terminate()
+        for proc in filter(None, self._processes):
+            os.kill(proc.pid, signal.SIGINT)
+            #proc.terminate()
 
 
 # python load_generator/slave.py --name=sequencer --cmd "cargo run -- --plain --sequencer" --output=./logging  --wd=./

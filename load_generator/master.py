@@ -164,7 +164,7 @@ def print_time(launch_time, termination_time=None, show_elapsed=False):
 class SignalHandler():
     def __init__(self, ssh_manager):
         self._ssh_manager = ssh_manager
-        signal.signal(signal.SIGTERM, self.exit_gracefully)
+        signal.signal(signal.SIGINT, self.exit_gracefully)
 
     def exit_gracefully(self, signum, frame):
         self._ssh_manager.__del__()
@@ -453,7 +453,7 @@ def killer_process(wait_time):
     time.sleep(wait_time)
     print('')
     print('Info:', 'Terminate due to --duration!')
-    os.kill(os.getppid(), signal.SIGTERM)
+    os.kill(os.getppid(), signal.SIGINT)
 
 
 def init(parser):
