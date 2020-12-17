@@ -225,12 +225,13 @@ class SSHManager:
 
     def launch_task_on_machine(self, idx, task_launcher):
         '''
-        (stdin, stdout, stderr) = task_launcher(idx, machine, machine_name)
+        command = task_launcher(idx, machine, machine_name)
         '''
         assert idx < self.get_num_machines()
         assert task_launcher is not None
-        #self._ioe[idx] = task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))
-        self._ioe[idx] = self.get_machine(idx).exec_command('source ~/.bashrc; cd /groups/qlhgrp/liuli15/dv-in-rust', get_pty=True)
+        self._ioe[idx] = self.get_machine(idx).exec_command('', get_pty=True)
+        self._ioe[idx][0].write("{}\r\n".format(task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))))
+        self._ioe[idx][0].flush()
 
     def close_machine(self, idx):
         assert idx < self.get_num_machines()
@@ -410,7 +411,7 @@ def main(args):
             print('Info:', 'Launching:')
             print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
             print('Info:', '    ' + command)
-            return machine.exec_command(command, get_pty=True)
+            return command
         return launcher
 
     # Launch ssh
