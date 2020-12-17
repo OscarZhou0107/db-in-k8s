@@ -476,7 +476,8 @@ def main(args):
 
 
     # Double check from stupid caller
-    answer = input('!!!!:', 'Is the above setting correct? Have you run cargo build --release?', '[y/n]' , '!!!!').lower()
+    prompt = ' '.join(['!!!!:', 'Is the above setting correct? Have you run cargo build --release?', '[y/n]' , '!!!!'])
+    answer = input(prompt).lower()
     if answer != 'y':
         exit()
 
