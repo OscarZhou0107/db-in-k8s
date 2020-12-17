@@ -366,7 +366,10 @@ def generate_cargo_run(which, conf_path, verbose=None, release=True):
     return commands
 
 
-#  python3 load_generator/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx
+# python3 load_generator/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx
+# TODO:
+# 1. Add admin perf
+# 2. Hook ssh_launcher, need it to be hard-code free
 def main(args):
     print('Info:')
 
