@@ -749,6 +749,8 @@ def main(args):
     # machines[2] == sequencer
     # machines[3..] == dbproxies
     machines = [scheduler, scheduler_admin, sequencer] + dbproxies
+    print('Info:')
+    print('Info:', 'SSH to:', machines)
 
     ssh_manager = SSHManager(machines=machines)
 
