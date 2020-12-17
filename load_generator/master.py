@@ -230,12 +230,18 @@ class SSHManager:
         assert idx < self.get_num_machines()
         assert task_launcher is not None
         self._ioe[idx] = self.get_machine(idx).exec_command('', get_pty=True)
-        self._ioe[idx][0].write("{}\r\n".format(task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))))
+        self._ioe[idx][0].write('{}\r\n'.format(task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))))
         self._ioe[idx][0].flush()
 
     def close_machine(self, idx):
         assert idx < self.get_num_machines()
-        self._machines[idx].close()
+        ioe = self.get_ioe(idx)
+        if ioe is None:
+            self._machines[idx].close()
+        else:
+            # SIGINT
+            ioe[0].write('\x03')
+            ioe[0].flush()
         print('Info:', '    Closed', self.get_machine_name(idx))
 
     def close_all(self):
