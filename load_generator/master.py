@@ -12,6 +12,7 @@ import random
 import signal
 import socket
 import subprocess
+import telnetlib
 import time
 import warnings
 
@@ -32,11 +33,12 @@ except:
 
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
-        self._socket = socket.connect(scheduler_admin_addr)
+        self._tn = telnetlib.Telnet(scheduler_admin_addr)
         print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
     
     def perf(self):
-        self._socket.send(b'perf\n')
+        self._tn.write(b'perf\n')
+        print('Info:', self._tn.read_until(b'\n'))
         
 
 class ControlPrompt(cmd.Cmd):
@@ -165,7 +167,6 @@ class ControlPrompt(cmd.Cmd):
         try:
             print('Info:', 'Perf..')
             self._scheduler_admin.perf()
-            time.sleep(10)
         except:
             pass
         print('Info:', 'Closing connections to', self._ssh_manager.get_num_machines(), 'machines')
@@ -205,7 +206,6 @@ class SignalHandler():
         try:
             print('Info:', 'Perf..')
             self._scheduler_admin.perf()
-            time.sleep(10)
         except:
             pass
         self._ssh_manager.__del__()
