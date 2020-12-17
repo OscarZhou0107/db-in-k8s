@@ -33,7 +33,7 @@ except:
 
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
-        self._tn = telnetlib.Telnet(scheduler_admin_addr)
+        self._tn = telnetlib.Telnet((get_ip(scheduler_admin_addr), get_port(scheduler_admin_addr)))
         print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
     
     def perf(self):
@@ -296,7 +296,7 @@ def get_ip(addr):
     return addr.rpartition(':')[0]
 
 def get_port(addr):
-    return addr.rpartition(':')[1]
+    return addr.rpartition(':')[2]
 
 
 class Conf:
