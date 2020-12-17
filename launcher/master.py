@@ -588,13 +588,13 @@ def init(parser):
     parser.add_argument('--client_mix', type=int, required=True, help='The workload mode for the client')
 
     # Optional args, important ones
-    parser.add_argument('--duration', type=int, default=None, help='Time in seconds to auto terminate this script')
+    parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
     parser.add_argument('--perf_logging', type=str, default='./perf', help='Dir to dump perf logging. Either absolute path, or relative path to --remote_dv!')
 
     # Optional args, not important
     parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
     parser.add_argument('--follow_conf', action='store_true', help='Follow the conf exactly')
-    parser.add_argument('--delay', type=int, default=1, help='Delay interval between jobs launching on each machine')
+    parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
     parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--stdout', action='store_true', help='Forward the stdout and stderr of each subprocesses to stdout. Default is devnull.')
     parser.add_argument('--bypass_stupid_check', action='store_true', help='Bypass the stupidness check')
