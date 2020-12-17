@@ -128,7 +128,7 @@ def init(parser):
     parser.add_argument('--dbproxy_nums', type=int, nargs='+', required=True, help='Number of dbproxies to launch to sweep')
 
     # Optional args, important ones
-    parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
+    parser.add_argument('--duration', type=int, default=None, help='Time in seconds to auto terminate this script')
     parser.add_argument('--perf_logging', type=str, default='./perf', help='Dir to dump perf logging. Either absolute path, or relative path to --remote_dv!')
 
     # Optional args, not important
