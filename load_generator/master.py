@@ -82,8 +82,9 @@ class ControlPrompt(cmd.Cmd):
         print('Info:', 'List of', num_machines, 'connected machines:')
         for idx in range(num_machines):
             print('Info:', '    ' + self._ssh_manager.get_machine_name_str(idx), ':', 'Running' if self._ssh_manager.get_ioe(idx) is not None else 'Idling')
-        print('')
+        print('Info:')
         self.get_conf().print_addrs()
+        print('Info:')
 
     def do_talk(self, arg):
         '''
