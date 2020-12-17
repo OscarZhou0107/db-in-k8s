@@ -401,9 +401,9 @@ def main(args):
             print('Info:', 'Launching:')
             print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
             print('Info:', '    ' + command)
-            #return machine.exec_command(command, get_pty=True)
-            return machine.exec_command('bash;top', get_pty=True)
-        return launcher
+            return machine.exec_command(command, get_pty=True)
+            #return machine.exec_command('bash;top', get_pty=True)
+        return None
 
     # Launch ssh
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
