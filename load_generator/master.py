@@ -625,6 +625,9 @@ except:
     
 #     return parser.parse_args()
 
+def get_ip(addr):
+    return addr.rpartition(':')[0]
+
 class Conf:
     def __init__(self, conf_path):
         self._conf_path = conf_path
@@ -638,18 +641,27 @@ class Conf:
     def get_all_dbproxy_addrs(self):
         return list(map(lambda c: c['addr'], self._conf['dbproxy']))
 
-    def get_scheduler_addr_port(self):
+    def get_all_dbproxy_ips(self):
+        return list(map(lambda addr: get_ip(addr), self.get_all_dbproxy_addrs()))
+
+    def get_scheduler_addr(self):
         return self._conf['scheduler']['addr']
 
-    def set_scheduler_addr_port(self, addr):
+    def get_scheduler_ip(self):
+        return get_ip(self.get_scheduler_addr())
+
+    def set_scheduler_addr(self, addr):
         self._conf['scheduler']['addr'] = addr
     
     def update_scheduler_addr(self, new_ip):
-        _prev_ip, separator, port = self.get_scheduler_addr_port().rpartition(':')
-        self.set_scheduler_addr_port(new_ip + separator + port)
+        _prev_ip, separator, port = self.get_scheduler_addr().rpartition(':')
+        self.set_scheduler_addr(new_ip + separator + port)
 
     def get_scheduler_admin_addr(self):
         return self._conf['scheduler']['admin_addr']
+
+    def get_scheduler_admin_ip(self):
+        return get_ip(self.get_scheduler_admin_addr())
 
     def set_scheduler_admin_addr(self, addr):
         self._conf['scheduler']['admin_addr'] = addr
@@ -661,6 +673,9 @@ class Conf:
     def get_sequencer_addr(self):
         return self._conf['sequencer']['addr']
 
+    def get_sequencer_ip(self):
+        return get_ip(self.get_sequencer_addr())
+
     def set_sequencer_addr(self, addr):
         self._conf['sequencer']['addr'] = addr
 
@@ -670,7 +685,7 @@ class Conf:
 
     def print_addrs(self):
         print('Info:', 'Addrs Settings:')
-        scheduler = self.get_scheduler_addr_port()
+        scheduler = self.get_scheduler_addr()
         print('Info:', 'Scheduler:', scheduler)
         scheduler_admin = self.get_scheduler_admin_addr()
         print('Info:', 'Scheduler Admin:', scheduler_admin)
@@ -691,7 +706,7 @@ def prepare_conf(conf, args):
 
     if args.follow_conf:
         args.new_conf = args.conf
-        print('Info:', '--follow_conf. Will use the existing setting!')
+        print('Info:', '--follow_conf. Will use the existing setting at', args.new_conf)
         return
 
     # Set scheduler, scheduler_admin, and sequencer
@@ -714,8 +729,22 @@ def prepare_conf(conf, args):
 def main(args):
     print('Info:')
 
+    # Prepare conf
     conf = Conf(args.conf)
     prepare_conf(conf, args)
+
+    # Prepare ssh agents, will create a new ssh agent for every job
+    print('Info:')
+    print('Info:', 'Preparing SSH agents')
+    scheduler = conf.get_scheduler_ip()
+    print('Info:', 'Scheduler:', scheduler)
+    scheduler_admin = conf.get_scheduler_admin_ip()
+    print('Info:', 'Scheduler Admin:', scheduler_admin)
+    sequencer = conf.get_sequencer_ip()
+    print('Info:', 'Sequencer:', sequencer)
+    dbproxies = conf.get_all_dbproxy_ips()
+    print('Info:', 'Dbproxies:', dbproxies)
+
 
 
 def init(parser):
