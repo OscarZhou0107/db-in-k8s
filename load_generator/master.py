@@ -362,7 +362,7 @@ def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, 
     cargo_commands = generate_cargo_run(which='--' + which, conf_path=conf_path, verbose=verbose, release=release)
     cargo_command = '"' + ' '.join(cargo_commands) + '"'
 
-    commands = [python, 'load_generator/slave.py','--name', which, '--cmd', cargo_command, '--output', './logging', '--wd', remote_dv]
+    commands = [python, 'load_generator/slave.py','--name', which, '--cmd', cargo_command, '--wd', remote_dv, '--stdout'] #'--output', './logging']
     def launcher(idx, machine, machine_name):
         command = ' '.join(commands)
         print('Info:', 'Launching:')
@@ -372,6 +372,7 @@ def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, 
     return launcher
 
 
+#  python3 load_generator/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx
 def main(args):
     print('Info:')
 
