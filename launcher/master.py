@@ -346,7 +346,7 @@ class Conf:
             new_ip = prev_ip
         if new_port is None:
             new_port = prev_port
-        self.set_scheduler_addr(new_ip + separator + new_port)
+        self.set_scheduler_addr(str(new_ip) + separator + str(new_port))
 
     def get_scheduler_admin_addr(self):
         return self._conf['scheduler']['admin_addr']
@@ -366,7 +366,7 @@ class Conf:
             new_ip = prev_ip
         if new_port is None:
             new_port = prev_port
-        self.set_scheduler_admin_addr(new_ip + separator + new_port)
+        self.set_scheduler_admin_addr(str(new_ip) + separator + str(new_port))
 
     def get_sequencer_addr(self):
         return self._conf['sequencer']['addr']
@@ -383,7 +383,7 @@ class Conf:
             new_ip = prev_ip
         if new_port is None:
             new_port = prev_port
-        self.set_sequencer_addr(new_ip + separator + new_port)
+        self.set_sequencer_addr(str(new_ip) + separator + str(new_port))
 
     def print_summary(self):
         print('Info:', 'Scheduler:', self.get_scheduler_addr())
