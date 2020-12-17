@@ -183,7 +183,7 @@ def main(args):
     print('Info:', 'cd', args.wd)
 
     if args.sweeps is None or len(args.sweeps) == 0:
-        args.sweeps = ['']
+        args.sweeps = [None]
     
     if args.stdout: # stdout
         out_place_str = 'redirected into stdout'
@@ -211,10 +211,18 @@ def main(args):
             output = sys.stdout
         else:
             if args.output: # file
-                output = open(os.path.join(args.output, str(args.sweeps[idx]) + '.log'), mode='w')
+                if args.sweep[idx] is None:
+                    sweep_str = ''
+                else:
+                    sweep_str = str(args.sweep[idx])
+                output = open(os.path.join(args.output, sweep_str + '.log'), mode='w')
             else: # devnull
                 output = subprocess.DEVNULL
-        return subprocess.Popen(command + [args.sweeps[idx]], stdout=output, stderr=output)
+        if args.sweep[idx] is None:
+            cmds = command
+        else:
+            cmds = command + [args.sweeps[idx]]
+        return subprocess.Popen(cmds, stdout=output, stderr=output)
 
     pm = ProcessManager(launch_job)
     for _ in range(len(args.sweeps)):
