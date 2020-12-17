@@ -32,7 +32,7 @@ except:
 
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
-        self._socket = socket.create_connection((get_ip(scheduler_admin_addr), get_port(scheduler_admin_addr)))
+        self._socket = socket.connect(scheduler_admin_addr)
         print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
     
     def perf(self):
