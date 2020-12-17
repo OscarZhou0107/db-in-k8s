@@ -448,8 +448,6 @@ def construct_cargo_launcher(args, machine_idx, verbose=None, release=True):
 
 
 # python3 launcher/master.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username=xx --password=xx --duration=50
-# TODO:
-# 1. Hook ssh_launcher, need it to be hard-code free
 def main(args):
     print('Info:')
 
