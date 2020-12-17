@@ -476,7 +476,7 @@ def main(args):
 
 
     # Double check from stupid caller
-    prompt = ' '.join(['\n!!!!:', 'Is the above setting correct? Have you run cargo build --release?', '[y/n] > '])
+    prompt = ' '.join(['\n!!!!:', 'Is the setting correct? Run "cargo build --release" in', args.remote_dv , '?', '[y/n] > '])
     answer = input(prompt).lower()
     if answer != 'y':
         print('Error:', 'Go fix your stupid mistakes')
