@@ -378,7 +378,7 @@ def construct_launcher(python, remote_dv, machine_idx, conf_path, verbose=None, 
         print('Info:', '    ' + '@', '[' + str(idx) + ']', machine_name)
         print('Info:', '    ' + command)
         #return machine.exec_command(command, get_pty=True)
-        return machine.exec_command('top', get_pty=True)
+        return machine.exec_command('bash;top', get_pty=True)
     return launcher
 
 
