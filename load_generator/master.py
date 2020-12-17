@@ -399,6 +399,7 @@ def main(args):
     
     # Launch ssh
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
+    # Cannot launch scheduler first!
     for machine_idx in reversed(range(ssh_manager.get_num_machines())):
         ssh_manager.launch_task_on_machine(machine_idx, construct_launcher(python=args.python, remote_dv=args.remote_dv, machine_idx=machine_idx, conf_path=args.new_conf, verbose=None, release=True))
         time.sleep(args.delay)
