@@ -230,7 +230,7 @@ class SSHManager:
         assert idx < self.get_num_machines()
         assert task_launcher is not None
         #self._ioe[idx] = task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))
-        self._ioe[idx] = self.get_machine(idx).exec_command('source ~/.bashrc; python3', get_pty=True)
+        self._ioe[idx] = self.get_machine(idx).exec_command('source ~/.bashrc; cd /groups/qlhgrp/liuli15/dv-in-rust', get_pty=True)
 
     def close_machine(self, idx):
         assert idx < self.get_num_machines()
