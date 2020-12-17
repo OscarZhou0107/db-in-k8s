@@ -37,9 +37,9 @@ class SchedulerAdmin:
         print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
     
     def perf(self):
-        print('Info:', 'Send Perf request..')
+        print('Info:', 'Sending Perf request...')
         self._tn.write(b'perf\n')
-        print('Info:', '..', self._tn.read_until(b'\n'))
+        print('Info:', '...', self._tn.read_until(b'\n').decode('utf-8'))
         
 
 class ControlPrompt(cmd.Cmd):
