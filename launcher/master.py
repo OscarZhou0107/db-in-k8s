@@ -83,7 +83,7 @@ class ControlPrompt(cmd.Cmd):
         for idx in range(num_machines):
             print('Info:', '    ' + self._ssh_manager.get_machine_name_str(idx), ':', 'Running' if self._ssh_manager.get_ioe(idx) is not None else 'Idling')
         print('Info:')
-        self.get_conf().print_addrs()
+        self.get_conf().print_summary()
         print('Info:')
 
     def do_talk(self, arg):
@@ -308,6 +308,12 @@ class Conf:
         with open(new_conf_path, 'w') as f:
             toml.dump(self._conf, f)
 
+    def get_performance_logging(self):
+        return self._conf['scheduler'].get('performance_logging')
+
+    def set_performance_logging(self, performance_logging):
+        self._conf['scheduler']['performance_logging'] = performance_logging
+
     def get_all_dbproxy_addrs(self):
         return list(map(lambda c: c['addr'], self._conf['dbproxy']))
 
@@ -359,15 +365,12 @@ class Conf:
         _prev_ip, separator, port = self.get_sequencer_addr().rpartition(':')
         self.set_sequencer_addr(new_ip + separator + port)
 
-    def print_addrs(self):
-        scheduler = self.get_scheduler_addr()
-        print('Info:', 'Scheduler:', scheduler)
-        scheduler_admin = self.get_scheduler_admin_addr()
-        print('Info:', 'Scheduler Admin:', scheduler_admin)
-        sequencer = self.get_sequencer_addr()
-        print('Info:', 'Sequencer:', sequencer)
-        dbproxies = self.get_all_dbproxy_addrs()
-        print('Info:', 'Dbproxies:', dbproxies)
+    def print_summary(self):
+        print('Info:', 'Scheduler:', self.get_scheduler_addr())
+        print('Info:', 'performance_logging:', self.get_performance_logging())
+        print('Info:', 'Scheduler Admin:', self.get_scheduler_admin_addr())
+        print('Info:', 'Sequencer:', self.get_sequencer_addr())
+        print('Info:', 'Dbproxies:', self.get_all_dbproxy_addrs())
 
 
 def prepare_conf(conf, args):
@@ -377,13 +380,15 @@ def prepare_conf(conf, args):
     # Existing Settings
     print('Info:')
     print('Info:', 'Existing Setting:')
-    conf.print_addrs()
+    conf.print_summary()
 
     if args.follow_conf:
         args.new_conf = args.conf
         print('Info:', '--follow_conf. Will use the existing setting at', args.new_conf)
         return
 
+
+    conf.set_performance_logging(args.perf_logging)
     # Set scheduler, scheduler_admin, and sequencer
     # to current machine using current machine's ip address,
     # instead of localhost. Ports are not modified
@@ -393,7 +398,7 @@ def prepare_conf(conf, args):
     # New Settings
     print('Info:')
     print('Info:', 'New Setting:')
-    conf.print_addrs()
+    conf.print_summary()
 
     # Write to file
     splitted = os.path.splitext(args.conf)
@@ -555,6 +560,7 @@ def init(parser):
 
     # Optional args, important ones
     parser.add_argument('--duration', type=float, default=None, help='Time in seconds to auto terminate this script')
+    parser.add_argument('--perf_logging', type=str, default='./perf', help='Dir to dump perf logging. Either absolute path, or relative path to --remote_dv!')
 
     # Optional args, not important
     parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
