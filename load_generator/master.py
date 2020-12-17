@@ -633,7 +633,7 @@ class Conf:
         self._conf = toml.load(conf_path)
 
     def write(self, new_conf_path):
-        print('Warning:', 'Write updated conf to', new_conf_path)
+        print('Info:', 'Write updated conf to', new_conf_path)
         with open(new_conf_path, 'w') as f:
             toml.dump(self._conf, f)
 
@@ -749,8 +749,6 @@ def main(args):
     # machines[2] == sequencer
     # machines[3..] == dbproxies
     machines = [scheduler, scheduler_admin, sequencer] + dbproxies
-    print('Info:')
-    print('Info:', 'SSH to:', machines)
 
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
 
