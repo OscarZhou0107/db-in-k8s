@@ -35,7 +35,7 @@ def check_ip_alive(ip):
 
 def is_port_in_use(ip, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex((ip, port)) == 0
+        return s.connect_ex((ip, int(port))) == 0
 
 
 def single_run(args, client_num, client_mix, dbproxy_num):
