@@ -45,6 +45,7 @@ class SchedulerAdmin:
                 print('Warning', 'Cannot connect to Scheduler Admin at', scheduler_admin_addr, 'Attempt', iattempt, '/', max_attempt)
                 time.sleep(5)
                 iattempt += 1
+                assert iattempt < max_attempt
     
     def perf(self):
         print('Info:', 'Sending Perf request...')
