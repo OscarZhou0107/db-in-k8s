@@ -74,7 +74,7 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     conf.write(args.new_conf)
 
     # Run
-    master_cmds = [args.python, os.path.join(args.remote_dv, 'load_generator/master.py'), '--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
+    master_cmds = [args.python, os.path.join(args.remote_dv, 'launcher/master.py'), '--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
         '--duration', args.duration, '--client_num', client_num, '--client_mix', client_mix, '--perf_logging', args.perf_logging,
         '--python', args.python, '--output', args.output, '--bypass_stupid_check']
     master_cmds = list(map(lambda x: str(x), master_cmds))
