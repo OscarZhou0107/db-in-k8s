@@ -16,6 +16,6 @@ addr = "128.100.13.212:38875"
 # THESE NEEDS TO BE INTEGERS, IN MS
 [dbproxy.db_mock_latency]
 begintx = {mean = 0, stddev = 0}
-endtx = {mean = 0, stddev = 1}
+endtx = {mean = 0, stddev = 0}
 read = {mean = 0, stddev = 1}
 write = {mean = 1, stddev = 2}
