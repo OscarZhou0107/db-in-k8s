@@ -508,7 +508,7 @@ def main(args):
     print('Info:', 'Sequencer:', sequencer)
     dbproxies = conf.get_all_dbproxy_ips()
     print('Info:', 'Dbproxies:', dbproxies)
-    client_launcher = scheduler
+    client_launcher = socket.gethostbyname(socket.gethostname())
     print('Info:', 'Client Launcher:', client_launcher)
     # machines[0] == client_launcher
     # machines[1] == scheduler
