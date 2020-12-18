@@ -225,7 +225,7 @@ class Throughput(list):
         values = self.get_throughputs_per_sec(window=1)
         return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
 
-    def plot_distribution(self, ax, alpha=1, label=None, bins=70, log=False):
+    def plot_distribution(self, ax, alpha=1, label=None, bins=50, log=False):
         throughputs = self.get_throughputs_per_sec()
         ax.hist(throughputs, bins=bins, edgecolor='black', alpha=alpha, label=label, log=log)
         ax.set(xlabel='Moving Average Throughput (#RequestFinished/Sec)', ylabel='Frequency')
