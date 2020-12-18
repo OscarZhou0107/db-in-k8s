@@ -140,7 +140,7 @@ o2versioner
 
 
 ### Sequencer
-- `sequenecer::main()` - main entrance
+- `sequenecer_main()` - main entrance
 - Handler
   - For every incomming tcp connection - `tokio::spawn()`
   - For each incomming tcp connection
@@ -152,8 +152,11 @@ o2versioner
 
 
 ### Scheduler
-- `scheduler::main()` - main entrance
-- Handler and Dispatcher decoupled, running concurrently, communicate through channels
+- `scheduler_main()` - main entrance
+- Modularized, decoupled, running concurrently, communicate through channels
+  - Handler, receive and reply client requests
+  - Dispatcher, process client requests
+  - Transceiver, communicate with Dbproxy
 - Handler
   - For every incoming tcp connection - `tokio::spawn()`
   - For each incomming tcp connection
@@ -170,34 +173,57 @@ o2versioner
   - Manages the DbVN for each Dbproxy
   - A single event loop for receiving requests from handler via `DispatcherAddr` object 
   - Request is sent via `DispatcherAddr` object to the eventloop. The request also includes
-  a single-use `Oneshot::Sender` channel for replying back to the handler
+    a single-use `Oneshot::Sender` channel for replying back to the handler
   - Only reply back the handler the response received from the first Dbproxy replying,
-  the rest of the reponses are not sent back to the handler, but they are still needed to
-  update the internal state of the Dispatcher
+    the rest of the reponses are not sent back to the handler, but they are still needed to
+    update the internal state of the Dispatcher
   - Lifetime is till all `DispatcherAddr` objects are dropped
   - Incoming queries are executed concurrently
   - For each query, the query is sent to each transceiver in serial. After all queries
-  are sent to all transceivers, waiting for the trasceiver replies concurrently. Since
-  no dbproxy replies are able to arrive before all requests are sent to transceiver,
-  this guarantees the query ordering within the same transaction.
+    are sent to all transceivers, waiting for the trasceiver replies concurrently. Since
+    no dbproxy replies are able to arrive before all requests are sent to transceiver,
+    this guarantees the query ordering within the same transaction.
 - Transceiver
   - Manges a single `TcpStream` socket for a single dbproxy. The socket
-  is used for reading and writing to dbproxy concurrently.
+    is used for reading and writing to dbproxy concurrently.
   - `TransceiverAddr` mechanism works same as `DispathcerAddr`
   - Two separate event loops in serial:
     - Receiving request from dispatcher and forwards to dbproxy
     - Receiving response from dbproxy and forwards to dispatcher
   - For each client (with the single dbproxy), a `LinkedList` is used as a FIFO queue
-  for tracking the outstanding requests. Push front upon transmitting and pop back upon receiving.
-  The outgoing request and incoming response all have `RequestMeta` that can uniquely identify
-  a request for each client, this is used to make sure that dbproxy does not reorder the queries
-  within a single transaction.
+    for tracking the outstanding requests. Push front upon transmitting and pop back upon receiving.
+    The outgoing request and incoming response all have `RequestMeta` that can uniquely identify
+    a request for each client, this is used to make sure that dbproxy does not reorder the queries
+    within a single transaction.
 - Admin Handler (Optional)
   - Only process a single incoming tcp connection at a time
   - Receive a single request in raw bytes, process the request, and send one response back
   - Supports remotely stopping the main handler for taking in any new connections, this also
-  stops the sequencer from taking in any new connections
+    stops the sequencer from taking in any new connections
   - Can send Block and Unblock request to sequencer to block new transactions
+  
+  
+### Dbproxy
+- `dbproxy_main()` - main entrance
+- Modularized, decoupled, running concurrently, communicate through channels
+  - Transceiver, receive and reply client Scheduler
+  - Dispatcher, process sql requests
+- Dispatcher
+  - FIFO `Queue` in order of request receiving order from scheduler from `Transceiver::Receiver`
+  - Manages a DbVN
+  - An event loop that is triggered by new incoming requests into the `Queue` or a version release
+  - For each iteration:
+    - Find requests that have their version ready, and can be executed
+    - If multiple requests of the same transaction are in the Queue, only the first one is checked
+  - Each transaction is spawned as a separate task, with a channel open for receiving subsequent requests
+    within the same transaction
+  - Once the request is finished, the reply will be sent to `Transceiver::Responder`
+  - Once the transaction is finished, the task is shutdown
+- Transceiver
+  - Manges a single `TcpStream` socket. The socket is used for reading and writing to Scheduler concurrently.
+  - Two separate event loops in parallel:
+    - Receiver: receiving request from scheduler and push into the `Queue`
+    - Responder: send response back to scheduler, also performs version release
 
 
 ## Notes for asynchronous
