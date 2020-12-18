@@ -503,6 +503,7 @@ def main(args):
     print('Info:')
     print('Info:', 'duration:', args.duration)
     print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:', 'output', args.output)
     print('Info:')
 
 
