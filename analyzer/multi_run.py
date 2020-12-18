@@ -8,6 +8,11 @@ from collections import defaultdict
 from analyzer import single_run
 
 try:
+    import numpy as np
+except:
+    print('Error:', 'pip install numpy')
+
+try:
     import matplotlib.pyplot as plt
 except:
     print('Error:', 'pip install matplotlib')
@@ -61,8 +66,6 @@ def plot_charts(args, database):
     axl = fig.add_subplot(1, 2, 1)
     axr = fig.add_subplot(1, 2, 2)
     for num_dbproxy, dataset in database_by_num_dbproxy.items():
-        print(num_dbproxy)
-
         # [(run_name, num_clients, sr_perf_db, perfdb)]
         dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_request_filter), x[1]), dataset))
 
@@ -77,23 +80,26 @@ def plot_charts(args, database):
         mean_throughputs, stddev_throughputs = tuple(zip(*sr_throughputs_stats))[1:3]
         mean_latencies, stddev_latencies = tuple(zip(*latencies))[0:2]
         
-        print('nums_clients', nums_clients)
-        print('mean_throughputs', mean_throughputs)
-        print('stddev_throughputs', stddev_throughputs)
-        print('mean_latencies', mean_latencies)
-        print('stddev_latencies', stddev_latencies)
+        if args.debug:
+            print('Debug:', 'nums_clients', nums_clients)
+            print('Debug:', 'mean_throughputs', mean_throughputs)
+            print('Debug:', 'stddev_throughputs', stddev_throughputs)
+            print('Debug:', 'mean_latencies', mean_latencies)
+            print('Debug:', 'stddev_latencies', stddev_latencies)
         
         # Left y-axis for throughput
-        axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies',
-            marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
+        axl.plot(nums_clients, mean_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
+        # axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies',
+        #     marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
         axl.set(xlabel='Number of Clients', ylabel='Average Throughput on Successful Queries (#queries/sec)')
         axl.grid(axis='x', linestyle='--')
         axl.grid(axis='y', linestyle='-')
         axl.legend()
 
         # Right y-axis for latency
-        axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies',
-            marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
+        axr.plot(nums_clients, mean_latencies, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
+        # axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies',
+        #     marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
         axr.set(xlabel='Number of Clients', ylabel='Average Latency on Successful Queries (sec)')
         axr.grid(axis='x', linestyle='--')
         axr.grid(axis='y', linestyle='-')
@@ -128,6 +134,35 @@ def plot_charts(args, database):
     plt.show()
 
 
+def check_data_validity(database):
+    '''
+    [(run_name, (PerfDB, DbproxyStatsDB))]
+
+    return:
+    [(run_name, (PerfDB, DbproxyStatsDB))]
+    '''
+    print('Info:')
+    print('Info:', 'check_data_validity')
+    # Main data structure to work with
+    # [(size_perfdb, (run_name, (PerfDB, DbproxyStatsDB)))]
+    original_size = len(database)
+    datasize_list = list(map(lambda x: (len(x[1][0]), x), database))
+    datasize_list.sort(key=lambda x: x[0])
+
+    if len(datasize_list) == 0:
+        return database
+
+    filtered_database = list()
+    for size, data in datasize_list:
+        if size < 500:
+            print('Warning:', data[0], 'only contains', size, 'data. Excluded from analysis')
+        else:
+            filtered_database.append(data)
+
+    print('Warning:', original_size - len(filtered_database), '/', original_size, 'data sets do not have enough data. Excluded from analysis')
+    return filtered_database
+
+
 def init(parser):
     parser.add_argument('dir', type=str, help='log files directory for all runs')
     parser.add_argument('--debug', action='store_true', help='debug messages')
@@ -146,6 +181,8 @@ def main(args):
     print('Info:', 'Parsing in parallel...')
     start = time.time()
     database = multiprocessing.Pool().map(parse_single_run_wrapper, map(lambda run_name: (run_name, args), run_names))
+    database = check_data_validity(database)
+    # {run_name: (PerfDB, DbproxyStatsDB)}
     database = dict(database)
     end = time.time()
     print('Info:')
