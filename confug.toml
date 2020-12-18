@@ -18,4 +18,4 @@ addr = "128.100.13.212:38875"
 begintx = {mean = 75, stddev = 150}
 endtx = {mean = 150, stddev = 250}
 read = {mean = 150, stddev = 275}
-write = {mean = 800, stddev = 2000}
+write = {mean = 650, stddev = 1800}
