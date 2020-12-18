@@ -16,6 +16,7 @@ import telnetlib
 import time
 import warnings
 
+import planner
 import slave
 
 warnings.filterwarnings(action='ignore',module='.*paramiko.*')
@@ -374,6 +375,9 @@ class Conf:
     def get_sequencer_ip(self):
         return get_ip(self.get_sequencer_addr())
 
+    def get_sequencer_port(self):
+        return get_port(self.get_sequencer_addr())
+
     def set_sequencer_addr(self, addr):
         self._conf['sequencer']['addr'] = addr
 
@@ -415,6 +419,10 @@ def prepare_conf(conf, args):
     conf.update_scheduler_addr(new_ip=cur_ip)
     conf.update_scheduler_admin_addr(new_ip=cur_ip)
     conf.update_sequencer_addr(new_ip=cur_ip)
+    assert not planner.is_port_in_use(conf.get_scheduler_ip(), conf.get_scheduler_port())
+    assert not planner.is_port_in_use(conf.get_scheduler_admin_ip(), conf.get_scheduler_admin_port())
+    assert not planner.is_port_in_use(conf.get_sequencer_ip(), conf.get_sequencer_port())
+
     # New Settings
     print('Info:')
     print('Info:', 'New Setting:')
