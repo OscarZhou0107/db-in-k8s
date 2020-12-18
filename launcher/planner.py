@@ -105,7 +105,7 @@ def main(args):
     print('Info:')
     print('Info:', 'Total', total_num_tasks, 'tasks')
     if args.duration is not None:
-        elapsed_est = total_num_tasks * args.duration
+        elapsed_est = datetime.timedelta(seconds=(total_num_tasks * args.duration))
         now = datetime.datetime.now()
         end_est = now + elapsed_est
         print('Info:', 'Now         :', now.strftime('%Y-%m-%d %H:%M:%S'))
@@ -137,7 +137,7 @@ def main(args):
     print('Info:')
     print('Info:', 'Total       :', total_num_tasks, 'tasks')
     if args.duration is not None:
-        elapsed_est = total_num_tasks * args.duration
+        elapsed_est = datetime.timedelta(seconds=(total_num_tasks * args.duration))
         end_est = launch_time + elapsed_est
         print('Info:')
         print('Info:', 'Est Finish  :', end_est.strftime('%Y-%m-%d %H:%M:%S'))
