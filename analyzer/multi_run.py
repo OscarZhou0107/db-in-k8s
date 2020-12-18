@@ -155,11 +155,11 @@ def check_data_validity(database):
     filtered_database = list()
     for size, data in datasize_list:
         if size < 500:
-            print('Warning:', data[0], 'only contains', size, 'data. Excluded')
+            print('Warning:', data[0], 'only contains', size, 'data. Excluded from analysis')
         else:
             filtered_database.append(data)
 
-    print('Warning:', original_size - len(filtered_database), '/', original_size, 'data sets do not have enough data')
+    print('Warning:', original_size - len(filtered_database), '/', original_size, 'data sets do not have enough data. Excluded from analysis')
     return filtered_database
 
 
