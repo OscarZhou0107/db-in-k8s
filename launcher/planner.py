@@ -90,7 +90,7 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     # Run
     master_cmds = [args.python, os.path.join(args.remote_dv, 'launcher/master.py'), '--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
         '--duration', args.duration, '--client_num', client_num, '--client_mix', client_mix, '--perf_logging', args.perf_logging,
-        '--python', args.python, '--output', args.output, '--bypass_stupid_check']
+        '--python', args.python, '--output', args.output, '--bypass_stupid_check', '--delay', args.delay]
     master_cmds = list(map(lambda x: str(x), master_cmds))
     print('Info:', ' '.join(master_cmds))
     subprocess.Popen(master_cmds).wait()
@@ -106,7 +106,7 @@ def estimate_elapsed(args):
     for _client_num in args.client_nums:
         for _client_mix in args.client_mixes:
             for dbproxy_num in args.dbproxy_nums:
-                total += args.duration * (dbproxy_num + 1 + 1 + 10)
+                total += (args.duration + args.delay * (dbproxy_num + 1 + 1 + 10))
     return datetime.timedelta(seconds=total)
 
 
@@ -189,6 +189,7 @@ def init(parser):
     parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
     parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--debug', action='store_true', help='Trun on debug messages')
+    parser.add_argument('--delay', type=float, default=1.0, help='Delay interval between jobs launching on each machine')
 
 
 if __name__ == '__main__':
