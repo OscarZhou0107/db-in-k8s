@@ -282,7 +282,7 @@ def print_stats(perfdb, dbproxy_stats_db, run_name=None):
     # sr_throughput.print_trajectory()
 
     print('Info:')
-    print('Info:', 'Successful Request:', len(sr_perfdb))
+    print('Info:', 'Successful Request:', len(sr_perfdb), '/', len(perfdb))
     print('Info:')
     print('Info:', 'Throughput - Request Completed / Sec')
     print('Info:', '(peak, mean, stddev, geomean, median)')
@@ -311,7 +311,7 @@ def print_stats(perfdb, dbproxy_stats_db, run_name=None):
 
 def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
     figsize = (16, 8)
-    figname = 'distribution_' + str(run_name)
+    figname = 'distribution_' + str(run_name) + '_' + str(len(perfdb))
     fig = plt.figure(figname, figsize=figsize)
     fig.suptitle( 'Distribution with ' + str(perfdb.get_num_clients()) + ' Clients ' + str(dbproxy_stats_db.get_num_dbproxies()) + ' Dbproxies', fontsize=16)
     fig.set_tight_layout(True)
