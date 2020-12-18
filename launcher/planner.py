@@ -63,9 +63,10 @@ def single_run(args, client_num, client_mix, dbproxy_num):
         print('debug:', ug_candidates)
 
     # Find the ports for scheduler, scheduler admin, and sequencer
-    # conf.update_scheduler_addr(new_port=9998)
-    # conf.update_scheduler_admin_addr(new_port=9999)
-    # conf.update_sequencer_addr(new_port=9997)
+    conf.update_scheduler_addr(new_port=2077)
+    conf.update_scheduler_admin_addr(new_port=9999)
+    conf.update_sequencer_addr(new_port=9876)
+    conf.print_summary()
     # conf.update_scheduler_addr(new_port=random.randint(12000, 13000))
     # conf.update_scheduler_admin_addr(new_port=random.randint(11000, 12000))
     # conf.update_sequencer_addr(new_port=random.randint(10000, 11000))
