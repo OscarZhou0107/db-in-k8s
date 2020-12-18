@@ -536,6 +536,7 @@ def main(args):
     # scheduler
     ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
     time.sleep(args.delay  * ssh_manager.get_num_machines() * 2)
+    time.sleep(args.delay * 5)
     # Launch client launcher last
     def client_launcher_launcher(idx, machine, machine_name):
         assert idx == 0
