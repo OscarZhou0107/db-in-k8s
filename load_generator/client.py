@@ -186,9 +186,10 @@ class Client:
         
         # set up logging
         # check if the log folder exist
-        if not os.path.isdir("./logs"):
-            os.mkdir("./logs")
-        logname = "./logs/client_" + str(c_id) + "_process_" + str(os.getpid()) + ".log"
+        log_path = os.path.join(PATH, "/logs")
+        if not os.path.isdir(log_path):
+            os.mkdir(log_path)
+        logname = os.path.join(log_path, "client_" + str(c_id) + "_process_" + str(os.getpid()) + ".log")
         handlers = [logging.FileHandler(logname, mode="w")]
         if DEBUG:
             handlers.append(logging.StreamHandler(sys.stdout))
@@ -1294,6 +1295,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=int, default=0)
     parser.add_argument("--mock_db", type=int, default=0)
     parser.add_argument("--ip", type=str, default='128.100.13.240')
+    parser.add_argument("--path", type=str, default='/groups/qlhgrp/dv-in-rust/load_generator/')
 
     args = parser.parse_args()
 
@@ -1316,6 +1318,7 @@ if __name__ == "__main__":
     DEBUG = args.debug
     MOCK = args.mock_db
     HOST = args.ip
+    PATH = args.path
 
     newClient = Client(int(args.c_id), int(args.port), mix)
     if newClient.run():
