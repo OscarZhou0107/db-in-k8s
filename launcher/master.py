@@ -281,6 +281,7 @@ class SSHManager:
         assert idx < self.get_num_machines()
         assert task_launcher is not None
         self._ioe[idx] = self.get_machine(idx).exec_command('', get_pty=True)
+        time.sleep(1)
         self._ioe[idx][0].write('{}\r\n'.format(task_launcher(idx, self.get_machine(idx), self.get_machine_name(idx))))
         self._ioe[idx][0].flush()
 
