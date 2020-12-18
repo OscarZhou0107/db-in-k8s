@@ -5,6 +5,7 @@ import datetime
 import itertools
 import os
 import random
+import socket
 import subprocess
 
 import master
@@ -16,7 +17,7 @@ def get_ug_slaves():
     return list(map(lambda m: prefix + str(m), machines))
 
 
-def check_alive(ip):
+def check_ip_alive(ip):
     cmds = ['ping', '-c', '1', ip]
     alive = False
     
@@ -30,6 +31,11 @@ def check_alive(ip):
         alive = False
 
     return alive
+
+
+def is_port_in_use(ip, port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex((ip, port)) == 0
 
 
 def single_run(args, client_num, client_mix, dbproxy_num):
@@ -46,11 +52,11 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     ug_candidates = list()
     for _ in range(dbproxy_num):
         ug_ip = None
-        while not check_alive(ug_ip):
+        while not check_ip_alive(ug_ip):
             ug_ip = next(ug_slaves)
         
         ug_port = random.randint(13000, 60000)  
-        while str(ug_ip + ':' + str(ug_port)) in ug_candidates:
+        while str(ug_ip + ':' + str(ug_port)) in ug_candidates or is_port_in_use(ug_ip, ug_port):
             ug_port = random.randint(13000, 60000)  
 
         ug_candidates.append(str(ug_ip + ':' + str(ug_port)))
@@ -64,14 +70,16 @@ def single_run(args, client_num, client_mix, dbproxy_num):
         print('debug:', ug_candidates)
 
     # Find the ports for scheduler, scheduler admin, and sequencer
-    # Hardcode for now
-    conf.update_scheduler_addr(new_port=2077)
-    conf.update_scheduler_admin_addr(new_port=9999)
-    conf.update_sequencer_addr(new_port=9876)
-    conf.print_summary()
-    # conf.update_scheduler_addr(new_port=random.randint(12000, 13000))
-    # conf.update_scheduler_admin_addr(new_port=random.randint(11000, 12000))
-    # conf.update_sequencer_addr(new_port=random.randint(10000, 11000))
+    cur_ip = socket.gethostbyname(socket.gethostname())
+    def find_port(begin, end):
+        port = random.randint(begin, end)
+        while is_port_in_use(cur_ip, port):
+            port = random.randint(begin, end)
+        return port
+
+    conf.update_scheduler_addr(new_port=find_port(12000, 13000))
+    conf.update_scheduler_admin_addr(new_port=find_port(11000, 12000))
+    conf.update_sequencer_addr(new_port=find_port(10000, 11000))
     print('Info:', 'Assigned ports to Scheduler, Scheduler Admin and Sequencer')
 
     # Save the conf
@@ -93,6 +101,15 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     print('Info:')
 
 
+def estimate_elapsed(args):
+    total = 0
+    for _client_num in args.client_nums:
+        for _client_mix in args.client_mixes:
+            for dbproxy_num in args.dbproxy_nums:
+                total += args.duration * (dbproxy_num + 1 + 1 + 10)
+    return datetime.timedelta(seconds=total)
+
+
 # python3 launcher/planner.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username= --password= --duration=60 --client_nums 100 200 --client_mixes 2 3 --dbproxy_nums 2 3
 def main(args):
     total_num_tasks = len(args.client_nums) * len(args.client_mixes) * len(args.dbproxy_nums)
@@ -105,7 +122,7 @@ def main(args):
     print('Info:')
     print('Info:', 'Total', total_num_tasks, 'tasks')
     if args.duration is not None:
-        elapsed_est = datetime.timedelta(seconds=(total_num_tasks * args.duration))
+        elapsed_est = estimate_elapsed(args)
         now = datetime.datetime.now()
         end_est = now + elapsed_est
         print('Info:', 'Now         :', now.strftime('%Y-%m-%d %H:%M:%S'))
@@ -137,7 +154,7 @@ def main(args):
     print('Info:')
     print('Info:', 'Total       :', total_num_tasks, 'tasks')
     if args.duration is not None:
-        elapsed_est = datetime.timedelta(seconds=(total_num_tasks * args.duration))
+        elapsed_est = estimate_elapsed(args)
         end_est = launch_time + elapsed_est
         print('Info:')
         print('Info:', 'Est Finish  :', end_est.strftime('%Y-%m-%d %H:%M:%S'))
