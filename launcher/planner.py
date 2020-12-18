@@ -57,8 +57,12 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     # Set perf_logging
     conf.set_performance_logging(args.perf_logging)
     
+    # Get ug slaves in random order
+    ug_slaves = get_ug_slaves()
+    random.shuffle(ug_slaves)
+
     # Find the addrs for dbproxies
-    ug_slaves = itertools.cycle(get_ug_slaves())
+    ug_slaves = itertools.cycle(ug_slaves)
     ug_candidates = list()
     for _ in range(dbproxy_num):
         ug_ip = None

@@ -421,7 +421,6 @@ def prepare_conf(conf, args):
         print('Info:', '--follow_conf. Will use the existing setting at', args.new_conf)
         return
 
-
     conf.set_performance_logging(args.perf_logging)
     # Set scheduler, scheduler_admin, and *sequencer*(disabled)
     # to current machine using current machine's ip address,
