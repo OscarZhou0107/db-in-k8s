@@ -8,6 +8,11 @@ import statistics
 from datetime import datetime, timedelta
 
 try:
+    import pandas as pd
+except:
+    print('Error:', 'pip install pandas')
+
+try:
     from dateutil import parser as dateutil_parser
 except:
     print('Error:', 'pip install python-dateutil')
@@ -118,7 +123,7 @@ class PerfDB(DB):
     def get_num_clients(self):
         return len(set(map(lambda x: x['client_addr'], self)))
 
-    def get_throughput(self, interval_length=timedelta(seconds=0.25)):
+    def get_throughput(self, interval_length=timedelta(seconds=0.1)):
         '''
         A list of groups, each group is defined to be
         having final_timestamp within [k, k+1] integer multiple of interval_length since the earliest initial_timestamp
@@ -207,10 +212,11 @@ class Throughput(list):
         print('Info:')
         print('Info:', 'Peak throughput is', max(trajectory, key=lambda kv: kv[1]))
 
-    def get_throughputs_per_sec(self):
+    def get_throughputs_per_sec(self, window=10):
         base_throughputs = tuple(zip(*self.get_trajectory()))[1]
         multiplier = timedelta(seconds=1) / self._interval_length
-        return list(map(lambda t: multiplier * t, base_throughputs))
+        raw = list(map(lambda t: multiplier * t, base_throughputs))
+        return list(pd.Series(raw).rolling(window=window).mean().iloc[window-1:].values)
 
     def get_stats(self):
         '''
@@ -222,7 +228,7 @@ class Throughput(list):
     def plot_distribution(self, ax, alpha=1, label=None, bins=70, log=False):
         throughputs = self.get_throughputs_per_sec()
         ax.hist(throughputs, bins=bins, edgecolor='black', alpha=alpha, label=label, log=log)
-        ax.set(xlabel='Throughput (#RequestFinished/Sec)', ylabel='Frequency')
+        ax.set(xlabel='Moving Average Throughput (#RequestFinished/Sec)', ylabel='Frequency')
 
 
 class DbproxyStatsDB(DB):
