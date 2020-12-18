@@ -35,7 +35,7 @@ except:
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
         iattempt = 0
-        max_attempt = 48
+        max_attempt = 15
         while iattempt < max_attempt:
             try:
                 self._tn = telnetlib.Telnet(host=get_ip(scheduler_admin_addr), port=get_port(scheduler_admin_addr))
@@ -43,7 +43,7 @@ class SchedulerAdmin:
                 return
             except:
                 print('Warning', 'Cannot connect to Scheduler Admin at', scheduler_admin_addr, 'Attempt', iattempt, '/', max_attempt)
-                time.sleep(5)
+                time.sleep(2)
                 iattempt += 1
                 assert iattempt < max_attempt
     
@@ -544,8 +544,8 @@ def main(args):
         ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
     time.sleep(args.delay * ssh_manager.get_num_machines() * 2)
     # scheduler
-    ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
-    time.sleep(args.delay * 15)
+    ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=1, verbose=None, release=True))
+    time.sleep(args.delay * 5)
     # Launch client launcher last
     def client_launcher_launcher(idx, machine, machine_name):
         assert idx == 0
