@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 
 import argparse
+import datetime
 import itertools
+import os
 import random
 import subprocess
-import os
 
 import master
 
@@ -63,6 +64,7 @@ def single_run(args, client_num, client_mix, dbproxy_num):
         print('debug:', ug_candidates)
 
     # Find the ports for scheduler, scheduler admin, and sequencer
+    # Hardcode for now
     conf.update_scheduler_addr(new_port=2077)
     conf.update_scheduler_admin_addr(new_port=9999)
     conf.update_sequencer_addr(new_port=9876)
@@ -93,12 +95,22 @@ def single_run(args, client_num, client_mix, dbproxy_num):
 
 # python3 launcher/planner.py --conf=confug.toml --remote_dv=/groups/qlhgrp/liuli15/dv-in-rust --username= --password= --duration=60 --client_nums 100 200 --client_mixes 2 3 --dbproxy_nums 2 3
 def main(args):
+    total_num_tasks = len(args.client_nums) * len(args.client_mixes) * len(args.dbproxy_nums)
     print('Info:')
     print('Info:', 'client_nums:', args.client_nums)
     print('Info:', 'client_mixes:', args.client_mixes)
     print('Info:', 'dbproxy_nums:', args.dbproxy_nums)
     print('Info:', 'duration:', args.duration)
     print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:')
+    print('Info:', 'Total', total_num_tasks, 'tasks')
+    if args.duration is not None:
+        elapsed_est = total_num_tasks * args.duration
+        now = datetime.datetime.now()
+        end_est = now + elapsed_est
+        print('Info:', 'Now         :', now.strftime('%Y-%m-%d %H:%M:%S'))
+        print('Info:', 'Est Finish  :', end_est.strftime('%Y-%m-%d %H:%M:%S'))
+        print('Info:', 'Est Elapsed :', '{:.2f}'.format(elapsed_est.total_seconds()), 'seconds')
     print('Info:')
 
     prompt = ' '.join(['\n!!!!:', 'Is the setting correct? Run "cargo build --release" in', args.remote_dv, '?', '[y/n] > '])
@@ -107,15 +119,32 @@ def main(args):
         print('Error:', 'Go fix your stupid mistakes')
         exit()
 
+    launch_time = datetime.datetime.now()
     # Run each sweep:
     for client_num in args.client_nums:
         for client_mix in args.client_mixes:
             for dbproxy_num in args.dbproxy_nums:
                 single_run(args, client_num=client_num, client_mix=client_mix, dbproxy_num=dbproxy_num)
+    finish_time = datetime.datetime.now()
+    elapsed = finish_time - launch_time
 
-
+    print('Info:')  
+    print('Info:', '******************************************************')
+    print('Info:', "ALL JOBS FINISHED")
+    print('Info:', 'Launch      :', launch_time.strftime('%Y-%m-%d %H:%M:%S'))
+    print('Info:', 'Finish      :', finish_time.strftime('%Y-%m-%d %H:%M:%S'))
+    print('Info:', 'Elapsed     :', '{:.2f}'.format(elapsed.total_seconds()), 'seconds')
     print('Info:')
-    print('Info:', "DONE ALL JOBS")
+    print('Info:', 'Total       :', total_num_tasks, 'tasks')
+    if args.duration is not None:
+        elapsed_est = total_num_tasks * args.duration
+        end_est = launch_time + elapsed_est
+        print('Info:')
+        print('Info:', 'Est Finish  :', end_est.strftime('%Y-%m-%d %H:%M:%S'))
+        print('Info:', 'Est Elapsed :', '{:.2f}'.format(elapsed_est.total_seconds()), 'seconds')
+        if elapsed_est > elapsed:
+            print('Warning:', 'Some jobs probably did not successfully finished')
+    print('Info:', '******************************************************')
     print('Info:')
 
 
