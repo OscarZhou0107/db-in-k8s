@@ -8,11 +8,6 @@ from collections import defaultdict
 from analyzer import single_run
 
 try:
-    import numpy as np
-except:
-    print('Error:', 'pip install numpy')
-
-try:
     import matplotlib.pyplot as plt
 except:
     print('Error:', 'pip install matplotlib')
@@ -77,15 +72,13 @@ def plot_charts(args, database):
 
         # Final data, all are linked by their index
         run_names, nums_clients, sr_throughputs_stats, latencies = tuple(zip(*dataset))[0:4]
-        mean_throughputs, stddev_throughputs = tuple(zip(*sr_throughputs_stats))[1:3]
-        mean_latencies, stddev_latencies = tuple(zip(*latencies))[0:2]
+        mean_throughputs = tuple(zip(*sr_throughputs_stats))[1]
+        mean_latencies = tuple(zip(*latencies))[0]
         
         if args.debug:
             print('Debug:', 'nums_clients', nums_clients)
             print('Debug:', 'mean_throughputs', mean_throughputs)
-            print('Debug:', 'stddev_throughputs', stddev_throughputs)
             print('Debug:', 'mean_latencies', mean_latencies)
-            print('Debug:', 'stddev_latencies', stddev_latencies)
         
         # Left y-axis for throughput
         axl.plot(nums_clients, mean_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
@@ -155,11 +148,11 @@ def check_data_validity(database):
     filtered_database = list()
     for size, data in datasize_list:
         if size < 500:
-            print('Warning:', data[0], 'only contains', size, 'data. Excluded from analysis')
+            print('Warning:', data[0], 'only contains', size, 'datapoints. Excluded from analysis')
         else:
             filtered_database.append(data)
 
-    print('Warning:', original_size - len(filtered_database), '/', original_size, 'data sets do not have enough data. Excluded from analysis')
+    print('Warning:', original_size - len(filtered_database), '/', original_size, 'datasets do not have enough data. Excluded from analysis')
     return filtered_database
 
 
