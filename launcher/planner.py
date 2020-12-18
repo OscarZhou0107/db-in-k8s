@@ -74,14 +74,12 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     conf.write(args.new_conf)
 
     # Run
-    master_cmds = ['--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
+    master_cmds = [args.python, os.path.join(args.remote_dv, 'load_generator/master.py'), '--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
         '--duration', args.duration, '--client_num', client_num, '--client_mix', client_mix, '--perf_logging', args.perf_logging,
-        '--output', args.output, '--bypass_stupid_check']
+        '--python', args.python, '--output', args.output, '--bypass_stupid_check']
     master_cmds = list(map(lambda x: str(x), master_cmds))
-    print('Info:', 'RUN:', ' '.join(master_cmds))
-    master_parser = argparse.ArgumentParser(description='master.py')
-    master.init(master_parser)
-    master.main(master_parser.parse_args(master_cmds))
+    print('Info:', ' '.join(master_cmds))
+    subprocess.Popen(master_cmds).wait()
 
     print('Info:', 'Done', 'client_num:', client_num, 'client_mix:', client_mix, 'dbproxy_num:', dbproxy_num)
     print('Info:')
@@ -138,6 +136,7 @@ def init(parser):
     parser.add_argument('--perf_logging', type=str, default='./perf', help='Dir to dump perf logging. Either absolute path, or relative path to --remote_dv!')
 
     # Optional args, not important
+    parser.add_argument('--python', default='python3', help='Python to use (needs python3)')
     parser.add_argument('--output', type=str, default='./logging', help='Directory to forward the stdout and stderr of each subprocesses. Default is devnull. Either absolute path, or relative path to --remote_dv!')
     parser.add_argument('--debug', action='store_true', help='Trun on debug messages')
 
