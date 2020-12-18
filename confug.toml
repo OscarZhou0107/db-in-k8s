@@ -15,7 +15,7 @@ addr = "128.100.13.212:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 # THESE NEEDS TO BE INTEGERS, IN us
 [dbproxy.db_mock_latency]
-begintx = {mean = 0, stddev = 200}
+begintx = {mean = 50, stddev = 200}
 endtx = {mean = 200, stddev = 300}
-read = {mean = 0, stddev = 500}
-write = {mean = 800, stddev = 2500}
+read = {mean = 150, stddev = 300}
+write = {mean = 800, stddev = 2100}
