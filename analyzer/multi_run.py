@@ -46,7 +46,7 @@ def plot_charts(args, database):
     {run_name: (PerfDB, DbproxyStatsDB)}
     '''
     # [(num_dbproxy, run_name, PerfDB)]
-    database_list = list(map(lambda x: (x[1][1].get_num_dbproxies(), x[0], x[1][0]), database.items()))
+    database_list = list(filter(lambda x: len(x[2])>0, map(lambda x: (x[1][1].get_num_dbproxies(), x[0], x[1][0]), database.items())))
     # {num_dbproxy: [(run_name, PerfDB)]}
     database_by_num_dbproxy = defaultdict(list)
     for num_dbproxy, run_name, perfdb in database_list:
