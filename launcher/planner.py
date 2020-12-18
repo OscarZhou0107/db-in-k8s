@@ -116,8 +116,8 @@ def estimate_elapsed(args):
     total = 0
     for _client_num in args.client_nums:
         for _client_mix in args.client_mixes:
-            for dbproxy_num in args.dbproxy_nums:
-                total += (args.duration + args.delay * ((dbproxy_num + 1 + 1) * 2 + 15))
+            for _dbproxy_num in args.dbproxy_nums:
+                total += (args.duration + args.delay * (3))
     return datetime.timedelta(seconds=total)
 
 
