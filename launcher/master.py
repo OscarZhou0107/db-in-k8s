@@ -35,7 +35,7 @@ except:
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
         iattempt = 0
-        max_attempt = 15
+        max_attempt = 30
         while iattempt < max_attempt:
             try:
                 self._tn = telnetlib.Telnet(host=get_ip(scheduler_admin_addr), port=get_port(scheduler_admin_addr))
@@ -542,10 +542,10 @@ def main(args):
     # Launch cargos, cannot launch scheduler first!
     for machine_idx in reversed(range(2, ssh_manager.get_num_machines())):
         ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
-    time.sleep(args.delay * ssh_manager.get_num_machines() * 2)
+    #time.sleep(args.delay * ssh_manager.get_num_machines() * 2)
     # scheduler
     ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=1, verbose=None, release=True))
-    time.sleep(args.delay * 5)
+    #time.sleep(args.delay * 5)
     # Launch client launcher last
     def client_launcher_launcher(idx, machine, machine_name):
         assert idx == 0
@@ -563,7 +563,7 @@ def main(args):
 
     print('Info:')
     print('Info:', 'Waiting for start up')
-    time.sleep(args.delay * 10)
+    #time.sleep(args.delay * 10)
 
     # Launch scheduler admin
     print('Info:')
