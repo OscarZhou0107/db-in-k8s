@@ -42,7 +42,7 @@ class SchedulerAdmin:
                 print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
                 return
             except:
-                print('Warning', 'Cannot connect to Scheduler Admin at', scheduler_admin_addr, 'Attempt', iattempt, '/', max_attempt)
+                print('Warning:', 'Cannot connect to Scheduler Admin at', scheduler_admin_addr, 'Attempt', iattempt, '/', max_attempt)
                 time.sleep(2)
                 iattempt += 1
                 assert iattempt < max_attempt
@@ -423,15 +423,15 @@ def prepare_conf(conf, args):
 
 
     conf.set_performance_logging(args.perf_logging)
-    # Set scheduler, scheduler_admin, and sequencer
+    # Set scheduler, scheduler_admin, and *sequencer*(disabled)
     # to current machine using current machine's ip address,
     # instead of localhost. Ports are not modified
     conf.update_scheduler_addr(new_ip=cur_ip)
     conf.update_scheduler_admin_addr(new_ip=cur_ip)
-    conf.update_sequencer_addr(new_ip=cur_ip)
+    #conf.update_sequencer_addr(new_ip=cur_ip)
     assert not planner.is_port_in_use(conf.get_scheduler_ip(), conf.get_scheduler_port())
     assert not planner.is_port_in_use(conf.get_scheduler_admin_ip(), conf.get_scheduler_admin_port())
-    assert not planner.is_port_in_use(conf.get_sequencer_ip(), conf.get_sequencer_port())
+    #assert not planner.is_port_in_use(conf.get_sequencer_ip(), conf.get_sequencer_port())
 
     # New Settings
     print('Info:')

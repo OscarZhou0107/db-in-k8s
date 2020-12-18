@@ -38,6 +38,13 @@ def is_port_in_use(ip, port):
         return s.connect_ex((ip, int(port))) == 0
 
 
+def find_port(ip, begin, end):
+    port = random.randint(begin, end)
+    while is_port_in_use(ip, port):
+        port = random.randint(begin, end)
+    return port
+
+
 def single_run(args, client_num, client_mix, dbproxy_num):
     print('Info:')
     print('Info:', '=============================================================================================')
@@ -69,17 +76,16 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     if args.debug:
         print('debug:', ug_candidates)
 
-    # Find the ports for scheduler, scheduler admin, and sequencer
-    cur_ip = socket.gethostbyname(socket.gethostname())
-    def find_port(begin, end):
-        port = random.randint(begin, end)
-        while is_port_in_use(cur_ip, port):
-            port = random.randint(begin, end)
-        return port
+    # Find the port for sequencer
+    ug_ip = None
+    while not check_ip_alive(ug_ip):
+        ug_ip = next(ug_slaves)
+    conf.update_sequencer_addr(new_ip=ug_ip, new_port=find_port(ug_ip, 10000, 11000))
 
-    conf.update_scheduler_addr(new_port=find_port(12000, 13000))
-    conf.update_scheduler_admin_addr(new_port=find_port(11000, 12000))
-    conf.update_sequencer_addr(new_port=find_port(10000, 11000))
+    # Find the ports for scheduler, scheduler admin
+    cur_ip = socket.gethostbyname(socket.gethostname())
+    conf.update_scheduler_addr(new_port=find_port(cur_ip, 12000, 13000))
+    conf.update_scheduler_admin_addr(new_port=find_port(cur_ip, 11000, 12000))
     print('Info:', 'Assigned ports to Scheduler, Scheduler Admin and Sequencer')
 
     # Save the conf
