@@ -35,12 +35,14 @@ except:
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
         iattempt = 0
-        while iattempt < 10:
+        max_attempt = 30
+        while iattempt < max_attempt:
             try:
                 self._tn = telnetlib.Telnet(host=get_ip(scheduler_admin_addr), port=get_port(scheduler_admin_addr))
                 print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
                 return
             except:
+                print('Warning', 'Cannot connect to Scheduler Admin at', scheduler_admin_addr, 'Attempt', iattempt, '/', max_attempt)
                 time.sleep(2)
                 iattempt += 1
     
