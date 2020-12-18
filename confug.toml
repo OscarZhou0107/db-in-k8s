@@ -1,5 +1,5 @@
 # cd dv-in-rust
-# cargo run -- --scheduler -c ./configug.toml
+# cargo run -- --scheduler -c ./confug.toml
 
 [scheduler]
 addr = "128.100.13.240:2077"
@@ -15,47 +15,7 @@ addr = "128.100.13.212:38875"
 #sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
 # THESE NEEDS TO BE INTEGERS, IN MS
 [dbproxy.db_mock_latency]
-begintx = {mean = 1, stddev = 1}
-endtx = {mean = 1, stddev = 1}
-read = {mean = 1, stddev = 1}
-write = {mean = 1, stddev = 1}
-
-[[dbproxy]]
-addr = "128.100.13.244:38875"
-#sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
-[dbproxy.db_mock_latency]
-begintx = {mean = 1, stddev = 1}
-endtx = {mean = 1, stddev = 1}
-read = {mean = 1, stddev = 1}
-write = {mean = 1, stddev = 1}
-
-
-[[dbproxy]]
-addr = "128.100.13.243:38875"
-#sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
-[dbproxy.db_mock_latency]
-begintx = {mean = 1, stddev = 1}
-endtx = {mean = 1, stddev = 1}
-read = {mean = 1, stddev = 1}
-write = {mean = 1, stddev = 1}
-
-
-[[dbproxy]]
-addr ="128.100.13.242:38875"
-#sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
-[dbproxy.db_mock_latency]
-begintx = {mean = 1, stddev = 1}
-endtx = {mean = 1, stddev = 1}
-read = {mean = 1, stddev = 1}
-write = {mean = 1, stddev = 1}
-
-[[dbproxy]]
-addr = "128.100.13.241:38875"
-#sql_conf = "host=localhost port=33333 dbname=tpcw user=qinsinin"
-[dbproxy.db_mock_latency]
-begintx = {mean = 1, stddev = 1}
-endtx = {mean = 1, stddev = 1}
-read = {mean = 1, stddev = 1}
-write = {mean = 1, stddev = 1}
-
-
+begintx = {mean = 100, stddev = 120}
+endtx = {mean = 90, stddev = 230}
+read = {mean = 90, stddev = 200}
+write = {mean = 120, stddev = 350}
