@@ -222,7 +222,7 @@ class Throughput(list):
         '''
         (peak, mean, stddev, geomean, median)
         '''
-        values = self.get_throughputs_per_sec()
+        values = self.get_throughputs_per_sec(window=1)
         return (max(values), statistics.mean(values), statistics.stdev(values), geomean(values), statistics.median(values))
 
     def plot_distribution(self, ax, alpha=1, label=None, bins=70, log=False):
