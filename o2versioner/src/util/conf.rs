@@ -226,7 +226,7 @@ impl DbProxyConf {
     }
 }
 
-/// In units of ms, by default, 100% 0ms
+/// In units of us, by default, 100% 0us
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DbMockLatency {
@@ -269,7 +269,7 @@ impl DbMockLatency {
     }
 }
 
-/// In units of ms, by default, 100% 0ms
+/// In units of us, by default, 100% 0ms
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LatencyDistr {
     pub mean: u32,
@@ -283,7 +283,7 @@ impl Default for LatencyDistr {
 }
 
 impl LatencyDistr {
-    /// In units of ms
+    /// In units of us
     pub fn new(mean: u32, stddev: u32) -> Self {
         Self { mean, stddev }
     }
@@ -291,7 +291,7 @@ impl LatencyDistr {
 
 impl fmt::Display for LatencyDistr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Latency(ms) ~ N({}, {}**2)", self.mean, self.stddev)
+        write!(f, "Latency(us) ~ N({}, {}**2)", self.mean, self.stddev)
     }
 }
 
