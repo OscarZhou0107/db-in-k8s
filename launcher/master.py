@@ -532,7 +532,7 @@ def main(args):
     # Launch cargos, cannot launch scheduler first!
     for machine_idx in reversed(range(2, ssh_manager.get_num_machines())):
         ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
-    time.sleep(args.delay * 7)
+    time.sleep(args.delay * ssh_manager.get_num_machines())
     # scheduler
     ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
     time.sleep(args.delay * 5)
