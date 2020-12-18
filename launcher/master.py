@@ -16,6 +16,7 @@ import telnetlib
 import time
 import warnings
 
+import planner
 import slave
 
 warnings.filterwarnings(action='ignore',module='.*paramiko.*')
@@ -33,8 +34,18 @@ except:
 
 class SchedulerAdmin:
     def __init__(self, scheduler_admin_addr):
-        self._tn = telnetlib.Telnet(host=get_ip(scheduler_admin_addr), port=get_port(scheduler_admin_addr))
-        print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
+        iattempt = 0
+        max_attempt = 30
+        while iattempt < max_attempt:
+            try:
+                self._tn = telnetlib.Telnet(host=get_ip(scheduler_admin_addr), port=get_port(scheduler_admin_addr))
+                print('Info:', 'Connected to Scheduler Admin at', scheduler_admin_addr)
+                return
+            except:
+                print('Warning', 'Cannot connect to Scheduler Admin at', scheduler_admin_addr, 'Attempt', iattempt, '/', max_attempt)
+                time.sleep(2)
+                iattempt += 1
+                assert iattempt < max_attempt
     
     def perf(self):
         print('Info:', 'Sending Perf request...')
@@ -374,6 +385,9 @@ class Conf:
     def get_sequencer_ip(self):
         return get_ip(self.get_sequencer_addr())
 
+    def get_sequencer_port(self):
+        return get_port(self.get_sequencer_addr())
+
     def set_sequencer_addr(self, addr):
         self._conf['sequencer']['addr'] = addr
 
@@ -415,6 +429,10 @@ def prepare_conf(conf, args):
     conf.update_scheduler_addr(new_ip=cur_ip)
     conf.update_scheduler_admin_addr(new_ip=cur_ip)
     conf.update_sequencer_addr(new_ip=cur_ip)
+    assert not planner.is_port_in_use(conf.get_scheduler_ip(), conf.get_scheduler_port())
+    assert not planner.is_port_in_use(conf.get_scheduler_admin_ip(), conf.get_scheduler_admin_port())
+    assert not planner.is_port_in_use(conf.get_sequencer_ip(), conf.get_sequencer_port())
+
     # New Settings
     print('Info:')
     print('Info:', 'New Setting:')
@@ -503,6 +521,7 @@ def main(args):
     print('Info:')
     print('Info:', 'duration:', args.duration)
     print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:', 'output', args.output)
     print('Info:')
 
 
@@ -521,9 +540,12 @@ def main(args):
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     print('Info:')
     # Launch cargos, cannot launch scheduler first!
-    for machine_idx in reversed(range(1, ssh_manager.get_num_machines())):
+    for machine_idx in reversed(range(2, ssh_manager.get_num_machines())):
         ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
-        time.sleep(args.delay)
+    #time.sleep(args.delay * ssh_manager.get_num_machines() * 2)
+    # scheduler
+    ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=1, verbose=None, release=True))
+    #time.sleep(args.delay * 5)
     # Launch client launcher last
     def client_launcher_launcher(idx, machine, machine_name):
         assert idx == 0
@@ -541,7 +563,7 @@ def main(args):
 
     print('Info:')
     print('Info:', 'Waiting for start up')
-    time.sleep(args.delay * 10)
+    #time.sleep(args.delay * 10)
 
     # Launch scheduler admin
     print('Info:')

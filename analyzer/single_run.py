@@ -347,6 +347,7 @@ def plot_distribution_charts(perfdb, dbproxy_stats_db, run_name=None):
 
 def init(parser):
     parser.add_argument('log_dir', type=str, help='log file directory for single run')
+    parser.add_argument('--nogui', action='store_true', help='Turn off gui')
 
 
 def main(args):
@@ -361,8 +362,9 @@ def main(args):
     # Print some stats
     print_stats(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=run_name)
 
-    # Plot
-    plot_distribution_charts(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=run_name)
+    if not args.nogui:
+        # Plot
+        plot_distribution_charts(perfdb=perfdb, dbproxy_stats_db=dbproxy_stats_db, run_name=run_name)
 
 
 if __name__ == '__main__':

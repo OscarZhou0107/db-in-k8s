@@ -35,7 +35,7 @@ def check_ip_alive(ip):
 
 def is_port_in_use(ip, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex((ip, port)) == 0
+        return s.connect_ex((ip, int(port))) == 0
 
 
 def single_run(args, client_num, client_mix, dbproxy_num):
@@ -106,7 +106,7 @@ def estimate_elapsed(args):
     for _client_num in args.client_nums:
         for _client_mix in args.client_mixes:
             for dbproxy_num in args.dbproxy_nums:
-                total += (args.duration + args.delay * (dbproxy_num + 1 + 1 + 10))
+                total += (args.duration + args.delay * ((dbproxy_num + 1 + 1) * 2 + 15))
     return datetime.timedelta(seconds=total)
 
 
@@ -119,6 +119,7 @@ def main(args):
     print('Info:', 'dbproxy_nums:', args.dbproxy_nums)
     print('Info:', 'duration:', args.duration)
     print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:', 'output', args.output)
     print('Info:')
     print('Info:', 'Total', total_num_tasks, 'tasks')
     if args.duration is not None:
