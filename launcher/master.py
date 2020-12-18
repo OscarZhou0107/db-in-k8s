@@ -530,9 +530,12 @@ def main(args):
     ssh_manager = SSHManager(machines=machines, username=args.username, password=args.password)
     print('Info:')
     # Launch cargos, cannot launch scheduler first!
-    for machine_idx in reversed(range(1, ssh_manager.get_num_machines())):
+    for machine_idx in reversed(range(2, ssh_manager.get_num_machines())):
         ssh_manager.launch_task_on_machine(machine_idx, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
-        time.sleep(args.delay)
+    time.sleep(args.delay * 7)
+    # scheduler
+    ssh_manager.launch_task_on_machine(1, construct_cargo_launcher(args=args, machine_idx=machine_idx, verbose=None, release=True))
+    time.sleep(args.delay * 5)
     # Launch client launcher last
     def client_launcher_launcher(idx, machine, machine_name):
         assert idx == 0
