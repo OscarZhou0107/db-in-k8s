@@ -53,7 +53,7 @@ if __name__ == "__main__":
             break
         client_range_per_host.append("{} {}".format(num - client_num_per_host, num))
 
-    host_num = len(client_num_per_host)
+    host_num = len(client_range_per_host)
 
     #host_index = [str(x) for x in range(host_num)]
     
