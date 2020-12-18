@@ -186,7 +186,7 @@ class Client:
         
         # set up logging
         # check if the log folder exist
-        log_path = os.path.join(PATH, "/logs")
+        log_path = os.path.join(PATH, "logs")
         if not os.path.isdir(log_path):
             os.mkdir(log_path)
         logname = os.path.join(log_path, "client_" + str(c_id) + "_process_" + str(os.getpid()) + ".log")
