@@ -119,6 +119,7 @@ def main(args):
     print('Info:', 'dbproxy_nums:', args.dbproxy_nums)
     print('Info:', 'duration:', args.duration)
     print('Info:', 'perf_logging:', args.perf_logging)
+    print('Info:', 'output', args.output)
     print('Info:')
     print('Info:', 'Total', total_num_tasks, 'tasks')
     if args.duration is not None:
