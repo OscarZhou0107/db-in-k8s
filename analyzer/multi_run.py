@@ -80,11 +80,12 @@ def plot_charts(args, database):
         mean_throughputs, stddev_throughputs = tuple(zip(*sr_throughputs_stats))[1:3]
         mean_latencies, stddev_latencies = tuple(zip(*latencies))[0:2]
         
-        print('nums_clients', nums_clients)
-        print('mean_throughputs', mean_throughputs)
-        print('stddev_throughputs', stddev_throughputs)
-        print('mean_latencies', mean_latencies)
-        print('stddev_latencies', stddev_latencies)
+        if args.debug:
+            print('Debug:', 'nums_clients', nums_clients)
+            print('Debug:', 'mean_throughputs', mean_throughputs)
+            print('Debug:', 'stddev_throughputs', stddev_throughputs)
+            print('Debug:', 'mean_latencies', mean_latencies)
+            print('Debug:', 'stddev_latencies', stddev_latencies)
         
         # Left y-axis for throughput
         axl.plot(nums_clients, mean_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)

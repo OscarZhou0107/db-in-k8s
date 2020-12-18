@@ -138,7 +138,7 @@ class PerfDB(DB):
 
         # Base is set to be the earliest initial_timestamp
         first_timestamp = min(db, key=lambda row: row['initial_timestamp'])['initial_timestamp']
-        print('Info:', 'first_timestamp:', first_timestamp)
+        # print('Info:', 'first_timestamp:', first_timestamp)
 
         # Sort all rows by final_timestamp
         db = sorted(db, key=lambda row: row['final_timestamp'])
