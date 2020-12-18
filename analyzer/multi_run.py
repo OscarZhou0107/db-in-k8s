@@ -147,12 +147,17 @@ def check_data_validity(database):
 
     filtered_database = list()
     for size, data in datasize_list:
+        num_clients = data[1][0].get_num_clients()
+        num_dbproxies = data[1][1].get_num_dbproxies()
+        label = '(' + str(num_clients) + ' clients, ' + str(num_dbproxies) + ' dbproxies)'
         if size < 500:
-            print('Warning:', data[0], 'only contains', size, 'datapoints. Excluded from analysis')
+            print('Critical:', data[0], label, 'only contains', size, 'datapoints. Excluded from analysis')
         else:
+            if size < 2500:
+                print('Warning:', data[0], label, 'only contains', size, 'datapoints')
             filtered_database.append(data)
 
-    print('Warning:', original_size - len(filtered_database), '/', original_size, 'datasets do not have enough data. Excluded from analysis')
+    print('Critical:', original_size - len(filtered_database), '/', original_size, 'datasets do not have enough data. Excluded from analysis')
     return filtered_database
 
 
