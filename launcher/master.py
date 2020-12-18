@@ -428,10 +428,10 @@ def prepare_conf(conf, args):
     # instead of localhost. Ports are not modified
     conf.update_scheduler_addr(new_ip=cur_ip)
     conf.update_scheduler_admin_addr(new_ip=cur_ip)
-    #conf.update_sequencer_addr(new_ip=cur_ip)
+    conf.update_sequencer_addr(new_ip=cur_ip)
     assert not planner.is_port_in_use(conf.get_scheduler_ip(), conf.get_scheduler_port())
     assert not planner.is_port_in_use(conf.get_scheduler_admin_ip(), conf.get_scheduler_admin_port())
-    #assert not planner.is_port_in_use(conf.get_sequencer_ip(), conf.get_sequencer_port())
+    assert not planner.is_port_in_use(conf.get_sequencer_ip(), conf.get_sequencer_port())
 
     # New Settings
     print('Info:')

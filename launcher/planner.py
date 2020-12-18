@@ -53,6 +53,9 @@ def single_run(args, client_num, client_mix, dbproxy_num):
 
     # Read in the conf
     conf = master.Conf(args.conf)
+
+    # Set perf_logging
+    conf.set_performance_logging(args.perf_logging)
     
     # Find the addrs for dbproxies
     ug_slaves = itertools.cycle(get_ug_slaves())
@@ -83,9 +86,11 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     conf.update_sequencer_addr(new_ip=ug_ip, new_port=find_port(ug_ip, 10000, 11000))
 
     # Find the ports for scheduler, scheduler admin
-    cur_ip = socket.gethostbyname(socket.gethostname())
-    conf.update_scheduler_addr(new_port=find_port(cur_ip, 12000, 13000))
-    conf.update_scheduler_admin_addr(new_port=find_port(cur_ip, 11000, 12000))
+    ug_ip = None
+    while not check_ip_alive(ug_ip):
+        ug_ip = next(ug_slaves)
+    conf.update_scheduler_addr(new_ip=ug_ip, new_port=find_port(ug_ip, 12000, 13000))
+    conf.update_scheduler_admin_addr(new_ip=ug_ip, new_port=find_port(ug_ip, 11000, 12000))
     print('Info:', 'Assigned ports to Scheduler, Scheduler Admin and Sequencer')
 
     # Save the conf
@@ -96,7 +101,7 @@ def single_run(args, client_num, client_mix, dbproxy_num):
     # Run
     master_cmds = [args.python, os.path.join(args.remote_dv, 'launcher/master.py'), '--conf', args.new_conf, '--remote_dv', args.remote_dv, '--username', args.username, '--password', args.password, 
         '--duration', args.duration, '--client_num', client_num, '--client_mix', client_mix, '--perf_logging', args.perf_logging,
-        '--python', args.python, '--output', args.output, '--bypass_stupid_check', '--delay', args.delay]
+        '--python', args.python, '--output', args.output, '--bypass_stupid_check', '--delay', args.delay, '--follow_conf']
     master_cmds = list(map(lambda x: str(x), master_cmds))
     print('Info:', ' '.join(master_cmds))
     subprocess.Popen(master_cmds).wait()
