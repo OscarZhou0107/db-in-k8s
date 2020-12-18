@@ -164,8 +164,8 @@ o2versioner
     - Process all requests through this connection
     - Keep a connection/session state
     - Receive a single request, process the request, and send one response back
-    - For sequencer action, send a request to Sequencer and wait for reply
-    - For dbproxy action, send a requst to dispatcher and wait for reply
+    - For Sequencer action, send a request to Sequencer and wait for reply
+    - For Dbproxy action, send a requst to dispatcher and wait for reply
     - Manages a `DispatcherAddr` object to the Dispatcher
   - Manages a pool connection to Sequencer
   - Lifetime is till all incoming connections are closed if the max connection is set
@@ -181,26 +181,26 @@ o2versioner
   - Incoming queries are executed concurrently
   - For each query, the query is sent to each transceiver in serial. After all queries
     are sent to all transceivers, waiting for the trasceiver replies concurrently. Since
-    no dbproxy replies are able to arrive before all requests are sent to transceiver,
+    no Dbproxy replies are able to arrive before all requests are sent to transceiver,
     this guarantees the query ordering within the same transaction.
 - Transceiver
-  - Manges a single `TcpStream` socket for a single dbproxy. The socket
-    is used for reading and writing to dbproxy concurrently.
+  - Manges a single `TcpStream` socket for a single Dbproxy. The socket
+    is used for reading and writing to Dbproxy concurrently.
   - `TransceiverAddr` mechanism works same as `DispathcerAddr`
   - Two separate event loops in serial:
-    - Receiving request from dispatcher and forwards to dbproxy
-    - Receiving response from dbproxy and forwards to dispatcher
-  - For each client (with the single dbproxy), a `LinkedList` is used as a FIFO queue
+    - Receiving request from dispatcher and forwards to Dbproxy
+    - Receiving response from Dbproxy and forwards to dispatcher
+  - For each client (with the single Dbproxy), a `LinkedList` is used as a FIFO queue
     for tracking the outstanding requests. Push front upon transmitting and pop back upon receiving.
     The outgoing request and incoming response all have `RequestMeta` that can uniquely identify
-    a request for each client, this is used to make sure that dbproxy does not reorder the queries
+    a request for each client, this is used to make sure that Dbproxy does not reorder the queries
     within a single transaction.
 - Admin Handler (Optional)
   - Only process a single incoming tcp connection at a time
   - Receive a single request in raw bytes, process the request, and send one response back
   - Supports remotely stopping the main handler for taking in any new connections, this also
-    stops the sequencer from taking in any new connections
-  - Can send Block and Unblock request to sequencer to block new transactions
+    stops Sequencer from taking in any new connections
+  - Can send Block and Unblock request to Sequencer to block new transactions
   
   
 ### Dbproxy
@@ -209,7 +209,7 @@ o2versioner
   - Transceiver, receive and reply client Scheduler
   - Dispatcher, process sql requests
 - Dispatcher
-  - FIFO `Queue` in order of request receiving order from scheduler from `Transceiver::Receiver`
+  - FIFO `Queue` in order of request receiving order from Scheduler from `Transceiver::Receiver`
   - Manages a DbVN
   - An event loop that is triggered by new incoming requests into the `Queue` or a version release
   - For each iteration:
@@ -222,8 +222,8 @@ o2versioner
 - Transceiver
   - Manges a single `TcpStream` socket. The socket is used for reading and writing to Scheduler concurrently.
   - Two separate event loops in parallel:
-    - Receiver: receiving request from scheduler and push into the `Queue`
-    - Responder: send response back to scheduler, also performs version release
+    - Receiver: receiving request from Scheduler and push into the `Queue`
+    - Responder: send response back to Scheduler, also performs version release
 
 
 ## Notes for asynchronous
