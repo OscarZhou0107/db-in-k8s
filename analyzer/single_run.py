@@ -93,6 +93,7 @@ class OpenAnyFile():
         self.fd.close()
 
 
+# Change this to be [()] based rather than [dict]
 class DB(list):
     def __init__(self, csv_path=None, data=None, debug=False):
         if csv_path is not None:
