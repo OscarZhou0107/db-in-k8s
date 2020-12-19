@@ -152,6 +152,18 @@ class PerfDB(DB):
 
         return Throughput(data=zip(secs, groups_of_rows), interval_length=interval_length)
 
+    def get_average_throughput(self):
+        '''
+        # Total Request / # Total Time
+        '''
+        if len(self) == 0:
+            return
+
+        first_timestamp = min(self, key=lambda row: row['initial_timestamp'])['initial_timestamp']
+        last_timestamp = max(self, key=lambda row: row['final_timestamp'])['final_timestamp']
+        
+        return len(self) / (last_timestamp - first_timestamp).total_seconds()
+
     def get_latency_stats(self):
         '''
         in seconds

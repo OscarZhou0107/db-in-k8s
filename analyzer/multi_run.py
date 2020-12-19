@@ -63,27 +63,42 @@ def plot_charts(args, database):
 
     artist_run_names = dict()
     for num_dbproxy, dataset in database_by_num_dbproxy.items():
-        # [(run_name, num_clients, sr_perf_db, perfdb)]
-        dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_request_filter), x[1]), dataset))
+        # # [(run_name, num_clients, sr_perf_db, perfdb)]
+        # dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_request_filter), x[1]), dataset))
 
-        # [(run_name, num_clients, sr_throughput(peak, mean, stddev, geomean, median), latency(mean, stddev, geomean, median), sr_perf_db, perfdb)]
-        dataset = list(map(lambda x: (x[0], x[1], x[2].get_throughput().get_stats(), x[2].get_latency_stats(), x[2], x[3]), dataset))
+        # # [(run_name, num_clients, sr_throughput(peak, mean, stddev, geomean, median), latency(mean, stddev, geomean, median), sr_perf_db, perfdb)]
+        # dataset = list(map(lambda x: (x[0], x[1], x[2].get_throughput().get_stats(), x[2].get_latency_stats(), x[2], x[3]), dataset))
+
+        # # Sort by num_clients
+        # dataset = sorted(dataset, key=lambda x: x[1])
+
+        # # Final data, all are linked by their index
+        # run_names, nums_clients, sr_throughputs_stats, latencies = tuple(zip(*dataset))[0:4]
+        # mean_throughputs = tuple(zip(*sr_throughputs_stats))[1:2]
+        # mean_latencies = tuple(zip(*latencies))[0]
+
+        # [(run_name, num_clients, perfdb)]
+        dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1]), dataset))
 
         # Sort by num_clients
         dataset = sorted(dataset, key=lambda x: x[1])
 
-        # Final data, all are linked by their index
-        run_names, nums_clients, sr_throughputs_stats, latencies = tuple(zip(*dataset))[0:4]
-        mean_throughputs = tuple(zip(*sr_throughputs_stats))[1:2]
+        run_names, nums_clients, perfdbs = tuple(zip(*dataset))
+        sr_perf_dbs = list(map(lambda x: x.get_filtered(single_run.successful_request_filter), perfdbs))
+        average_throughputs = list(map(lambda x: x.get_average_throughput(), sr_perf_dbs))
+        # sr_throughput(peak, mean, stddev, geomean, median)
+        # mean_throughputs = tuple(zip(*map(lambda x: x.get_throughput().get_stats(), sr_perf_dbs)))[1]
+        # latency(mean, stddev, geomean, median)
+        latencies = list(map(lambda x: x.get_latency_stats(), sr_perf_dbs))
         mean_latencies = tuple(zip(*latencies))[0]
         
         if args.debug:
             print('Debug:', 'nums_clients', nums_clients)
-            print('Debug:', 'mean_throughputs', mean_throughputs)
+            print('Debug:', 'average_throughputs', average_throughputs)
             print('Debug:', 'mean_latencies', mean_latencies)
         
         # Left y-axis for throughput
-        linel, = axl.plot(nums_clients, mean_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
+        linel, = axl.plot(nums_clients, average_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
         axl.set(xlabel='Number of Clients', ylabel='Average Throughput on Successful Queries (#queries/sec)')
         axl.grid(axis='x', linestyle='--')
         axl.grid(axis='y', linestyle='-')
