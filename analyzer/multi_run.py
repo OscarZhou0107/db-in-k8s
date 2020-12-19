@@ -167,6 +167,7 @@ def init(parser):
     parser.add_argument('dir', type=str, help='log files directory for all runs')
     parser.add_argument('--debug', action='store_true', help='debug messages')
     parser.add_argument('--output', type=str, help='directory to dump the files')
+    parser.add_argument('--nogui', action='store_true', help='Turn off gui')
 
 
 def main(args):
@@ -188,7 +189,8 @@ def main(args):
     print('Info:')
     print('Info:', 'Parsing took', float_fmt(end - start), 'seconds')
 
-    plot_charts(args, database)
+    if not args.nogui:
+        plot_charts(args, database)
 
 
 if __name__ == '__main__':
