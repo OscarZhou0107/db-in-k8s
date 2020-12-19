@@ -60,6 +60,8 @@ def plot_charts(args, database):
 
     axl = fig.add_subplot(1, 2, 1)
     axr = fig.add_subplot(1, 2, 2)
+
+    artist_run_names = dict()
     for num_dbproxy, dataset in database_by_num_dbproxy.items():
         # [(run_name, num_clients, sr_perf_db, perfdb)]
         dataset = list(map(lambda x: (x[0], x[1].get_num_clients(), x[1].get_filtered(single_run.successful_request_filter), x[1]), dataset))
@@ -72,7 +74,7 @@ def plot_charts(args, database):
 
         # Final data, all are linked by their index
         run_names, nums_clients, sr_throughputs_stats, latencies = tuple(zip(*dataset))[0:4]
-        mean_throughputs = tuple(zip(*sr_throughputs_stats))[1]
+        mean_throughputs = tuple(zip(*sr_throughputs_stats))[1:2]
         mean_latencies = tuple(zip(*latencies))[0]
         
         if args.debug:
@@ -81,41 +83,42 @@ def plot_charts(args, database):
             print('Debug:', 'mean_latencies', mean_latencies)
         
         # Left y-axis for throughput
-        axl.plot(nums_clients, mean_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
-        # axl.errorbar(nums_clients, mean_throughputs, yerr=stddev_throughputs, label=str(num_dbproxy) + ' dbproxies',
-        #     marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
+        linel, = axl.plot(nums_clients, mean_throughputs, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
         axl.set(xlabel='Number of Clients', ylabel='Average Throughput on Successful Queries (#queries/sec)')
         axl.grid(axis='x', linestyle='--')
         axl.grid(axis='y', linestyle='-')
         axl.legend()
 
         # Right y-axis for latency
-        axr.plot(nums_clients, mean_latencies, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
-        # axr.errorbar(nums_clients, mean_latencies, yerr=stddev_latencies, label=str(num_dbproxy) + ' dbproxies',
-        #     marker='s', capsize=2, elinewidth=1, picker=True, pickradius=2)
+        liner, = axr.plot(nums_clients, mean_latencies, label=str(num_dbproxy) + ' dbproxies', marker='.', picker=True, pickradius=2)
         axr.set(xlabel='Number of Clients', ylabel='Average Latency on Successful Queries (sec)')
         axr.grid(axis='x', linestyle='--')
         axr.grid(axis='y', linestyle='-')
         axr.legend()
 
+        artist_run_names[linel] = run_names
+        artist_run_names[liner] = run_names
+
     def on_pick(event):
         print('Info:')
         artist = event.artist
-        xmouse, ymouse = event.mouseevent.xdata, event.mouseevent.ydata
-        x, y = artist.get_xdata(), artist.get_ydata()
-        ind = event.ind
-        indx = ind[0]
-        print('Info:', 'Clicked: {:.2f}, {:.2f}'.format(xmouse, ymouse))
-        print('Info:', 'Picked {} vertices: '.format(len(ind)), end='')
-        if len(ind) != 1:
-            print('Info:', 'Pick between vertices {} and {}'.format(min(ind), max(ind)+1))
-        else:
-            print('Info:', 'Picked vertice index:', indx)
+        if artist in artist_run_names:
+            run_names = artist_run_names[artist]
+            xmouse, ymouse = event.mouseevent.xdata, event.mouseevent.ydata
+            x, y = artist.get_xdata(), artist.get_ydata()
+            ind = event.ind
+            indx = ind[0]
+            print('Info:', 'Clicked: {:.2f}, {:.2f}'.format(xmouse, ymouse))
+            print('Info:', 'Picked {} vertices: '.format(len(ind)), end='')
+            if len(ind) != 1:
+                print('Info:', 'Pick between vertices {} and {}'.format(min(ind), max(ind)+1))
+            else:
+                print('Info:', 'Picked vertice index:', indx)
 
-        print('Info:', 'Selected: {:.2f}, {:.2f}'.format(x[indx], y[indx]))
-        run_name = run_names[indx]
-        single_run.print_stats(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
-        single_run.plot_distribution_charts(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
+            print('Info:', 'Selected: {:.2f}, {:.2f}'.format(x[indx], y[indx]))
+            run_name = run_names[indx]
+            single_run.print_stats(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
+            single_run.plot_distribution_charts(run_name=run_name, perfdb=database[run_name][0], dbproxy_stats_db=database[run_name][1])
 
     fig.canvas.callbacks.connect('pick_event', on_pick)
 
