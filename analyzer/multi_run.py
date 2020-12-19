@@ -74,9 +74,7 @@ def plot_charts(args, database):
         average_throughputs = list(map(lambda x: x.get_average_throughput(), sr_perf_dbs))
         # sr_throughput(peak, mean, stddev, geomean, median)
         # mean_throughputs = tuple(zip(*map(lambda x: x.get_throughput().get_stats(), sr_perf_dbs)))[1]
-        # latency(mean, stddev, geomean, median)
-        latencies = list(map(lambda x: x.get_latency_stats(), sr_perf_dbs))
-        mean_latencies = tuple(zip(*latencies))[0]
+        mean_latencies = list(map(lambda x: x.get_mean_latency(), sr_perf_dbs))
         
         if args.debug:
             print('Debug:', 'nums_clients', nums_clients)

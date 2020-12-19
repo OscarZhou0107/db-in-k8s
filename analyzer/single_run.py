@@ -177,6 +177,17 @@ class PerfDB(DB):
         latency = list(map(lambda row: row['latency'], db))
         return (statistics.mean(latency), statistics.stdev(latency), geomean(latency), statistics.median(latency))
 
+    def get_mean_latency(self):
+        '''
+        in seconds
+        mean
+        '''
+        if len(self) < 2:
+            return
+
+        latency = list(map(lambda row: row['latency'], self))
+        return statistics.mean(latency)
+
     def plot_latency_distribution(self, ax, alpha=1, label=None, bins=50, log=True):
         db = list(self)
 
