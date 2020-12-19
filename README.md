@@ -16,7 +16,7 @@ Cristiana Amza, Alan L. Cox and Willy Zwaenepoel
 
 
 ## Report
-[Report](http://htmlpreview.github.io/?https://github.com/lichen-liu/dv-in-rust/blob/main/intro/intro.html)
+[Report](http://htmlpreview.github.io/?https://github.com/lichen-liu/dv-in-rust/blob/main/report/report.html)
 
 
 ## How to run
