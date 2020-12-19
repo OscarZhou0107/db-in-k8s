@@ -15,6 +15,10 @@ Distributed Versioning: Consistent Replication for Scaling Back-end Databases of
 Cristiana Amza, Alan L. Cox and Willy Zwaenepoel  
 
 
+## Report
+[Report](http://htmlpreview.github.io/?https://github.com/lichen-liu/dv-in-rust/blob/main/intro/intro.html)
+
+
 ## How to run
 
 
