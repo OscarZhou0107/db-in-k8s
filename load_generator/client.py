@@ -17,7 +17,7 @@ import sql
 
 TT = 0
 #TT = 0.5 # think time
-MAX_TIME = 6000
+MAX_TIME = 10
 MAX_PROB = 9999
 OK = "Ok"
 NUM_ITEM = 1000
@@ -213,6 +213,10 @@ class Client:
         self.logger.info("Client {} in process {} connected at port {}".format(self.c_id, os.getpid(), self.port))
 
         while datetime.datetime.now() < self.max_time:
+            # [FIXME] added to avoid crushing when self.curr becomes None sometimes
+            if(self.curr==None) :
+                self.curr = 'home'
+            
             curr_index = con_data.states.index(self.curr)
             self.logger.debug("=======================================")
             self.logger.critical("Entering webpage {}".format(self.curr))
@@ -1289,13 +1293,13 @@ class Client:
 if __name__ == "__main__":
     # use port 56728 for testing
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=1077)
+    parser.add_argument("--port", type=int, default=2077)
     parser.add_argument("--c_id", type=int)
     parser.add_argument("--mix", type=int, default=0)
     parser.add_argument("--debug", type=int, default=0)
-    parser.add_argument("--mock_db", type=int, default=0)
-    parser.add_argument("--ip", type=str, default='128.100.13.240')
-    parser.add_argument("--path", type=str, default='/groups/qlhgrp/dv-in-rust/load_generator/')
+    parser.add_argument("--mock_db", type=int, default=1)
+    parser.add_argument("--ip", type=str, default='127.0.0.1')
+    parser.add_argument("--path", type=str, default='/Users/larrywu/Desktop/Capstone/implementation/load_generator')
 
     args = parser.parse_args()
 
