@@ -9,9 +9,9 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Specify the port number that needs to be exposed
-EXPOSE 1077
+EXPOSE 2077
 
 # Command for running the application
-CMD ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "127.0.0.1", "--path", "/usr/src/"]
+CMD ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "host.docker.internal", "--path", "/usr/src/"]
 
 
