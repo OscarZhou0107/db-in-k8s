@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 2077
 
 # Command for running the application
+# Note that here we use "host.docker.internal" to connect to the localhost
 CMD ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "host.docker.internal", "--path", "/usr/src/"]
 
 
