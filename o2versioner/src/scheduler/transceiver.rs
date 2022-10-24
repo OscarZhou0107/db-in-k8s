@@ -54,6 +54,7 @@ pub type TransceiverAddr = ExecutorAddr<TransceiverRequest>;
 /// # Notes
 /// 1. Uses a single TCP connection for both sending and receiving
 /// 2. Sending and receiving are split so can send and receive concurrently
+#[derive(Debug)]
 pub struct Transceiver {
     dbproxy_addr: SocketAddr,
     request_rx: RequestReceiver<TransceiverRequest>,

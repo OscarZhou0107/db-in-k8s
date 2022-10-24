@@ -45,7 +45,12 @@ impl Conf {
 
     /// Return a list of dbproxy addresses in `Vec<SocketAddr>`
     pub fn to_dbproxy_addrs(&self) -> Vec<SocketAddr> {
-        self.dbproxy.iter().map(|dbproxyconf| dbproxyconf.to_addr()).collect()
+        let soc_vec = self.dbproxy.iter().map(|dbproxyconf| dbproxyconf.to_addr()).collect();
+        for soc in &soc_vec {
+            // println!("[Larry] list of proxy ips: {}", soc);
+            dbg!(soc);
+        }
+        soc_vec
     }
 }
 

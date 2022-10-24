@@ -16,8 +16,8 @@ use futures::prelude::*;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use std::net::SocketAddr;
 use std::sync::Arc;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::net::TcpStream;
 use tokio::signal;
 use tokio::sync::oneshot;
@@ -27,7 +27,6 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 use unicase::UniCase;
-
 /// Main entrance for the Scheduler
 ///
 /// # Modes
@@ -60,6 +59,8 @@ pub async fn main(conf: Conf) {
         .await
         .unwrap();
 
+    dbg!(conf.scheduler.transceiver_queue_size);
+
     // Prepare transceiver
     let (transceiver_addrs, transceivers): (Vec<_>, Vec<_>) = conf
         .to_dbproxy_addrs()
@@ -69,6 +70,8 @@ pub async fn main(conf: Conf) {
             ((dbproxy_addr, trscaddrs), trsc)
         })
         .unzip();
+    
+    // dbg!(&transceivers);
 
     // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
@@ -168,6 +171,25 @@ pub async fn main(conf: Conf) {
 
     info!("DIES");
 }
+
+// spawn more transciever threads to handle new proxy communications 
+// right now we use the main binary to start this, but ideally we should prob use admin
+// to listen to requsts, because first the tranceiver and dispatchers are thread within the scheduler process
+// although their communication seems to be done via TCP, it is hard to modify the data structures they share, such as the 
+// dbproxymanager if we start them on different processes
+pub async fn connect_replica(conf : Conf) {
+    println!("In scheduler's connect_replica");
+
+    //for now lets just try if we can start a few tranciever threads from main
+
+    // Prepare transceiver
+    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
+    let (_transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
+    // Launch transceiver as a new task
+    let transceiver_handle = tokio::spawn(Box::new(transceiver).run().in_current_span());
+    let _join = tokio::join!(transceiver_handle);
+}
+
 
 #[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state))]
 async fn admin(

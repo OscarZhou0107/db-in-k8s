@@ -2,7 +2,7 @@ use std::env;
 
 use clap::{App, Arg, ArgGroup, ArgMatches};
 use o2versioner::util::conf::Conf;
-use o2versioner::{dbproxy_main, scheduler_main, sequencer_main};
+use o2versioner::{dbproxy_main, scheduler_main, sequencer_main, connect_replica};
 use tracing::info;
 
 pub fn init_logger() {}
@@ -12,7 +12,6 @@ pub fn init_logger() {}
 async fn main() {
     // Parse args
     let matches = parse_args();
-
     // Set tracing
     let max_level = match matches.occurrences_of("v") {
         0 => tracing::Level::INFO,
@@ -43,7 +42,21 @@ async fn main() {
     if matches.is_present("dbproxy") {
         let index: usize = matches.value_of("dbindex").unwrap().to_string().parse().unwrap();
         dbproxy_main(conf.dbproxy.get(index).unwrap().clone()).await
-    } else if matches.is_present("scheduler") {
+    } 
+    //start a new proxy acording to the 
+    else if matches.is_present("replicate") {
+        println!("Replicating a proxy...");
+        //copy the mockdb latency from the conf file
+        let ip: String = matches.value_of("ipaddr").unwrap().to_string();
+        let mut replicate_conf = conf.dbproxy.get(0).unwrap().clone();
+        replicate_conf.addr = ip;
+        dbproxy_main(replicate_conf).await
+    }
+    else if matches.is_present("connect-replica") {
+        println!("Connecting to a replica...");
+        connect_replica(conf).await
+    }
+    else if matches.is_present("scheduler") {
         scheduler_main(conf).await
     } else if matches.is_present("sequencer") {
         sequencer_main(conf.sequencer).await
@@ -70,16 +83,34 @@ fn parse_args() -> ArgMatches<'static> {
                 .requires("dbindex"),
         )
         .arg(
+            Arg::with_name("replicate")
+                .long("replicate")
+                .help("Replicate a db proxy")
+                .requires("ipaddr"),
+        )
+        .arg(
+            Arg::with_name("connect-replica")
+                .long("connect-replica")
+                .help("Connecting to a db proxy")
+        )
+        .arg(
             Arg::with_name("dbindex")
                 .long("dbindex")
                 .help("Indicate the index of dbproxy")
                 .index(1),
         )
+        .arg(
+            Arg::with_name("ipaddr")
+                .long("ipaddr")
+                .help("Set the address of the new proxy")
+                .value_name("ip_addr")
+                .takes_value(true),
+        )
         .arg(Arg::with_name("scheduler").long("scheduler").help("Run the scheduler"))
         .arg(Arg::with_name("sequencer").long("sequencer").help("Run the sequencer"))
         .group(
             ArgGroup::with_name("binary")
-                .args(&["dbproxy", "scheduler", "sequencer"])
+                .args(&["dbproxy", "scheduler", "sequencer", "replicate", "connect-replica"])
                 .required(true),
         )
         .arg(Arg::with_name("v").short("v").multiple(true).help("v-debug, vv-trace"))
