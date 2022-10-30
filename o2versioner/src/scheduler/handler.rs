@@ -27,6 +27,7 @@ use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 use unicase::UniCase;
+
 /// Main entrance for the Scheduler
 ///
 /// # Modes
@@ -72,12 +73,13 @@ pub async fn main(conf: Conf) {
         .unzip();
     
     // dbg!(&transceivers);
+    let mut dbproxy_manager = DbproxyManager::from_iter(transceiver_addrs);
 
     // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
         state.share_dbvn_manager(),
-        DbproxyManager::from_iter(transceiver_addrs),
+        dbproxy_manager.clone(),
     );
 
     // Launch transceiver as a new task
@@ -87,8 +89,10 @@ pub async fn main(conf: Conf) {
             .in_current_span(),
     );
 
+    let dispatcher_box = Box::new(dispatcher);
+
     // Launch dispatcher as a new task
-    let dispatcher_handle = tokio::spawn(Box::new(dispatcher).run().in_current_span());
+    let dispatcher_handle = tokio::spawn(dispatcher_box.run().in_current_span());
 
     // Create a stop_signal channel if admin mode is turned on
     let (stop_tx, stop_rx) = if conf.scheduler.admin_addr.is_some() {
@@ -102,10 +106,18 @@ pub async fn main(conf: Conf) {
     let conf_clone = conf.scheduler.clone();
     let sequencer_socket_pool_clone = sequencer_socket_pool.clone();
     let state_clone = state.clone();
+
+    //this handler thread listens the TCP msg from the admin port 
+    //so we need this thread to do two things 
+    //1) spawn transciever thread for the new proxy 
+        //- how to spawn inside a thread
+    //2) pass the new tranceiver addr to te dispatcher
+        //- pass the dispatcher struct by reference and modify the transciever addr list
     let handler_handle = tokio::spawn(
         tcp::start_tcplistener(
             conf.scheduler.to_addr(),
             move |tcp_stream| {
+                dbg!(&tcp_stream);
                 let sequencer_socket_pool = sequencer_socket_pool_clone.clone();
                 let state_cloned = state_clone.clone();
                 let conf = conf_clone.clone();
@@ -149,6 +161,8 @@ pub async fn main(conf: Conf) {
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),
+                dbproxy_manager.clone(),
+                // &mut dispatcher_box,
             )
             .in_current_span(),
         );
@@ -177,9 +191,9 @@ pub async fn main(conf: Conf) {
 // to listen to requsts, because first the tranceiver and dispatchers are thread within the scheduler process
 // although their communication seems to be done via TCP, it is hard to modify the data structures they share, such as the 
 // dbproxymanager if we start them on different processes
-pub async fn connect_replica(conf : Conf) {
+pub async fn connect_replica() {
+    let conf = Conf::from_file("o2versioner/conf.toml");
     println!("In scheduler's connect_replica");
-
     //for now lets just try if we can start a few tranciever threads from main
 
     // Prepare transceiver
@@ -191,13 +205,17 @@ pub async fn connect_replica(conf : Conf) {
 }
 
 
-#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state))]
+#[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state, dbproxy_manager, /*dispatcher*/))]
 async fn admin(
     admin_addr: SocketAddr,
     stop_tx: Option<oneshot::Sender<()>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     state: State,
+    dbproxy_manager: DbproxyManager,
+    // dispatcher: &mut Box<Dispatcher>,
 ) {
+    //we want a vec of tranceiver threads here 
+    //vec! 
     start_admin_tcplistener(admin_addr, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
         let state = state.clone();
@@ -206,11 +224,13 @@ async fn admin(
                 ("block_unblock", vec!["block", "unblock"]),
                 ("kill", vec!["kill", "exit", "quit"]),
                 ("perf", vec!["perf"]),
+                ("connect_replica", vec!["connect"]),
             ]
             .into_iter()
             .map(|(k, vs)| (k, vs.into_iter().map(|v| UniCase::new(String::from(v))).collect()))
             .collect();
 
+            println!("{}", msg);
             let command = UniCase::new(msg);
 
             if cmd_registry.get("block_unblock").unwrap().contains(&command) {
@@ -249,7 +269,11 @@ async fn admin(
             } else if cmd_registry.get("perf").unwrap().contains(&command) {
                 let location_dumped = state.dump_perf_log().await;
                 (format!("Perf logging dumped to {:?}", location_dumped), true)
-            } else {
+            }
+            else if cmd_registry.get("connect_replica").unwrap().contains(&command) {
+                (format!("Connecting to the new proxy"), true)
+            } 
+            else {
                 (
                     format!("Unknown command: {}. Available commands: {:?}", command, cmd_registry),
                     true,
@@ -258,6 +282,9 @@ async fn admin(
         }
     })
     .await;
+
+    //at this point, the stop signal has been sent
+    //so we join the extra tranciever threads here 
 
     stop_tx.unwrap().send(()).unwrap();
 

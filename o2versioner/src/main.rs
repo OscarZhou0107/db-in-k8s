@@ -54,7 +54,7 @@ async fn main() {
     }
     else if matches.is_present("connect-replica") {
         println!("Connecting to a replica...");
-        connect_replica(conf).await
+        connect_replica().await
     }
     else if matches.is_present("scheduler") {
         scheduler_main(conf).await
