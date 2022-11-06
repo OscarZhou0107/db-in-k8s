@@ -1,6 +1,9 @@
 [scheduler]
-addr = "127.0.0.1:2077"
-admin_addr = "127.0.0.1:9999"
+# Note: a docker have two internet interfaces: 127.0.0.1 and the interface for communicating with
+# the outside, we need to listen on the second interface for connecting with other dockers.
+# https://pythonspeed.com/articles/docker-connection-refused/#:~:text=The%20solution%3A%20listen%20on%20all%20interfaces
+addr = "0.0.0.0:2077"
+admin_addr = "0.0.0.0:9999"
 #disable_early_release = true
 #disable_single_read_optimization = true
 

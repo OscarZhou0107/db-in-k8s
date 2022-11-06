@@ -2,7 +2,7 @@
 FROM python:3.8
 
 # Set the working directory and copy all the files to the container
-WORKDIR /usr/src/
+# WORKDIR /usr/src/
 COPY . .
 
 # Install dependencies
@@ -13,6 +13,7 @@ EXPOSE 2077
 
 # Command for running the application
 # Note that here we use "host.docker.internal" to connect to the localhost
-CMD ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "host.docker.internal", "--path", "/usr/src/"]
+# Note that here we use "systems" to connect to the server through the bridge
+CMD ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "systems", "--path", "/usr/src/"]
 
 
