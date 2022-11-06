@@ -10,8 +10,8 @@ docker network rm db-in-k8s
 docker network create --subnet=172.25.0.0/16 db-in-k8s
 
 # Build the images
-# docker build ./ -t systems
-# docker build ./load_generator -t load_generator -f load_generator/Dockerfile
+docker build ./ -t systems
+docker build ./load_generator -t load_generator -f load_generator/Dockerfile
 
 # Run the system
 echo Starting dbproxies...
