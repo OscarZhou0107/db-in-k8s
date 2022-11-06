@@ -21,5 +21,3 @@ RUN cargo build
 # Specify the port number that needs to be exposed
 EXPOSE 2077
 
-CMD ["./systems_start.sh"]
-
