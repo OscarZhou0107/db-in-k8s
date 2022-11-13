@@ -206,6 +206,10 @@ impl DbVNManager {
     pub fn inner(&self) -> &HashMap<SocketAddr, DbVN> {
         &self.0
     }
+
+    pub fn insert(&mut self, socket:SocketAddr) {
+        self.0.insert(socket, DbVN::default());
+    }
 }
 
 #[derive(Clone)]

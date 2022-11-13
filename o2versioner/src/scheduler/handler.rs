@@ -76,9 +76,10 @@ pub async fn main(conf: Conf) {
     let dbproxy_manager = Arc::new(RwLock::new(DbproxyManager::from_iter(transceiver_addrs)));
     //dbg!(state.share_dbvn_manager());
     // Prepare dispatcher
+    let dbvn_manager:Arc<RwLock<DbVNManager>> = state.share_dbvn_manager();
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
-        state.share_dbvn_manager(),
+        dbvn_manager.clone(),
         dbproxy_manager.clone(),
     );
 
@@ -162,6 +163,7 @@ pub async fn main(conf: Conf) {
                 sequencer_socket_pool,
                 state.clone(),
                 dbproxy_manager,
+                dbvn_manager,
                 // &mut dispatcher_box,
             )
             .in_current_span(),
@@ -212,11 +214,12 @@ async fn admin(
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     state: State,
     dbproxy_manager: Arc<RwLock<DbproxyManager>>,
+    dbvn_manager:Arc<RwLock<DbVNManager>>,
     // dispatcher: &mut Box<Dispatcher>,
 ) {
     //we want a vec of tranceiver threads here 
     //vec! 
-    start_admin_tcplistener(admin_addr,  dbproxy_manager, move |msg| {
+    start_admin_tcplistener(admin_addr,  dbproxy_manager, dbvn_manager, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
         let state = state.clone();
         async move {
