@@ -6,11 +6,11 @@ use crate::util::conf::*;
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 #[derive(Debug, Clone)]
 /// A collection of shared variables across
@@ -208,7 +208,9 @@ impl DbVNManager {
     }
 
     pub fn insert(&mut self, socket:SocketAddr) {
-        self.0.insert(socket, DbVN::default());
+        let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
+
+        self.0.insert(socket, self.0.get(&socket_addr).unwrap().clone());
     }
 }
 

@@ -17,7 +17,7 @@ import sql
 
 TT = 0
 #TT = 0.5 # think time
-MAX_TIME = 10
+MAX_TIME = 50
 MAX_PROB = 9999
 OK = "Ok"
 NUM_ITEM = 1000
@@ -31,7 +31,7 @@ ALLOW_ABORT = 1
 
 def determineNext(curr_index, prob):
     row = prob[curr_index]
-    value = randint(0, MAX_PROB)
+    value = randint(1, MAX_PROB)
     for i in range(len(row)):
         if value <= row[i]:
             return con_data.states[i]
@@ -216,7 +216,7 @@ class Client:
             # [FIXME] added to avoid crushing when self.curr becomes None sometimes
             if(self.curr==None) :
                 self.curr = 'home'
-            
+            retry = False
             curr_index = con_data.states.index(self.curr)
             self.logger.debug("=======================================")
             self.logger.critical("Entering webpage {}".format(self.curr))
@@ -250,8 +250,10 @@ class Client:
 
                 if OK not in data["reply"]["BeginTx"]:
                     self.logger.error("Begin response contains error, terminating...")
-                    return 0
-            
+                    # return 0
+                    retry = True
+            if(retry):
+                continue
             if self.curr == 'adminConf':
                 okay = self.doAdminConf()
             elif self.curr == 'adminReq':
