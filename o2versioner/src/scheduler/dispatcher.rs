@@ -54,11 +54,11 @@ impl DispatcherRequest {
 struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     dbvn_manager_notify: Arc<Notify>,
-    dbproxy_manager: DbproxyManager,
+    dbproxy_manager: Arc<RwLock<DbproxyManager>>,
 }
 
 impl State {
-    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager: DbproxyManager) -> Self {
+    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager:  Arc<RwLock<DbproxyManager>>) -> Self {
         Self {
             dbvn_manager,
             dbvn_manager_notify: Arc::new(Notify::new()),
@@ -76,7 +76,7 @@ impl State {
 
         // Check whether there are no dbproxies in managers at all,
         // if such case, early exit
-        if self.dbproxy_manager.inner().is_empty() {
+        if self.dbproxy_manager.read().await.inner().is_empty() {
             warn!("There are currently no dbproxy servers online, Scheduler dispatcher skipped the work");
 
             reply_ch
@@ -99,12 +99,12 @@ impl State {
                     AccessPattern::ReadOnly => {
                         vec![self.wait_on_version_for_read_only_query(msqlquery, &request.txvn).await]
                     }
-                    AccessPattern::WriteOnly => self.dbproxy_manager.to_vec(),
+                    AccessPattern::WriteOnly => self.dbproxy_manager.read().await.to_vec(),
                 }
             }
             Msql::EndTx(msqlendtx) => {
                 Span::current().record("op", &&format!("{:?}", msqlendtx.mode())[..]);
-                self.dbproxy_manager.to_vec()
+                self.dbproxy_manager.read().await.to_vec()
             }
         };
 
@@ -260,16 +260,18 @@ impl State {
             }
 
             // Choose the dbproxy with least load
+            // Choose the dbproxy with least load
             let avail_dbproxy_load: Vec<_> =
                 stream::iter(avail_dbproxy.into_iter().map(|(dbproxy_addr, dbtablevns)| {
                     (
                         dbproxy_addr.clone(),
-                        self.dbproxy_manager.get(&dbproxy_addr),
+                        self.dbproxy_manager.read(),
                         dbtablevns,
                     )
                 }))
                 .then(|(dbproxy_addr, transceiver_addr, dbtablevns)| async move {
-                    match transceiver_addr.request(TransceiverRequest::DbproxyLoad).await.unwrap() {
+                    let n  = transceiver_addr.await.get(&dbproxy_addr);
+                    match n.request(TransceiverRequest::DbproxyLoad).await.unwrap() {
                         TransceiverReply::DbproxyLoad(load) => (dbproxy_addr, load, dbtablevns),
                         _ => panic!("Unexpected TransceiverReply"),
                     }
@@ -289,7 +291,7 @@ impl State {
             );
             (
                 selected_dbproxy.0.clone(),
-                self.dbproxy_manager.get(&selected_dbproxy.0),
+                self.dbproxy_manager.read().await.get(&selected_dbproxy.0),
             )
         } else {
             // Single read operation that does not have a TxVN
@@ -316,7 +318,7 @@ impl State {
             );
             (
                 selected_dbproxy.0.clone(),
-                self.dbproxy_manager.get(&selected_dbproxy.0),
+                self.dbproxy_manager.read().await.get(&selected_dbproxy.0),
             )
         }
     }
@@ -350,7 +352,7 @@ impl Dispatcher {
     pub fn new(
         queue_size: usize,
         dbvn_manager: Arc<RwLock<DbVNManager>>,
-        dbproxy_manager: DbproxyManager,
+        dbproxy_manager:  Arc<RwLock<DbproxyManager>>,
     ) -> (DispatcherAddr, Dispatcher) {
         let state = State::new(dbvn_manager, dbproxy_manager);
 

@@ -4,25 +4,31 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tracing::{field, info, info_span, instrument, warn, Instrument, Span};
+use super::core::{DbproxyManager};
 
 //bringing in every crates from the handler, don't need them all tho
-use super::dispatcher::*;
+// use super::dispatcher::*;
 use super::transceiver::*;
 use crate::util::conf::*;
 use crate::util::executor::Executor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use tokio::sync::{RwLock};
+use std::sync::Arc;
 
 
-pub async fn connect_replica() {
+pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>) {
     let conf = Conf::from_file("o2versioner/conf.toml");
     println!("In scheduler's connect_replica");
     //for now lets just try if we can start a few tranciever threads from main
+    dbg!(dbproxy_manager.read().await.inner());
 
     // Prepare transceiver
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
-    let (_transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
+    let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
+    dbproxy_manager.write().await.insert(socket, transceiver_addr);
     // Launch transceiver as a new task
     let transceiver_handle = tokio::spawn(Box::new(transceiver).run().in_current_span());
+    dbg!(dbproxy_manager.read().await.inner());
     let _join = tokio::join!(transceiver_handle);
 }
 
@@ -33,8 +39,9 @@ pub async fn connect_replica() {
 /// 2. `admin_command_handler` is a `FnMut` closure takes in `String` and returns `Future<Output = (String, bool)>`,
 /// with `String` represents the reply response, and `bool` denotes whether to continue the `TcpListener`.
 /// 3. The returned `String` should not have any newline characters
-#[instrument(name="listen", skip(addr, admin_command_handler), fields(message=field::Empty))]
-pub async fn start_admin_tcplistener<A, C, Fut>(addr: A, mut admin_command_handler: C)
+#[instrument(name="listen", skip(addr, admin_command_handler, dbproxy_manager), fields(message=field::Empty))]
+pub async fn start_admin_tcplistener<A, C, Fut>(addr: A,     dbproxy_manager: Arc<RwLock<DbproxyManager>>,
+            mut admin_command_handler: C)
 where
     A: ToSocketAddrs,
     C: FnMut(String) -> Fut,
@@ -63,11 +70,9 @@ where
                         if line == "connect" {
                             info!("Starting a tranciever thread in the admin control pannel");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tranceivers.push(tokio::spawn(connect_replica().in_current_span()));
+                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone()).in_current_span()));
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
-
-
                         }
                         else {
                             //old admin command handlers 

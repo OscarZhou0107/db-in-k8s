@@ -21,12 +21,12 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::net::TcpStream;
 use tokio::signal;
 use tokio::sync::oneshot;
-use tokio::sync::Mutex;
 use tokio_serde::formats::SymmetricalJson;
 use tokio_serde::SymmetricallyFramed;
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 use unicase::UniCase;
+use tokio::sync::{Mutex, RwLock};
 
 /// Main entrance for the Scheduler
 ///
@@ -72,9 +72,9 @@ pub async fn main(conf: Conf) {
         })
         .unzip();
     
-    // dbg!(&transceivers);
-    let mut dbproxy_manager = DbproxyManager::from_iter(transceiver_addrs);
-
+    dbg!(&transceiver_addrs);
+    let dbproxy_manager = Arc::new(RwLock::new(DbproxyManager::from_iter(transceiver_addrs)));
+    //dbg!(state.share_dbvn_manager());
     // Prepare dispatcher
     let (dispatcher_addr, dispatcher) = Dispatcher::new(
         conf.scheduler.dispatcher_queue_size,
@@ -161,7 +161,7 @@ pub async fn main(conf: Conf) {
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),
-                dbproxy_manager.clone(),
+                dbproxy_manager,
                 // &mut dispatcher_box,
             )
             .in_current_span(),
@@ -211,12 +211,12 @@ async fn admin(
     stop_tx: Option<oneshot::Sender<()>>,
     sequencer_socket_pool: Pool<tcp::TcpStreamConnectionManager>,
     state: State,
-    dbproxy_manager: DbproxyManager,
+    dbproxy_manager: Arc<RwLock<DbproxyManager>>,
     // dispatcher: &mut Box<Dispatcher>,
 ) {
     //we want a vec of tranceiver threads here 
     //vec! 
-    start_admin_tcplistener(admin_addr, move |msg| {
+    start_admin_tcplistener(admin_addr,  dbproxy_manager, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
         let state = state.clone();
         async move {

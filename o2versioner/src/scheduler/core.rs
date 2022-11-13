@@ -235,6 +235,10 @@ impl DbproxyManager {
             .map(|(addr, transceiver_addr)| (addr.clone(), transceiver_addr.clone()))
             .collect()
     }
+
+    pub fn insert(&mut self, socket: SocketAddr, transceiver_addr: TransceiverAddr) {
+        self.0.insert(socket, transceiver_addr);
+    }
 }
 
 /// Unit test for `ConnectionState`
