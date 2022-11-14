@@ -80,6 +80,9 @@ impl Executor for Receiver {
                         debug!("Request content is: {:?}", request.clone());
                         pending_queue.lock().await.emplace(meta, request, versions);
                     }
+                    Message::ReplicateRequest(new_db) => {
+                        info!("received SocketAddr: {:?}", new_db.clone()); 
+                    }
                     _ => debug!("nope"),
                 }
             }

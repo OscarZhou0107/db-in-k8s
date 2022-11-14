@@ -6,7 +6,7 @@ use tokio::net::{TcpListener, ToSocketAddrs};
 use tracing::{field, info, info_span, instrument, warn, Instrument, Span};
 use super::core::DbVNManager;
 use super::core::{DbproxyManager};
-
+use crate::comm::scheduler_dbproxy::*;
 //bringing in every crates from the handler, don't need them all tho
 // use super::dispatcher::*;
 use super::transceiver::*;
@@ -15,7 +15,7 @@ use crate::util::executor::Executor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::sync::{RwLock};
 use std::sync::Arc;
-
+use tracing::{error, trace};
 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     let conf = Conf::from_file("o2versioner/conf.toml");
@@ -39,6 +39,43 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     let _join = tokio::join!(transceiver_handle);
 }
 
+pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager:Arc<RwLock<DbVNManager>>) {
+    let dbproxy_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
+    let new_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
+    let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
+    let dbproxy_addrs = vec![(dbproxy_addr, transceiver_addr)];
+    let msg = Message::ReplicateRequest(new_db.clone());
+    println!("In replicating {:?}", dbproxy_addrs.clone());
+    println!("Msg {:?}", msg.clone());
+    let num_dbproxy = dbproxy_addrs.len();
+    let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
+    // Send all requests to transceivers
+    let _addr_receipts: Vec<_> = dbproxy_tasks_stream
+    .then(move |(dbproxy_addr, transceiver_addr)| {
+        let msg = msg.clone();
+        let dbproxy_addr_clone = dbproxy_addr.clone();
+        trace!("-> {:?}", msg);
+        async move {
+            transceiver_addr
+                .request_nowait(TransceiverRequest::Dbreplica {
+                    dbproxy_addr: dbproxy_addr.clone(),
+                    dbproxy_msg: msg,
+                })
+                .inspect_err(|e| error!("Cannot send: {:?}", e))
+                .map_ok(|receipt| (dbproxy_addr, receipt))
+                .await
+        }
+        .instrument(info_span!("->dbproxy", N = num_dbproxy, message = %dbproxy_addr_clone))
+    })
+    .filter_map(|r| async move {
+        match r {
+            Err(_) => None,
+            Ok(r) => Some(r),
+        }
+    })
+    .collect()
+    .await;
+}
 /// Helper function to bind to a `TcpListener` as an admin port and forward all incomming `TcpStream` to `connection_handler`.
 ///
 /// # Notes:
@@ -80,6 +117,11 @@ where
                             tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span()));
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
+                        }
+                        else if line == "replica" {
+                            info!("transfering date from old to new proxy, inform old data proxy to transfer");
+                            //[Oscar] we start the above replica() function in a thread 
+                            tokio::spawn(replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span());
                         }
                         else {
                             //old admin command handlers 

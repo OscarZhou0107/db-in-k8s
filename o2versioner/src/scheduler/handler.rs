@@ -227,7 +227,8 @@ async fn admin(
                 ("block_unblock", vec!["block", "unblock"]),
                 ("kill", vec!["kill", "exit", "quit"]),
                 ("perf", vec!["perf"]),
-                ("connect_replica", vec!["connect"]),
+                ("connect", vec!["connect"]),
+                ("replica", vec!["replica"]), 
             ]
             .into_iter()
             .map(|(k, vs)| (k, vs.into_iter().map(|v| UniCase::new(String::from(v))).collect()))
@@ -273,8 +274,12 @@ async fn admin(
                 let location_dumped = state.dump_perf_log().await;
                 (format!("Perf logging dumped to {:?}", location_dumped), true)
             }
-            else if cmd_registry.get("connect_replica").unwrap().contains(&command) {
+            else if cmd_registry.get("connect").unwrap().contains(&command) {
                 (format!("Connecting to the new proxy"), true)
+            }
+            else if cmd_registry.get("replica").unwrap().contains(&command) {
+
+                (format!("replica from old to the new proxy"), true)
             } 
             else {
                 (

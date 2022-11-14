@@ -3,7 +3,7 @@
 use super::msql_response::MsqlResponse;
 use crate::core::*;
 use serde::{Deserialize, Serialize};
-
+use std::net::{SocketAddr};
 /// Expecting every request will have a response replied back via the same tcp stream
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Message {
@@ -12,6 +12,7 @@ pub enum Message {
     /// The repsone to the `MsqlRequest`
     MsqlResponse(RequestMeta, MsqlResponse),
     /// Response to an invalid request, for exmample, sending `MsqlResponse(MsqlResponse)` to the dbproxy
+    ReplicateRequest(SocketAddr),
     Invalid,
 }
 

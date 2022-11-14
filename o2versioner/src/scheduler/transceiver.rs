@@ -23,6 +23,10 @@ pub enum TransceiverRequest {
         dbproxy_msg: Message,
     },
     DbproxyLoad,
+    Dbreplica{
+        dbproxy_addr: SocketAddr,
+        dbproxy_msg: Message,
+    },
 }
 
 impl TransceiverRequest {
@@ -170,6 +174,7 @@ impl Executor for Transceiver {
                             dbproxy_msg,
                         } => {
                             let dbproxy_msg = dbproxy_msg.clone();
+                            
                             let meta = dbproxy_msg.try_get_request_meta().unwrap();
                             let client_addr = meta.client_addr.clone();
                             Span::current().record("message", &&meta.to_string()[..]);
@@ -198,6 +203,16 @@ impl Executor for Transceiver {
                                 .unwrap()
                                 .send(TransceiverReply::DbproxyLoad(load))
                                 .unwrap();
+                        }
+                        TransceiverRequest::Dbreplica {
+                            dbproxy_addr: _dbproxy_addr,
+                            dbproxy_msg,
+                        } => {
+                            let dbproxy_msg = dbproxy_msg.clone();
+                            let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
+                            let mut serded_write =
+                                SymmetricallyFramed::new(delimited_write, SymmetricalJson::<Message>::default());
+                            serded_write.send(dbproxy_msg).await.expect("cannot send to dbproxy");
                         }
                     }
                 };
