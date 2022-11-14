@@ -32,21 +32,23 @@ where
     info!("Connection established with scheduler...");
     let (tcp_read, tcp_write) = tcp_stream.into_split();
 
-    let receiver = Receiver::new(pending_queue.clone(), tcp_read);
-    let responder = Responder::new(responder_receiver, version, tcp_write);
+    let receiver = Receiver::new(pending_queue.clone(), version.clone(), tcp_read);
+    let responder = Responder::new(responder_receiver, version.clone(), tcp_write);
     (receiver, responder)
 }
 
 /// Handles the incoming tcp request from scheduler
 pub struct Receiver {
     pending_queue: Arc<Mutex<PendingQueue>>,
+    version: Arc<Mutex<DbVersion>>,
     tcp_read: OwnedReadHalf,
 }
 
 impl Receiver {
-    pub fn new(pending_queue: Arc<Mutex<PendingQueue>>, tcp_read: OwnedReadHalf) -> Self {
+    pub fn new(pending_queue: Arc<Mutex<PendingQueue>>, version: Arc<Mutex<DbVersion>>, tcp_read: OwnedReadHalf) -> Self {
         Self {
             pending_queue,
+            version,
             tcp_read,
         }
     }
@@ -58,6 +60,7 @@ impl Executor for Receiver {
     async fn run(mut self: Box<Self>) {
         let Self {
             pending_queue,
+            version,
             tcp_read,
         } = *self;
 
@@ -84,7 +87,9 @@ impl Executor for Receiver {
                         info!("received SocketAddr: {:?}", new_db.clone()); 
                     }
                     Message::ReplicateData(old_db) => {
+                        version.lock().await.db_version = old_db.clone();
                         info!("received DBVN: {:?}", old_db.clone()); 
+                        info!("copied DBVN: {:?}", version.lock().await.db_version.clone()); 
                     }
                     _ => debug!("nope"),
                 }
