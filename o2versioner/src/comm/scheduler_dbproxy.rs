@@ -13,6 +13,7 @@ pub enum Message {
     MsqlResponse(RequestMeta, MsqlResponse),
     /// Response to an invalid request, for exmample, sending `MsqlResponse(MsqlResponse)` to the dbproxy
     ReplicateRequest(SocketAddr),
+    ReplicateData(DbVN),
     Invalid,
 }
 

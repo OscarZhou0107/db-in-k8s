@@ -76,6 +76,44 @@ pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager
     .collect()
     .await;
 }
+
+pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
+    let dbproxy_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
+    let old_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
+    let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
+    let old_db_vn = dbvn_manager.read().await.get(&old_db);
+    let dbproxy_addrs = vec![(dbproxy_addr, transceiver_addr)];
+    let msg = Message::ReplicateData(old_db_vn.clone());
+    println!("In replicating {:?}", old_db_vn.clone());
+    let num_dbproxy = dbproxy_addrs.len();
+    let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
+    // Send all requests to transceivers
+    let _addr_receipts: Vec<_> = dbproxy_tasks_stream
+    .then(move |(dbproxy_addr, transceiver_addr)| {
+        let msg = msg.clone();
+        let dbproxy_addr_clone = dbproxy_addr.clone();
+        trace!("-> {:?}", msg);
+        async move {
+            transceiver_addr
+                .request_nowait(TransceiverRequest::Dbreplica {
+                    dbproxy_addr: dbproxy_addr.clone(),
+                    dbproxy_msg: msg,
+                })
+                .inspect_err(|e| error!("Cannot send: {:?}", e))
+                .map_ok(|receipt| (dbproxy_addr, receipt))
+                .await
+        }
+        .instrument(info_span!("->dbproxy", N = num_dbproxy, message = %dbproxy_addr_clone))
+    })
+    .filter_map(|r| async move {
+        match r {
+            Err(_) => None,
+            Ok(r) => Some(r),
+        }
+    })
+    .collect()
+    .await;
+}
 /// Helper function to bind to a `TcpListener` as an admin port and forward all incomming `TcpStream` to `connection_handler`.
 ///
 /// # Notes:
@@ -122,6 +160,11 @@ where
                             info!("transfering date from old to new proxy, inform old data proxy to transfer");
                             //[Oscar] we start the above replica() function in a thread 
                             tokio::spawn(replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span());
+                        }
+                        else if line == "repdata" {
+                            info!("transfering date from old to new proxy, transfering DbVN hashtable to new db");
+                            //[Oscar] we start the above replica() function in a thread 
+                            tokio::spawn(repdata(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span());
                         }
                         else {
                             //old admin command handlers 

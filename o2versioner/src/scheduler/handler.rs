@@ -229,6 +229,7 @@ async fn admin(
                 ("perf", vec!["perf"]),
                 ("connect", vec!["connect"]),
                 ("replica", vec!["replica"]), 
+                ("repdata", vec!["repdata"]), 
             ]
             .into_iter()
             .map(|(k, vs)| (k, vs.into_iter().map(|v| UniCase::new(String::from(v))).collect()))
@@ -278,8 +279,10 @@ async fn admin(
                 (format!("Connecting to the new proxy"), true)
             }
             else if cmd_registry.get("replica").unwrap().contains(&command) {
-
                 (format!("replica from old to the new proxy"), true)
+            } 
+            else if cmd_registry.get("repdata").unwrap().contains(&command) {
+                (format!("replica DbVN to new db"), true)
             } 
             else {
                 (

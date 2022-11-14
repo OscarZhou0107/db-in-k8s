@@ -146,6 +146,12 @@ impl FromIterator<SocketAddr> for DbVNManager {
 impl DbVNManager {
     /// Find all dbproxies that have their versions ready to execute the
     /// ready query associated with the argument `TableOps`
+    pub fn get(&self, dbproxy_addr: &SocketAddr) -> DbVN {
+        self.0
+            .get(dbproxy_addr)
+            .expect(&format!("{} is not in the DbVNManager", dbproxy_addr))
+            .clone()
+    }
     pub fn get_all_that_can_execute_read_query(
         &self,
         tableops: &TableOps,

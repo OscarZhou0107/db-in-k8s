@@ -83,6 +83,9 @@ impl Executor for Receiver {
                     Message::ReplicateRequest(new_db) => {
                         info!("received SocketAddr: {:?}", new_db.clone()); 
                     }
+                    Message::ReplicateData(old_db) => {
+                        info!("received DBVN: {:?}", old_db.clone()); 
+                    }
                     _ => debug!("nope"),
                 }
             }

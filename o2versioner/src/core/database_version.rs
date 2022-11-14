@@ -1,7 +1,7 @@
 use super::operation::*;
 use super::transaction_version::*;
 use std::collections::HashMap;
-
+use serde::{Deserialize, Serialize};
 /// Version number of a table of on a single database instance
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct DbTableVN {
@@ -19,7 +19,7 @@ impl DbTableVN {
 }
 
 /// Version number of all tables on a single database instance
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbVN(HashMap<String, VN>);
 
 impl Default for DbVN {
