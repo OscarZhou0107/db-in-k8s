@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: systems-deployment
+  labels:
+    app: systems
+spec: 
+  replicas: 1
+  selector:
+    matchLabels:
+      app: systems
+  template:
+    metadata:
+      labels:
+        app: systems
+    spec: 
+      containers:
+        - name: systems
+          image: systems:latest
+          imagePullPolicy: Never
+          ports:
+          - containerPort: 2077
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: systems-service
+spec:
+  selector:
+    app: systems
+  # type: LoadBalancer  
+  ports:
+    - protocol: TCP
+      port: 2077
+      targetPort: 2077
