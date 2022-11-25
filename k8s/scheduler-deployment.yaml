@@ -1,22 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: systems-deployment
+  name: scheduler-deployment
   labels:
-    app: systems
+    app: scheduler
 spec: 
   replicas: 1
   selector:
     matchLabels:
-      app: systems
+      app: scheduler
   template:
     metadata:
       labels:
-        app: systems
+        app: scheduler
+      annotations:
+        k8s.v1.cni.cncf.io/networks: db-in-k8s
+        k8s.v1.cni.cncf.io/networks-status: |- 
+          [{
+              "ips": [
+                  "172.25.0.65"
+              ],
+          }]
     spec: 
       containers:
-        - name: systems
+        - name: scheduler
           image: systems:latest
+          command: ["./systems_start.sh"]
           imagePullPolicy: Never
           ports:
           - containerPort: 2077
@@ -24,10 +33,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: systems-service
+  name: scheduler-service
 spec:
+  clusterIP: 10.96.149.230
   selector:
-    app: systems
+    app: scheduler
   # type: LoadBalancer  
   ports:
     - protocol: TCP

@@ -8,7 +8,7 @@ spec:
       containers:
       - name: load-generator
         image: load_generator:latest
-        command: ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "10.103.65.33", "--path", "/usr/src/"]
+        command: ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--ip", "10.96.149.230", "--path", "/usr/src/"]
         imagePullPolicy: Never
       restartPolicy: Never
 
