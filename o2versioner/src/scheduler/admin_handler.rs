@@ -16,26 +16,36 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tokio::sync::{RwLock};
 use std::sync::Arc;
 use tracing::{error, trace};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
+    //read the default config
     let conf = Conf::from_file("o2versioner/conf.toml");
+    
+    //-------- Print the info of proxy and dbvn managers before insertion -------//
     println!("In scheduler's connect_replica");
-    //for now lets just try if we can start a few tranciever threads from main
-    // dbg!(dbproxy_manager.read().await.inner());
-    dbg!(dbvn_manager.read().await.inner());
-    // Prepare transceiver
-    let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
-    let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
-    //insert the new tranciever into the proxy manager
-    dbproxy_manager.write().await.insert(socket, transceiver_addr);
-    //insert the new proxy into the dbvn manager
-    dbvn_manager.write().await.insert(socket);
-    // Launch transceiver as a new task
-    let transceiver_handle = tokio::spawn(Box::new(transceiver).run().in_current_span());
-    //compare the before and after of the managers 
-    // dbg!(dbproxy_manager.read().await.inner());
+    dbg!(dbproxy_manager.read().await.inner());
     dbg!(dbvn_manager.read().await.inner());
 
+    // Obtain the IP address of the new proxy
+    // All new proxy increment from the base port addr 38877, so we have a static variable here to keep track
+    static INDEX: AtomicUsize = AtomicUsize::new(0);
+    //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
+    let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
+    let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
+    let socket:SocketAddr = replicate_proxy.addr.parse().expect("Unable to parse socket address");
+    // Construct the new tranceiver and insert the IP addr into the managers
+    let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
+    dbproxy_manager.write().await.insert(socket, transceiver_addr);
+    dbvn_manager.write().await.insert(socket);
+    // Launch the transceiver 
+    let transceiver_handle = tokio::spawn(Box::new(transceiver).run().in_current_span());
+
+    //------ compare the before and after of the managers -------//
+    dbg!(dbproxy_manager.read().await.inner());
+    dbg!(dbvn_manager.read().await.inner());
+
+    // ----- wait for the thread ------//
     let _join = tokio::join!(transceiver_handle);
 }
 
@@ -207,35 +217,35 @@ where
     warn!("Service terminated, have a good night");
 }
 
-/// Unit test for `start_admin_tcplistener`
-#[cfg(test)]
-mod tests_start_admin_tcplistener {
-    use super::*;
-    use crate::util::tests_helper::*;
-    use std::iter::FromIterator;
-    use tokio::net::TcpStream;
-    use unicase::UniCase;
+// /// Unit test for `start_admin_tcplistener`
+// #[cfg(test)]
+// mod tests_start_admin_tcplistener {
+//     use super::*;
+//     use crate::util::tests_helper::*;
+//     use std::iter::FromIterator;
+//     use tokio::net::TcpStream;
+//     use unicase::UniCase;
 
-    #[tokio::test]
-    async fn test_admin_tcplistener() {
-        let _guard = init_logger();
+//     #[tokio::test]
+//     async fn test_admin_tcplistener() {
+//         let _guard = init_logger();
 
-        let admin_addr = "127.0.0.1:27643";
+//         let admin_addr = "127.0.0.1:27643";
 
-        let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, |msg| async {
-            let command = UniCase::new(msg);
-            if Vec::from_iter(vec!["kill", "exit", "quit"].into_iter().map(|s| s.into())).contains(&command) {
-                (String::from("Terminating"), false)
-            } else {
-                (format!("Unknown command: {}", command), true)
-            }
-        }));
-        let client_handle = tokio::spawn(async move {
-            let mut tcp_stream = TcpStream::connect(admin_addr).await.unwrap();
-            let res = mock_ascii_client(&mut tcp_stream, vec!["help", "exit"]).await;
-            info!("All responses received: {:?}", res);
-        });
+//         let admin_handle = tokio::spawn(start_admin_tcplistener(admin_addr, |msg| async {
+//             let command = UniCase::new(msg);
+//             if Vec::from_iter(vec!["kill", "exit", "quit"].into_iter().map(|s| s.into())).contains(&command) {
+//                 (String::from("Terminating"), false)
+//             } else {
+//                 (format!("Unknown command: {}", command), true)
+//             }
+//         }));
+//         let client_handle = tokio::spawn(async move {
+//             let mut tcp_stream = TcpStream::connect(admin_addr).await.unwrap();
+//             let res = mock_ascii_client(&mut tcp_stream, vec!["help", "exit"]).await;
+//             info!("All responses received: {:?}", res);
+//         });
 
-        tokio::try_join!(admin_handle, client_handle).unwrap();
-    }
-}
+//         tokio::try_join!(admin_handle, client_handle).unwrap();
+//     }
+// }

@@ -36,6 +36,7 @@ async fn main() {
     // Parse config
     info!("current dir is: {}", env::current_dir().unwrap().to_str().unwrap());
     let conf = Conf::from_file(matches.value_of("config").unwrap());
+
     info!("{:?}", conf);
 
     // Launch binary
@@ -47,10 +48,11 @@ async fn main() {
     else if matches.is_present("replicate") {
         println!("Replicating a proxy...");
         //copy the mockdb latency from the conf file
-        let ip: String = matches.value_of("ipaddr").unwrap().to_string();
-        let mut replicate_conf = conf.dbproxy.get(0).unwrap().clone();
-        replicate_conf.addr = ip;
-        dbproxy_main(replicate_conf).await
+        let index = matches.value_of("ipaddr").unwrap().to_string().parse::<i32>().unwrap() as usize;
+        //reading the replicate config file
+        let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
+        let replicate_proxy = replicate_conf.dbproxy.get(index).unwrap().clone();
+        dbproxy_main(replicate_proxy).await
     }
     else if matches.is_present("connect-replica") {
         println!("Connecting to a replica...");

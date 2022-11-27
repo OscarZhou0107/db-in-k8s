@@ -214,9 +214,9 @@ impl DbVNManager {
     }
 
     pub fn insert(&mut self, socket:SocketAddr) {
-        let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
-
-        self.0.insert(socket, self.0.get(&socket_addr).unwrap().clone());
+        let current_vn = self.0.values().next().unwrap();
+        //we want to clone the VN number from an existing entry
+        self.0.insert(socket, current_vn.clone());
     }
 }
 
