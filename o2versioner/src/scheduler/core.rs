@@ -73,7 +73,7 @@ impl State {
                     info!("{} {:?}", dbproxy_addr, vndb);
                     (dbproxy_addr, vndb)
                 })
-                .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), vndb.get_version_sum()))
+                .map(|(dbproxy_addr, vndb)| (dbproxy_addr.clone(), serde_json::to_string(&vndb).unwrap()))
                 .for_each(|d| wrt.serialize(d).unwrap());
             info!("Dumped dbproxy stats to {}", dbproxy_stats_csv_path.display());
             Some(cur_log_dir.as_path().to_string_lossy().to_string())
