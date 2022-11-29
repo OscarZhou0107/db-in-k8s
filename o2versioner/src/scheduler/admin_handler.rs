@@ -88,7 +88,11 @@ pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager
 }
 
 pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
-    let dbproxy_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
+    static INDEX: AtomicUsize = AtomicUsize::new(0);
+    //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
+    let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
+    let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
+    let dbproxy_addr:SocketAddr = replicate_proxy.addr.parse().expect("Unable to parse socket address");
     let old_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
     let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
     let old_db_vn = dbvn_manager.read().await.get(&old_db);
