@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dbproxy0-deployment
+  labels:
+    app: dbproxy0
+spec: 
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dbproxy0
+  template:
+    metadata:
+      labels:
+        app: dbproxy0
+      annotations:
+        k8s.v1.cni.cncf.io/networks: db-in-k8s
+        k8s.v1.cni.cncf.io/networks-status: |- 
+          [{
+              "ips": [
+                  "172.25.0.66"
+              ],
+          }]
+    spec: 
+      containers:
+        - name: dbproxy0
+          image: systems:latest
+          command: ["cargo", "run", "0", "--dbproxy", "-c", "./o2versioner/conf_dbproxy0.toml"]
+          imagePullPolicy: Never
+          ports:
+          - containerPort: 38875
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dbproxy0-service
+spec:
+  clusterIP: 10.109.157.158
+  selector:
+    app: dbproxy0
+  #type: LoadBalancer  
+  ports:
+    - protocol: TCP
+      port: 38875
+      targetPort: 38875

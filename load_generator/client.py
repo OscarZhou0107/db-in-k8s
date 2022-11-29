@@ -17,7 +17,7 @@ import sql
 
 TT = 0
 #TT = 0.5 # think time
-MAX_TIME = 50
+MAX_TIME = 600
 MAX_PROB = 9999
 OK = "Ok"
 NUM_ITEM = 1000

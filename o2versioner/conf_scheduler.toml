@@ -1,0 +1,37 @@
+[scheduler]
+# Note: a docker have two internet interfaces: 127.0.0.1 and the interface for communicating with
+# the outside, we need to listen on the second interface for connecting with other dockers.
+# https://pythonspeed.com/articles/docker-connection-refused/#:~:text=The%20solution%3A%20listen%20on%20all%20interfaces
+addr = "0.0.0.0:2077"
+admin_addr = "0.0.0.0:9999"
+#disable_early_release = true
+#disable_single_read_optimization = true
+
+[sequencer]
+addr = "0.0.0.0:19876"
+
+[[dbproxy]]
+addr = "10.109.157.158:38875"
+#sql_conf = "host=34.70.104.125 port=5432 dbname=tpcw user=postgres password=Abc@123"
+[dbproxy.db_mock_latency]
+begintx = {mean = 30, stddev = 10}
+endtx = {mean = 20, stddev = 10}
+read = {mean = 20, stddev = 10}
+write = {mean = 30, stddev = 10}
+
+[[dbproxy]]
+addr = "10.105.127.57:38876"
+#sql_conf = "host=34.69.18.204 port=5432 dbname=tpcw user=postgres password=Abc@123"
+[dbproxy.db_mock_latency]
+begintx = {mean = 30, stddev = 10}
+endtx = {mean = 20, stddev = 10}
+read = {mean = 20, stddev = 10}
+write = {mean = 30, stddev = 10}
+
+# [[dbproxy]]
+# addr = "127.0.0.1:38877"
+# sql_conf = "host=34.122.129.200 port=5432 dbname=tpcw user=postgres password=Abc@123"
+
+# [[dbproxy]]
+# addr = "127.0.0.1:38878"
+# sql_conf = "host=34.70.96.183 port=5432 dbname=tpcw user=postgres password=Abc@123"
