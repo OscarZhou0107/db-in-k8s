@@ -17,6 +17,7 @@ use tokio::sync::{RwLock};
 use std::sync::Arc;
 use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use run_script::ScriptOptions;
 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     //read the default config
@@ -44,6 +45,22 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     //------ compare the before and after of the managers -------//
     dbg!(dbproxy_manager.read().await.inner());
     dbg!(dbvn_manager.read().await.inner());
+
+    //------ replicate data using pgdump -------//
+    //pg_dump tpcw > tpcw_dump.sql 
+    //psql tcpw3 < tpcw_dump.sql 
+    let (code, output, error) = run_script::run_script!(
+        r#"
+            pg_dump tpcw > tpcw_dump.sql
+            psql tpcw3 < tpcw_dump.sql
+            "#
+    )
+    .unwrap();
+
+    if code!=0 {
+        println!("{}", output);
+        println!("{}", error);
+    }
 
     // ----- wait for the thread ------//
     let _join = tokio::join!(transceiver_handle);
