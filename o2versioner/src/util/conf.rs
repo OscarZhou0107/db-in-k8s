@@ -47,7 +47,7 @@ impl Conf {
     pub fn to_dbproxy_addrs(&self) -> Vec<SocketAddr> {
         let soc_vec = self.dbproxy.iter().map(|dbproxyconf| dbproxyconf.to_addr()).collect();
         for soc in &soc_vec {
-            // println!("[Larry] list of proxy ips: {}", soc);
+            println!("[Larry] list of proxy ips: {}", soc);
             dbg!(soc);
         }
         soc_vec
@@ -143,7 +143,8 @@ impl SchedulerConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-        self.addr.parse().expect("Invalid scheduler addr")
+        let address:String = self.addr.replacen("localhost", "127.0.0.1", 1); 
+        address.parse().expect("Invalid scheduler addr")
     }
 }
 
@@ -170,7 +171,7 @@ impl SequencerConf {
     }
 
     pub fn set_addr<S: Into<String>>(mut self, addr: S) -> Self {
-        self.addr = addr.into();
+        self.addr = addr.into(); 
         self
     }
 
@@ -180,7 +181,8 @@ impl SequencerConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-        self.addr.parse().expect("Invalid sequencer addr")
+        let address:String = self.addr.replacen("localhost", "127.0.0.1", 1); 
+        address.parse().expect("Invalid sequencer addr")
     }
 }
 
@@ -227,7 +229,9 @@ impl DbProxyConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-        self.addr.parse().expect("Invalid dbproxy addr")
+        let address:String = self.addr.replacen("localhost", "127.0.0.1", 2);
+        println!("[Oscar] proxy ips: {}", address); 
+        address.parse().expect("Invalid dbproxy addr")
     }
 }
 

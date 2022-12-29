@@ -37,8 +37,9 @@ pub async fn main(conf: DbProxyConf) {
     let dispatcher_handle = tokio::spawn(Box::new(dispatcher).run().in_current_span());
 
     // Receiver and responder
+    let str1 = conf.addr.replace("localhost", "127.0.0.1");
     let (receiver, responder) =
-        transceiver::connection(conf.addr, pending_queue.clone(), responder_receiver, version).await;
+        transceiver::connection(str1, pending_queue.clone(), responder_receiver, version).await;
     let responder_handle = tokio::spawn(Box::new(responder).run().in_current_span());
     let receiver_handle = tokio::spawn(Box::new(receiver).run().in_current_span());
 

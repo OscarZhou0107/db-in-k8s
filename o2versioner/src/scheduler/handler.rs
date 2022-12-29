@@ -154,11 +154,12 @@ pub async fn main(conf: Conf) {
             .map_err(|e| e.to_string()),
     });
 
-    // Allow scheduler to be terminated by admin
+    // Allow scheduler to be terminated by admin   
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
+        let address:String = admin_addr.replacen("localhost", "127.0.0.1", 1); 
         let admin_handle = tokio::spawn(
             admin(
-                admin_addr.parse().unwrap(),
+                address.parse().unwrap(),
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),
