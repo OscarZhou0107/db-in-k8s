@@ -1,29 +1,29 @@
 [scheduler]
-addr = "127.0.0.1:2077"
-admin_addr = "127.0.0.1:9999"
+addr = "localhost:2077"
+admin_addr = "localhost:9999"
 #disable_early_release = true
 #disable_single_read_optimization = true
 
 [sequencer]
-addr = "127.0.0.1:19876"
+addr = "localhost:19876"
 
 [[dbproxy]]
-addr = "127.0.0.1:38875"
-sql_conf = "host=localhost port=5432 dbname=tpcw user=k8s password=Abc@123"
-# [dbproxy.db_mock_latency]
-# begintx = {mean = 30, stddev = 10}
-# endtx = {mean = 20, stddev = 10}
-# read = {mean = 20, stddev = 10}
-# write = {mean = 30, stddev = 10}
+addr = "localhost:38875"
+#sql_conf = "host=localhost port=5432 dbname=tpcw user=k8s password=Abc@123" 
+[dbproxy.db_mock_latency]
+begintx = {mean = 30, stddev = 10}
+endtx = {mean = 20, stddev = 10}
+read = {mean = 20, stddev = 10}
+write = {mean = 30, stddev = 10}
 
 [[dbproxy]]
-addr = "127.0.0.1:38876"
-sql_conf = "host=localhost port=5432 dbname=tpcw2 user=k8s password=Abc@123"
-# [dbproxy.db_mock_latency]
-# begintx = {mean = 30, stddev = 10}
-# endtx = {mean = 20, stddev = 10}
-# read = {mean = 20, stddev = 10}
-# write = {mean = 30, stddev = 10}
+addr = "localhost:38876"
+#sql_conf = "host=localhost port=5432 dbname=tpcw2 user=k8s password=Abc@123"
+[dbproxy.db_mock_latency]
+begintx = {mean = 30, stddev = 10}
+endtx = {mean = 20, stddev = 10}
+read = {mean = 20, stddev = 10}
+write = {mean = 30, stddev = 10}
 
 # [[dbproxy]]
 # addr = "127.0.0.1:38877"

@@ -27,7 +27,7 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument, Span};
 use unicase::UniCase;
 use tokio::sync::{Mutex, RwLock};
-
+use std::net::ToSocketAddrs;
 /// Main entrance for the Scheduler
 ///
 /// # Modes
@@ -154,11 +154,14 @@ pub async fn main(conf: Conf) {
             .map_err(|e| e.to_string()),
     });
 
-    // Allow scheduler to be terminated by admin
+    // Allow scheduler to be terminated by admin   
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
+        let address = admin_addr;
+        let server: Vec<_> = address.to_socket_addrs().expect("Invalid admin addr").collect();
+        println!("[Oscar] admin ips: {:?}", server[1]); 
         let admin_handle = tokio::spawn(
             admin(
-                admin_addr.parse().unwrap(),
+                server[1],
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),
