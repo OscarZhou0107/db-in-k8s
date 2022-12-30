@@ -18,7 +18,8 @@ use std::sync::Arc;
 use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
-
+use super::replication::*;
+/* 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     //read the default config
     let conf = Conf::from_file("o2versioner/conf.toml");
@@ -34,7 +35,10 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
     let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
     let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
-    let socket:SocketAddr = replicate_proxy.addr.parse().expect("Unable to parse socket address");
+    let address = &replicate_proxy.addr;
+    let server: Vec<_> = address<ToSocketAddrs>.to_socket_addrs().expect("Invalid sequencer addr").collect();
+    println!("[Oscar] proxy ips: {:?}", server[1]); 
+    let socket:SocketAddr = server[1];
     // Construct the new tranceiver and insert the IP addr into the managers
     let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
     dbproxy_manager.write().await.insert(socket, transceiver_addr);
@@ -65,7 +69,7 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     // ----- wait for the thread ------//
     let _join = tokio::join!(transceiver_handle);
 }
-
+*/
 pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager:Arc<RwLock<DbVNManager>>) {
     let dbproxy_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
     let new_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
