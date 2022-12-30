@@ -184,15 +184,10 @@ impl SequencerConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-<<<<<<< HEAD
         let address = &self.addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
         println!("[Oscar] proxy ips: {:?}", server[1]); 
         server[1]
-=======
-        let address:String = self.addr.replacen("localhost", "127.0.0.1", 1); 
-        address.parse().expect("Invalid sequencer addr")
->>>>>>> cef143e700f4a9590cab210b8ae21a0cc9f0e5df
     }
 }
 
@@ -239,18 +234,12 @@ impl DbProxyConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-<<<<<<< HEAD
         //let address:String = self.addr.replacen("localhost", "127.0.0.1", 2);
         //println!("[Oscar] proxy ips: {}", address); 
         let address = &self.addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid db addr").collect();
         println!("[Oscar] proxy ips: {:?}", server[1]); 
         server[1]
-=======
-        let address:String = self.addr.replacen("localhost", "127.0.0.1", 2);
-        println!("[Oscar] proxy ips: {}", address); 
-        address.parse().expect("Invalid dbproxy addr")
->>>>>>> cef143e700f4a9590cab210b8ae21a0cc9f0e5df
     }
 }
 
