@@ -6,7 +6,7 @@ metadata:
     app: dbproxy0
 spec: 
   serviceName: dbproxy0-service
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: dbproxy0
@@ -26,7 +26,7 @@ spec:
       containers:
         - name: dbproxy0
           image: systems:latest
-          command: ["cargo", "run", "0", "--dbproxy", "-c", "./o2versioner/conf_dbproxy0.toml"]
+          command: ["./dbproxy_start.sh"]
           imagePullPolicy: Never
           ports:
           - containerPort: 38875

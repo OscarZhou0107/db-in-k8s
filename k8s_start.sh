@@ -6,7 +6,7 @@ sleep 10 # Wait for old deployment fully deleted
 docker container prune
 echo ===================================Starting Dbproxies=============================================
 kubectl apply -f k8s/deployment/dbproxy0-deployment.yaml
-kubectl apply -f k8s/deployment/dbproxy1-deployment.yaml
+# kubectl apply -f k8s/deployment/dbproxy1-deployment.yaml
 echo ===================================Starting Scheduler_sequencer===================================
 kubectl apply -f k8s/deployment/scheduler-deployment.yaml
 sleep 3 # Need time for system to establish connection

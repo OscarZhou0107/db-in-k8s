@@ -1,5 +1,5 @@
 [[dbproxy]]
-addr = "dbproxy1-deployment-0.dbproxy1-service.default.svc.cluster.local:38876"
+addr = "dbproxy0-deployment-1.dbproxy0-service.default.svc.cluster.local:38876"
 #addr = "172.25.0.67:38876"
 #sql_conf = "host=34.70.104.125 port=5432 dbname=tpcw user=postgres password=Abc@123"
 [dbproxy.db_mock_latency]
