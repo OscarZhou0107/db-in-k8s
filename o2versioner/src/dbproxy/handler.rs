@@ -39,9 +39,10 @@ pub async fn main(conf: DbProxyConf) {
     // Receiver and responder
     let address = &conf.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid db addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
+    println!("[wwz] DNS: {:?}", address);
+    println!("[Oscar] proxy ips: {:?}", server[0]); 
     let (receiver, responder) =
-        transceiver::connection(server[1], pending_queue.clone(), responder_receiver, version).await;
+        transceiver::connection(server[0], pending_queue.clone(), responder_receiver, version).await;
     let responder_handle = tokio::spawn(Box::new(responder).run().in_current_span());
     let receiver_handle = tokio::spawn(Box::new(receiver).run().in_current_span());
 

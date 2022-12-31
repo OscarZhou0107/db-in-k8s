@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: scheduler-deployment
   labels:
     app: scheduler
 spec: 
+  serviceName: scheduler-service
   replicas: 1
   selector:
     matchLabels:
@@ -38,7 +39,7 @@ kind: Service
 metadata:
   name: scheduler-service
 spec:
-  clusterIP: 10.96.149.230
+  clusterIP: None
   selector:
     app: scheduler
   # type: LoadBalancer  

@@ -38,8 +38,8 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let socket:SocketAddr = server[1];
+    println!("[Oscar] proxy ips: {:?}", server[0]); 
+    let socket:SocketAddr = server[0];
     // Construct the new tranceiver and insert the IP addr into the managers
     let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
     dbproxy_manager.write().await.insert(socket, transceiver_addr);

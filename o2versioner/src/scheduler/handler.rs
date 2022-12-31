@@ -158,10 +158,10 @@ pub async fn main(conf: Conf) {
     if let Some(admin_addr) = &conf.scheduler.admin_addr {
         let address = admin_addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid admin addr").collect();
-        println!("[Oscar] admin ips: {:?}", server[1]); 
+        println!("[Oscar] admin ips: {:?}", server[0]); 
         let admin_handle = tokio::spawn(
             admin(
-                server[1],
+                server[0],
                 stop_tx,
                 sequencer_socket_pool,
                 state.clone(),

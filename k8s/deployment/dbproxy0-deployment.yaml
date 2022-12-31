@@ -1,10 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: dbproxy0-deployment
   labels:
     app: dbproxy0
 spec: 
+  serviceName: dbproxy0-service
   replicas: 1
   selector:
     matchLabels:
@@ -35,7 +36,7 @@ kind: Service
 metadata:
   name: dbproxy0-service
 spec:
-  clusterIP: 10.109.157.158
+  clusterIP: None
   selector:
     app: dbproxy0
   #type: LoadBalancer  

@@ -1,17 +1,5 @@
-[scheduler]
-# Note: a docker have two internet interfaces: 127.0.0.1 and the interface for communicating with
-# the outside, we need to listen on the second interface for connecting with other dockers.
-# https://pythonspeed.com/articles/docker-connection-refused/#:~:text=The%20solution%3A%20listen%20on%20all%20interfaces
-addr = "0.0.0.0:2077"
-admin_addr = "0.0.0.0:9999"
-#disable_early_release = true
-#disable_single_read_optimization = true
-
-[sequencer]
-addr = "0.0.0.0:19876"
-
 [[dbproxy]]
-addr = "0.0.0.0:38875"
+addr = "dbproxy0-deployment-0.dbproxy0-service.default.svc.cluster.local:38875"
 #addr = "172.25.0.66:38875"
 #sql_conf = "host=34.70.104.125 port=5432 dbname=tpcw user=postgres password=Abc@123"
 [dbproxy.db_mock_latency]

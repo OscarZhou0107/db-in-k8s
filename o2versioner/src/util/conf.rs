@@ -145,8 +145,8 @@ impl SchedulerConf {
     pub fn to_addr(&self) -> SocketAddr {
         let address = &self.addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid scheduler addr").collect();
-        println!("[Oscar] proxy ips: {:?}", server[1]); 
-        server[1]
+        println!("[Oscar] proxy ips: {:?}", server[0]); 
+        server[0]
 
     }
 }
@@ -186,8 +186,8 @@ impl SequencerConf {
     pub fn to_addr(&self) -> SocketAddr {
         let address = &self.addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-        println!("[Oscar] proxy ips: {:?}", server[1]); 
-        server[1]
+        println!("[Oscar] proxy ips: {:?}", server[0]); 
+        server[0]
     }
 }
 
@@ -238,8 +238,8 @@ impl DbProxyConf {
         //println!("[Oscar] proxy ips: {}", address); 
         let address = &self.addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid db addr").collect();
-        println!("[Oscar] proxy ips: {:?}", server[1]); 
-        server[1]
+        println!("[Oscar] proxy ips: {:?}", server[0]); 
+        server[0]
     }
 }
 
