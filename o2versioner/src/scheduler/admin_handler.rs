@@ -53,7 +53,7 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
         r#"
             pg_dump tpcw > tpcw_dump.sql
             psql tpcw3 < tpcw_dump.sql
-            "#
+        "#
     )
     .unwrap();
 
@@ -61,6 +61,11 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
         println!("{}", output);
         println!("{}", error);
     }
+    else {
+        println!("Data migration completed!");
+    }
+
+    repdata(dbproxy_manager.clone(), dbvn_manager.clone()).await;
 
     // ----- wait for the thread ------//
     let _join = tokio::join!(transceiver_handle);
