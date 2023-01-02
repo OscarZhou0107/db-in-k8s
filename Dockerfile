@@ -15,6 +15,7 @@ RUN rustup target add aarch64-unknown-linux-gnu
 RUN printf '#!/bin/sh\nexport CARGO_HOME=/opt/cargo\nexec /bin/sh "$@"\n' >/usr/local/bin/sh
 RUN chmod +x /usr/local/bin/sh
 RUN sudo apt-get install gcc -y
+RUN apt-get install -y netcat
 # RUN cargo update -p lexical-core
 RUN cargo build
 

@@ -14,14 +14,6 @@ spec:
     metadata:
       labels:
         app: dbproxy0
-      annotations:
-        k8s.v1.cni.cncf.io/networks: db-in-k8s
-        k8s.v1.cni.cncf.io/networks-status: |- 
-          [{
-              "ips": [
-                  "172.25.0.66"
-              ],
-          }]
     spec: 
       containers:
         - name: dbproxy0
@@ -39,7 +31,6 @@ spec:
   clusterIP: None
   selector:
     app: dbproxy0
-  #type: LoadBalancer  
   ports:
     - protocol: TCP
       port: 38875
