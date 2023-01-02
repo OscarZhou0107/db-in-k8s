@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
 use tracing::{field, info, instrument, Instrument, Span};
-
+use std::net::ToSocketAddrs;
 /// Main entrance for the DbProxy
 #[instrument(name = "dbproxy", skip(conf), fields(message=field::Empty))]
 pub async fn main(conf: DbProxyConf) {
@@ -37,8 +37,11 @@ pub async fn main(conf: DbProxyConf) {
     let dispatcher_handle = tokio::spawn(Box::new(dispatcher).run().in_current_span());
 
     // Receiver and responder
+    let address = &conf.addr;
+    let server: Vec<_> = address.to_socket_addrs().expect("Invalid db addr").collect();
+    println!("[Oscar] proxy ips: {:?}", server[1]); 
     let (receiver, responder) =
-        transceiver::connection(conf.addr, pending_queue.clone(), responder_receiver, version).await;
+        transceiver::connection(server[1], pending_queue.clone(), responder_receiver, version).await;
     let responder_handle = tokio::spawn(Box::new(responder).run().in_current_span());
     let receiver_handle = tokio::spawn(Box::new(receiver).run().in_current_span());
 

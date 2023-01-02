@@ -18,7 +18,8 @@ use std::sync::Arc;
 use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
-
+use super::replication::*;
+/* 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     //read the default config
     let conf = Conf::from_file("o2versioner/conf.toml");
@@ -34,7 +35,10 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
     let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
     let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
-    let socket:SocketAddr = replicate_proxy.addr.parse().expect("Unable to parse socket address");
+    let address = &replicate_proxy.addr;
+    let server: Vec<_> = address<ToSocketAddrs>.to_socket_addrs().expect("Invalid sequencer addr").collect();
+    println!("[Oscar] proxy ips: {:?}", server[1]); 
+    let socket:SocketAddr = server[1];
     // Construct the new tranceiver and insert the IP addr into the managers
     let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
     dbproxy_manager.write().await.insert(socket, transceiver_addr);
@@ -70,7 +74,7 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     // ----- wait for the thread ------//
     let _join = tokio::join!(transceiver_handle);
 }
-
+*/
 pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager:Arc<RwLock<DbVNManager>>) {
     let dbproxy_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
     let new_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
@@ -109,47 +113,48 @@ pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager
     .await;
 }
 
-pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
-    static INDEX: AtomicUsize = AtomicUsize::new(0);
-    //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
-    let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
-    let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
-    let dbproxy_addr:SocketAddr = replicate_proxy.addr.parse().expect("Unable to parse socket address");
-    let old_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
-    let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
-    let old_db_vn = dbvn_manager.read().await.get(&old_db);
-    let dbproxy_addrs = vec![(dbproxy_addr, transceiver_addr)];
-    let msg = Message::ReplicateData(old_db_vn.clone());
-    println!("In replicating {:?}", old_db_vn.clone());
-    let num_dbproxy = dbproxy_addrs.len();
-    let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
-    // Send all requests to transceivers
-    let _addr_receipts: Vec<_> = dbproxy_tasks_stream
-    .then(move |(dbproxy_addr, transceiver_addr)| {
-        let msg = msg.clone();
-        let dbproxy_addr_clone = dbproxy_addr.clone();
-        trace!("-> {:?}", msg);
-        async move {
-            transceiver_addr
-                .request_nowait(TransceiverRequest::Dbreplica {
-                    dbproxy_addr: dbproxy_addr.clone(),
-                    dbproxy_msg: msg,
-                })
-                .inspect_err(|e| error!("Cannot send: {:?}", e))
-                .map_ok(|receipt| (dbproxy_addr, receipt))
-                .await
-        }
-        .instrument(info_span!("->dbproxy", N = num_dbproxy, message = %dbproxy_addr_clone))
-    })
-    .filter_map(|r| async move {
-        match r {
-            Err(_) => None,
-            Ok(r) => Some(r),
-        }
-    })
-    .collect()
-    .await;
-}
+// pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
+//     static INDEX: AtomicUsize = AtomicUsize::new(0);
+//     //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
+//     let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
+//     let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
+//     let dbproxy_addr:SocketAddr = replicate_proxy.addr.parse().expect("Unable to parse socket address");
+//     let old_db = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38875);
+//     let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
+//     let old_db_vn = dbvn_manager.read().await.get(&old_db);
+//     let dbproxy_addrs = vec![(dbproxy_addr, transceiver_addr)];
+//     let msg = Message::ReplicateData(old_db_vn.clone());
+//     println!("In replicating {:?}", old_db_vn.clone());
+//     let num_dbproxy = dbproxy_addrs.len();
+//     let dbproxy_tasks_stream = stream::iter(dbproxy_addrs);
+//     // Send all requests to transceivers
+//     let _addr_receipts: Vec<_> = dbproxy_tasks_stream
+//     .then(move |(dbproxy_addr, transceiver_addr)| {
+//         let msg = msg.clone();
+//         let dbproxy_addr_clone = dbproxy_addr.clone();
+//         trace!("-> {:?}", msg);
+//         async move {
+//             transceiver_addr
+//                 .request_nowait(TransceiverRequest::Dbreplica {
+//                     dbproxy_addr: dbproxy_addr.clone(),
+//                     dbproxy_msg: msg,
+//                 })
+//                 .inspect_err(|e| error!("Cannot send: {:?}", e))
+//                 .map_ok(|receipt| (dbproxy_addr, receipt))
+//                 .await
+//         }
+//         .instrument(info_span!("->dbproxy", N = num_dbproxy, message = %dbproxy_addr_clone))
+//     })
+//     .filter_map(|r| async move {
+//         match r {
+//             Err(_) => None,
+//             Ok(r) => Some(r),
+//         }
+//     })
+//     .collect()
+//     .await;
+// }
+
 /// Helper function to bind to a `TcpListener` as an admin port and forward all incomming `TcpStream` to `connection_handler`.
 ///
 /// # Notes:
@@ -185,10 +190,14 @@ where
                         let line = line.trim().to_owned();
                         
                         //handler for replicating tracievers 
-                        if line == "connect" {
+                        if line.contains("connect") {
+                            println!("{}", line);
+                            let id = line.chars().nth(8).unwrap();
+                            println!("{}", id);
+
                             info!("Starting a tranciever thread in the admin control pannel");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span()));
+                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()));
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
@@ -200,7 +209,8 @@ where
                         else if line == "repdata" {
                             info!("transfering date from old to new proxy, transfering DbVN hashtable to new db");
                             //[Oscar] we start the above replica() function in a thread 
-                            tokio::spawn(repdata(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span());
+                            let id = line.chars().nth(8).unwrap();
+                            tokio::spawn(repdata(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span());
                         }
                         else {
                             //old admin command handlers 

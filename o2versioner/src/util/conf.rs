@@ -9,7 +9,7 @@ use config;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::net::SocketAddr;
-
+use std::net::ToSocketAddrs;
 /// Config for scheduler, sequencer and dbproxies
 ///
 /// # Notes
@@ -47,7 +47,7 @@ impl Conf {
     pub fn to_dbproxy_addrs(&self) -> Vec<SocketAddr> {
         let soc_vec = self.dbproxy.iter().map(|dbproxyconf| dbproxyconf.to_addr()).collect();
         for soc in &soc_vec {
-            // println!("[Larry] list of proxy ips: {}", soc);
+            println!("[Larry] list of proxy ips: {}", soc);
             dbg!(soc);
         }
         soc_vec
@@ -143,7 +143,11 @@ impl SchedulerConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-        self.addr.parse().expect("Invalid scheduler addr")
+        let address = &self.addr;
+        let server: Vec<_> = address.to_socket_addrs().expect("Invalid scheduler addr").collect();
+        println!("[Oscar] proxy ips: {:?}", server[1]); 
+        server[1]
+
     }
 }
 
@@ -170,7 +174,7 @@ impl SequencerConf {
     }
 
     pub fn set_addr<S: Into<String>>(mut self, addr: S) -> Self {
-        self.addr = addr.into();
+        self.addr = addr.into(); 
         self
     }
 
@@ -180,7 +184,10 @@ impl SequencerConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-        self.addr.parse().expect("Invalid sequencer addr")
+        let address = &self.addr;
+        let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
+        println!("[Oscar] proxy ips: {:?}", server[1]); 
+        server[1]
     }
 }
 
@@ -227,7 +234,12 @@ impl DbProxyConf {
     }
 
     pub fn to_addr(&self) -> SocketAddr {
-        self.addr.parse().expect("Invalid dbproxy addr")
+        //let address:String = self.addr.replacen("localhost", "127.0.0.1", 2);
+        //println!("[Oscar] proxy ips: {}", address); 
+        let address = &self.addr;
+        let server: Vec<_> = address.to_socket_addrs().expect("Invalid db addr").collect();
+        println!("[Oscar] proxy ips: {:?}", server[1]); 
+        server[1]
     }
 }
 

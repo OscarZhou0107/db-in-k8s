@@ -50,7 +50,7 @@ async fn main() {
         //copy the mockdb latency from the conf file
         let index = matches.value_of("ipaddr").unwrap().to_string().parse::<i32>().unwrap() as usize;
         //reading the replicate config file
-        let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
+        let replicate_conf = Conf::from_file("o2versioner/replicates1.toml");
         let replicate_proxy = replicate_conf.dbproxy.get(index).unwrap().clone();
         dbproxy_main(replicate_proxy).await
     }
