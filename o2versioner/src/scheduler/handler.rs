@@ -28,6 +28,7 @@ use tracing::{error, field, info, info_span, instrument, trace, warn, Instrument
 use unicase::UniCase;
 use tokio::sync::{Mutex, RwLock};
 use std::net::ToSocketAddrs;
+use std::sync::atomic::{AtomicUsize, Ordering};
 /// Main entrance for the Scheduler
 ///
 /// # Modes
@@ -42,6 +43,11 @@ use std::net::ToSocketAddrs;
 /// Upon receiving CTRL-C signal, scheduler will shutdown with
 /// possible *INCONSISTEN* state. Please use the above mentioned modes
 /// to properly stop the scheduler
+
+//global variable used to keep track of the global average latency 
+static avg_lat: AtomicUsize = AtomicUsize::new(0);
+static num_req: AtomicUsize = AtomicUsize::new(0);
+
 #[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Conf) {
     // Create the main state
@@ -484,9 +490,21 @@ async fn process_msql(
     };
 
     // Store the RequestRecord
+    let record = reqrecord.finish(&msqlresponse, conn_state.current_txvn());
     conn_state
-        .push_request_record(reqrecord.finish(&msqlresponse, conn_state.current_txvn()))
+        .push_request_record(record.clone())
         .await;
+
+    //[Larry] update global average latency
+    avg_lat.fetch_add(record.latency as usize, Ordering::Relaxed);
+    num_req.fetch_add(1, Ordering::Relaxed);
+
+    if num_req.load(Ordering::Relaxed) % 100 == 0 {
+        println!("Current avg latency in ms: {}", avg_lat.load(Ordering::Relaxed) / 100);
+        avg_lat.store(0, Ordering::Relaxed);
+        num_req.store(0, Ordering::Relaxed);
+    }
+
 
     scheduler_api::Message::Reply(msqlresponse)
 }
