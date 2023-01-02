@@ -21,8 +21,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
 use std::net::ToSocketAddrs;
 
-pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
+pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, id:char) {
     //read the default config
+    let id_str =id.to_string();
+    let mut replicate_toml = String::from("o2versioner/replicates.toml");
+    replicate_toml.insert_str(22, &id_str);
+    println!("{}", replicate_toml);
     let conf = Conf::from_file("o2versioner/conf.toml");
     
     //-------- Print the info of proxy and dbvn managers before insertion -------//
@@ -34,7 +38,7 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     // All new proxy increment from the base port addr 38877, so we have a static variable here to keep track
     static INDEX: AtomicUsize = AtomicUsize::new(0);
     //let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), IP_COUNTER.fetch_add(1, Ordering::Relaxed) as u16);
-    let replicate_conf = Conf::from_file("o2versioner/replicates.toml");
+    let replicate_conf = Conf::from_file(replicate_toml);
     let replicate_proxy = replicate_conf.dbproxy.get(INDEX.fetch_add(1, Ordering::Relaxed) as usize).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();

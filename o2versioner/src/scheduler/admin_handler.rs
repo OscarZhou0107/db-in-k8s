@@ -184,10 +184,14 @@ where
                         let line = line.trim().to_owned();
                         
                         //handler for replicating tracievers 
-                        if line == "connect" {
+                        if line.contains("connect") {
+                            println!("{}", line);
+                            let id = line.chars().nth(8).unwrap();
+                            println!("{}", id);
+
                             info!("Starting a tranciever thread in the admin control pannel");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span()));
+                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()));
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
