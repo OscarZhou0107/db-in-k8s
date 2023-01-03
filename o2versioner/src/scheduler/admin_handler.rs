@@ -212,6 +212,10 @@ where
                             let id = line.chars().nth(8).unwrap();
                             tokio::spawn(repdata(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span());
                         }
+                        else if line == "break" {
+                            info!("Terminating admin connection from {:?}...", peer_addr);
+                            break;
+                        }
                         else {
                             //old admin command handlers 
                             let conn = async {
