@@ -3,12 +3,14 @@ use super::core::*;
 use super::dispatcher::*;
 use super::logging::*;
 use super::transceiver::*;
+use std::path::PathBuf;
 use crate::comm::MsqlResponse;
 use crate::comm::{scheduler_api, scheduler_sequencer};
 use crate::core::*;
 use crate::util::conf::*;
 use crate::util::executor::Executor;
 use crate::util::tcp;
+use crate::util::common::{create_zip_csv_writer, prepare_lat_logging_dir};
 use bb8::Pool;
 use futures::future::Either;
 use futures::pin_mut;
@@ -500,11 +502,24 @@ async fn process_msql(
     num_req.fetch_add(1, Ordering::Relaxed);
 
     if num_req.load(Ordering::Relaxed) % 100 == 0 {
-        println!("Current avg latency in ms: {}", avg_lat.load(Ordering::Relaxed) / 100);
+        let avg_latency = avg_lat.load(Ordering::Relaxed) / 100;
+        println!("Current avg latency in ms: {}", avg_latency);
         avg_lat.store(0, Ordering::Relaxed);
         num_req.store(0, Ordering::Relaxed);
-    }
+        if let Some(perf_log_path) = conf.performance_logging.as_ref() {
+            // Prepare the logging directory
+            let cur_log_dir = prepare_lat_logging_dir(perf_log_path).await;
 
+            // Performance logging
+            let mut perf_csv_path_builder = PathBuf::from(&cur_log_dir);
+            perf_csv_path_builder.push("latency.txt");
+            let perf_csv_path = perf_csv_path_builder.as_path();
+            let mut wrt = std::fs::File::create(perf_csv_path).map(|w| csv::Writer::from_writer(w)).unwrap();
+            wrt.serialize(avg_latency).unwrap();
+            //info!("Dumped latency logging to {}", perf_csv_path.display());
+        }
+    }
+    
 
     scheduler_api::Message::Reply(msqlresponse)
 }
