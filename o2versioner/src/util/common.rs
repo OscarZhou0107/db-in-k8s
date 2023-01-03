@@ -36,3 +36,15 @@ pub async fn prepare_logging_dir<P: AsRef<Path>>(dump_dir: P) -> PathBuf {
 
     cur_log_dir.to_path_buf()
 }
+
+pub async fn prepare_lat_logging_dir<P: AsRef<Path>>(dump_dir: P) -> PathBuf {
+    let mut path_builder = PathBuf::from(dump_dir.as_ref());
+    let log_dir_name = "latency";
+
+    path_builder.push(log_dir_name);
+    let cur_log_dir = path_builder.as_path();
+    info!("Preparing {} for logging", cur_log_dir.display());
+    tokio::fs::create_dir_all(cur_log_dir.clone()).await.unwrap();
+
+    cur_log_dir.to_path_buf()
+}

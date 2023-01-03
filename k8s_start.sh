@@ -21,4 +21,4 @@ echo Running TPC-W...
 sleep 10
 echo ===================================Scale One dbproxy Up===========================================
 kubectl scale statefulsets dbproxy0-deployment --replicas=3
-kubectl exec scheduler-deployment-0 -- bash -c "netcat -e new_dbproxy_start.sh scheduler-deployment-0.scheduler-service.default.svc.cluster.local 9999"
+# kubectl exec scheduler-deployment-0 -- bash -c "netcat -e new_dbproxy_start.sh scheduler-deployment-0.scheduler-service.default.svc.cluster.local 9999"

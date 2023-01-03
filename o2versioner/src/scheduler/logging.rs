@@ -32,6 +32,9 @@ impl RequestRecordStart {
                 || (req.is_endtx() && res.is_endtx()),
             "Request must match with Response type"
         );
+        let now = Utc::now();
+        let diff = now - req_timestamp;
+        let lat: i64 = diff.num_microseconds().unwrap();
 
         RequestRecord {
             req,
@@ -39,6 +42,7 @@ impl RequestRecordStart {
             initial_txvn,
             res: res.clone(),
             res_timestamp: Utc::now(),
+            latency: lat,
             final_txvn: final_txvn.clone(),
         }
     }
@@ -53,6 +57,7 @@ pub struct RequestRecord {
     initial_txvn: Option<TxVN>,
     res: MsqlResponse,
     res_timestamp: DateTime<Utc>,
+    pub latency: i64,
     final_txvn: Option<TxVN>,
 }
 
