@@ -90,15 +90,15 @@ pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:
     
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let dbproxy_addr:SocketAddr = server[1];
+    println!("[Oscar] proxy ips: {:?}", server[0]); 
+    let dbproxy_addr:SocketAddr = server[0];
 
     let replicate_conf = Conf::from_file("o2versioner/conf.toml");
     let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let old_db:SocketAddr = server[1];
+    println!("[Oscar] proxy ips: {:?}", server[0]); 
+    let old_db:SocketAddr = server[0];
 
     let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
     let old_db_vn = dbvn_manager.read().await.get(&old_db);
