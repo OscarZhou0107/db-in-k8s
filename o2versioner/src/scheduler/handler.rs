@@ -240,7 +240,8 @@ async fn admin(
                 ("perf", vec!["perf"]),
                 ("connect", vec!["connect"]),
                 ("replica", vec!["replica"]), 
-                ("repdata", vec!["repdata"]), 
+                ("repdata", vec!["repdata"]),
+                ("drop", vec!["drop"]), 
             ]
             .into_iter()
             .map(|(k, vs)| (k, vs.into_iter().map(|v| UniCase::new(String::from(v))).collect()))
@@ -295,6 +296,9 @@ async fn admin(
             else if cmd_registry.get("repdata").unwrap().contains(&command) {
                 (format!("replica DbVN to new db"), true)
             } 
+            else if cmd_registry.get("drop").unwrap().contains(&command) {
+                (format!("drop a db"), true)
+            }  
             else {
                 (
                     format!("Unknown command: {}. Available commands: {:?}", command, cmd_registry),

@@ -20,7 +20,20 @@ use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
 use std::net::ToSocketAddrs;
-
+pub async fn drop_connect(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, id:char) {
+    let id_str =id.to_string();
+    let mut replicate_toml = String::from("o2versioner/replicates.toml");
+    replicate_toml.insert_str(22, &id_str);
+    println!("{}", replicate_toml);
+    let replicate_conf = Conf::from_file(replicate_toml);
+    let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
+    let address = &replicate_proxy.addr;
+    let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
+    println!("[Oscar] proxy ips: {:?}", server[1]); 
+    let socket:SocketAddr = server[1];
+    dbproxy_manager.write().await.remove(socket);
+    dbvn_manager.write().await.remove(socket);
+}
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, id:char) {
     //read the default config
     let id_str =id.to_string();
