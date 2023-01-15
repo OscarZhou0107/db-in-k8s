@@ -218,6 +218,10 @@ impl DbVNManager {
         //we want to clone the VN number from an existing entry
         self.0.insert(socket, current_vn.clone());
     }
+    pub fn remove(&mut self, socket:SocketAddr) {
+        //we want to clone the VN number from an existing entry
+        self.0.remove(&socket);
+    }
 }
 
 #[derive(Clone)]
@@ -251,6 +255,9 @@ impl DbproxyManager {
     pub fn insert(&mut self, socket: SocketAddr, transceiver_addr: TransceiverAddr) {
         self.0.insert(socket, transceiver_addr);
     }
+    pub fn remove(&mut self, socket: SocketAddr) {
+        self.0.remove(&socket);
+    } 
 }
 
 /// Unit test for `ConnectionState`

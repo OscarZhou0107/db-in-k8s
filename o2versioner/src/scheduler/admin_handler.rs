@@ -201,6 +201,17 @@ where
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
+                        else if line.contains("drop") {
+                            println!("{}", line);
+                            let id = line.chars().nth(5).unwrap();
+                            println!("{}", id);
+
+                            info!("Drop a db proxy from scheduler");
+                            //[Larry] we start the above connect_replica() function in a thread 
+                            tokio::spawn(drop_connect(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()); 
+                            
+                            //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
+                        }
                         else if line == "replica" {
                             info!("transfering date from old to new proxy, inform old data proxy to transfer");
                             //[Oscar] we start the above replica() function in a thread 
