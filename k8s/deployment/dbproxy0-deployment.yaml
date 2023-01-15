@@ -22,6 +22,11 @@ spec:
           imagePullPolicy: Never
           ports:
           - containerPort: 38875
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - ./preStop.sh
 ---
 apiVersion: v1
 kind: Service

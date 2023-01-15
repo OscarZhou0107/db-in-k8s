@@ -67,4 +67,7 @@ pub async fn main(conf: DbProxyConf) {
     dispatcher_res.unwrap();
     assert_eq!(pending_queue_size, 0);
     assert_eq!(transactions_size, 0);
+
+    info!("Waiting for k8s to kill...");
+    loop {}
 }

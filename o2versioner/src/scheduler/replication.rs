@@ -29,8 +29,8 @@ pub async fn drop_connect(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_man
     let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let socket:SocketAddr = server[1];
+    println!("[Oscar] proxy ips: {:?}", server[0]); 
+    let socket:SocketAddr = server[0];
     dbproxy_manager.write().await.remove(socket);
     dbvn_manager.write().await.remove(socket);
 }
