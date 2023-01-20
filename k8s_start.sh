@@ -19,9 +19,9 @@ kubectl apply -f k8s/deployment/load-generator-deployment.yaml
 echo Running TPC-W...
 # kubectl top pods
 
-sleep 10
-echo ===================================Scale One dbproxy Up===========================================
-kubectl scale statefulsets dbproxy0-deployment --replicas=3
-sleep 5
-kubectl scale statefulsets dbproxy0-deployment --replicas=4
+# sleep 10
+# echo ===================================Scale One dbproxy Up===========================================
+# kubectl scale statefulsets dbproxy0-deployment --replicas=3
+# sleep 5
+# kubectl scale statefulsets dbproxy0-deployment --replicas=4
 # kubectl exec scheduler-deployment-0 -- bash -c "netcat -e new_dbproxy_start.sh scheduler-deployment-0.scheduler-service.default.svc.cluster.local 9999"

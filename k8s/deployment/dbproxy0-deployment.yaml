@@ -6,7 +6,7 @@ metadata:
     app: dbproxy0
 spec: 
   serviceName: dbproxy0-service
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: dbproxy0
