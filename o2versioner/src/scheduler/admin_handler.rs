@@ -203,12 +203,12 @@ where
                         }
                         else if line.contains("drop") {
                             println!("{}", line);
-                            let id = line.chars().nth(5).unwrap();
-                            println!("{}", id);
+                            let ip: String = line[5..].trim().to_string();
+                            println!("{}", ip);
 
                             info!("Drop a db proxy from scheduler");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tokio::spawn(drop_connect(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()); 
+                            tokio::spawn(drop_connect(dbproxy_manager.clone(), dbvn_manager.clone(), ip).in_current_span()); 
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
