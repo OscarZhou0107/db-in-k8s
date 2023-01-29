@@ -2,10 +2,10 @@
 
 rm test_log.txt
 # 每次选一个replica的数量
-for replicas in 1 2 4 8 16
+for replicas in 1 2 4 8
 do 
     # 选client的数量
-    for clients in 1 10 40 80 100 200
+    for clients in 500
     do
         # 选workload
         for mix in 1 2 3

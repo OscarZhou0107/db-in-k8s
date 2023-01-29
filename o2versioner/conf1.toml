@@ -11,10 +11,10 @@ addr = "localhost:19876"
 addr = "localhost:38875"
 #sql_conf = "host=localhost port=5432 dbname=tpcw user=k8s password=Abc@123" 
 [dbproxy.db_mock_latency]
-begintx = {mean = 30, stddev = 10}
-endtx = {mean = 20, stddev = 10}
-read = {mean = 20, stddev = 10}
-write = {mean = 30, stddev = 10}
+begintx = {mean = 75, stddev = 150}
+endtx = {mean = 150, stddev = 275}
+read = {mean = 80, stddev = 250}
+write = {mean = 550, stddev = 1650}
 
 
 # [[dbproxy]]
