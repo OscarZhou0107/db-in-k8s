@@ -29,8 +29,7 @@ pub async fn drop_connect(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_man
     let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let socket:SocketAddr = server[1];
+    let socket:SocketAddr = if server.len()==1 { server[0] } else { server[1] };
     dbproxy_manager.write().await.remove(socket);
     dbvn_manager.write().await.remove(socket);
 }
@@ -55,8 +54,8 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let socket:SocketAddr = server[1];
+    //println!("[Oscar] proxy ips: {:?}", server_ip); 
+    let socket:SocketAddr = if server.len()==1 { server[0] } else { server[1] };
     // Construct the new tranceiver and insert the IP addr into the managers
     let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
     dbproxy_manager.write().await.insert(socket, transceiver_addr);
@@ -103,15 +102,14 @@ pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:
     
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let dbproxy_addr:SocketAddr = server[1];
+    //println!("[Oscar] proxy ips: {:?}", server_ip); 
+    let dbproxy_addr:SocketAddr = if server.len()==1 { server[0] } else { server[1] };
 
     let replicate_conf = Conf::from_file("o2versioner/conf.toml");
     let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
     let address = &replicate_proxy.addr;
     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-    println!("[Oscar] proxy ips: {:?}", server[1]); 
-    let old_db:SocketAddr = server[1];
+    let old_db:SocketAddr = if server.len()==1 { server[0] } else { server[1] };
 
     let transceiver_addr = dbproxy_manager.read().await.get(&dbproxy_addr);
     let old_db_vn = dbvn_manager.read().await.get(&old_db);
