@@ -4,7 +4,6 @@ rm test_log.txt
 # 每次选一个replica的数量
 for replicas in 1 2 4 8 16
 do 
-    ps ux | grep o2
     # 选client的数量
     for clients in 1 10 40 80 100 200
     do
@@ -35,6 +34,8 @@ do
             fi
             sleep 5
             python3 ./load_generator/launcher.py --port 2077 --mix $mix --range 0 $clients --ip 127.0.0.1 --mock_db --path ./load_generator
+            sleep 1
+            { echo perf; echo break; } | netcat localhost 9999
         done
     done
 done
