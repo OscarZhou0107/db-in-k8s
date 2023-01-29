@@ -83,17 +83,6 @@ if __name__ == "__main__":
     # put launch_client into a separate process
     p = multiprocessing.Process(target=launch_client, args=(cids, mix, pid, args.python, int(args.debug), int(args.mock_db), args.path, args.port, args.ip))
     p.start()
-
-    start_time = time.time()
-    while True:
-        text = input()
-        if text == "kill":
-            os.killpg(pid, signal.SIGTERM)
-        elif text == "status":
-            if p.is_alive():
-                print("Alive for {} seconds".format(int(time.time() - start_time)))
-            else:
-                print("All clients finished")
     
 
 
