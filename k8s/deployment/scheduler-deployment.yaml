@@ -35,6 +35,11 @@ kind: Service
 metadata:
   name: scheduler-service
 spec:
-  clusterIP: None
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 2077
+      targetPort: 2077
+      nodePort: 32077
   selector:
     app: scheduler
