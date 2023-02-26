@@ -69,13 +69,13 @@ pub async fn main(conf: Conf) {
         .unwrap();
 
     dbg!(conf.scheduler.transceiver_queue_size);
-
+    let admin_stop_signal = Arc::new(Mutex::new(false));
     // Prepare transceiver
     let (transceiver_addrs, transceivers): (Vec<_>, Vec<_>) = conf
         .to_dbproxy_addrs()
         .into_iter()
         .map(|dbproxy_addr| {
-            let (trscaddrs, trsc) = Transceiver::new(conf.scheduler.transceiver_queue_size, dbproxy_addr);
+            let (trscaddrs, trsc) = Transceiver::new(conf.scheduler.transceiver_queue_size, dbproxy_addr, admin_stop_signal.clone());
             ((dbproxy_addr, trscaddrs), trsc)
         })
         .unzip();
@@ -167,6 +167,7 @@ pub async fn main(conf: Conf) {
         let address = admin_addr;
         let server: Vec<_> = address.to_socket_addrs().expect("Invalid admin addr").collect();
         println!("[Oscar] admin ips: {:?}", server[1]); 
+        let admin_stop_signal_clone = admin_stop_signal.clone();
         let admin_handle = tokio::spawn(
             admin(
                 server[1],
@@ -175,6 +176,7 @@ pub async fn main(conf: Conf) {
                 state.clone(),
                 dbproxy_manager,
                 dbvn_manager,
+                admin_stop_signal_clone,
                 // &mut dispatcher_box,
             )
             .in_current_span(),
@@ -204,6 +206,7 @@ pub async fn main(conf: Conf) {
 // to listen to requsts, because first the tranceiver and dispatchers are thread within the scheduler process
 // although their communication seems to be done via TCP, it is hard to modify the data structures they share, such as the 
 // dbproxymanager if we start them on different processes
+/* 
 pub async fn connect_replica() {
     let conf = Conf::from_file("o2versioner/conf.toml");
     println!("In scheduler's connect_replica");
@@ -211,11 +214,12 @@ pub async fn connect_replica() {
 
     // Prepare transceiver
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 38877);
-    let (_transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
+    let (_transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket, admin_stop_signal.clone());
     // Launch transceiver as a new task
     let transceiver_handle = tokio::spawn(Box::new(transceiver).run().in_current_span());
     let _join = tokio::join!(transceiver_handle);
 }
+*/
 
 
 #[instrument(name = "admin", skip(admin_addr, stop_tx, sequencer_socket_pool, state, dbproxy_manager, /*dispatcher*/))]
@@ -226,11 +230,12 @@ async fn admin(
     state: State,
     dbproxy_manager: Arc<RwLock<DbproxyManager>>,
     dbvn_manager:Arc<RwLock<DbVNManager>>,
+    admin_stop_signal: Arc<Mutex<bool>>,
     // dispatcher: &mut Box<Dispatcher>,
 ) {
     //we want a vec of tranceiver threads here 
     //vec! 
-    start_admin_tcplistener(admin_addr,  dbproxy_manager, dbvn_manager, move |msg| {
+    start_admin_tcplistener(admin_addr,  dbproxy_manager, dbvn_manager, admin_stop_signal, move |msg| {
         let sequencer_socket_pool = sequencer_socket_pool.clone();
         let state = state.clone();
         async move {

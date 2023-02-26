@@ -20,6 +20,7 @@ use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
 use std::net::ToSocketAddrs;
+use tokio::sync::Mutex;
 pub async fn drop_connect(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, id:char) {
     let id_str =id.to_string();
     let mut replicate_toml = String::from("o2versioner/replicates.toml");
@@ -33,7 +34,7 @@ pub async fn drop_connect(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_man
     dbproxy_manager.write().await.remove(socket);
     dbvn_manager.write().await.remove(socket);
 }
-pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, id:char) {
+pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, admin_stop_signal:Arc<Mutex<bool>>, id:char) {
     //read the default config
     let id_str =id.to_string();
     let mut replicate_toml = String::from("o2versioner/replicates.toml");
@@ -57,7 +58,7 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     //println!("[Oscar] proxy ips: {:?}", server_ip); 
     let socket:SocketAddr = if server.len()==1 { server[0] } else { server[1] };
     // Construct the new tranceiver and insert the IP addr into the managers
-    let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket);
+    let (transceiver_addr, transceiver) = Transceiver::new(conf.scheduler.transceiver_queue_size, socket, admin_stop_signal);
     dbproxy_manager.write().await.insert(socket, transceiver_addr);
     dbvn_manager.write().await.insert(socket);
     // Launch the transceiver 
