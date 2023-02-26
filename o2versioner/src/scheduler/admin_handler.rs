@@ -232,7 +232,7 @@ where
                             if line == "block" { let mut guard = admin_stop_signal.lock().await;
                                 *guard = true;}
                             else if line == "unblock"{ let mut guard = admin_stop_signal.lock().await;
-                                *guard = true;}
+                                *guard = false;}
                             //old admin command handlers 
                             let conn = async {
                                 let (mut res, should_continue) = admin_command_handler(line.clone()).await;
