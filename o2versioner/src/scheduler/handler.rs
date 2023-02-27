@@ -89,6 +89,7 @@ pub async fn main(conf: Conf) {
         conf.scheduler.dispatcher_queue_size,
         dbvn_manager.clone(),
         dbproxy_manager.clone(),
+        admin_stop_signal.clone(),
     );
 
     // Launch transceiver as a new task
