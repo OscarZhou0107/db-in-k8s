@@ -140,7 +140,7 @@ impl Executor for Transceiver {
                             if queue.len() > 0 {
                                 info!("conn fifo has {} after Pop", queue.len());
                             } else {
-                                trace!("conn fifo has {} after Pop", queue.len());
+                                info!("conn fifo has {} after Pop", queue.len());
                             }
 
                             assert_eq!(
@@ -188,7 +188,7 @@ impl Executor for Transceiver {
                             if queue.len() > 0 {
                                 info!("conn fifo has {} before Push", queue.len());
                             } else {
-                                trace!("conn fifo has {} before Push", queue.len());
+                                info!("conn fifo has {} before Push", queue.len());
                             }
 
                             queue.push_back(request);
