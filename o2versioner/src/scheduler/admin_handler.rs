@@ -12,13 +12,14 @@ use crate::comm::scheduler_dbproxy::*;
 use super::transceiver::*;
 use crate::util::conf::*;
 use crate::util::executor::Executor;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as otherToSocketAddrs};
 use tokio::sync::{RwLock};
 use std::sync::Arc;
 use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
 use super::replication::*;
+use std::{thread, time};
 /* 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     //read the default config
@@ -236,6 +237,30 @@ where
                                     "admin_command_handler reply message should not contain any newline characters"
                                 );
                                 res += "\n";
+                                
+                                // Reply block only after all outstanding txn are finished in queue
+                                if line == "block" {
+                                    let replicate_toml = String::from("o2versioner/conf.toml");
+                                    let replicate_conf = Conf::from_file(replicate_toml);
+                                    let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
+                                    let address = &replicate_proxy.addr;
+                                    let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
+                                    let dbproxy_addr:SocketAddr = server[1];
+
+                                    thread::sleep(time::Duration::from_millis(100));
+                                    loop {
+                                        let old_db_vn = dbvn_manager.read().await.get(&dbproxy_addr);
+                                        thread::sleep(time::Duration::from_millis(300));
+                                        let new_db_vn = dbvn_manager.read().await.get(&dbproxy_addr);
+                                        // Compare vn number to check if there is new transaction being proceeded
+                                        if (new_db_vn.get_version_sum() == old_db_vn.get_version_sum()) {
+                                            break;
+                                        }
+                                    }
+                                    
+                                }
+
+                                
                                 tcp_write
                                     .write_all(res.as_bytes())
                                     .map_ok_or_else(
