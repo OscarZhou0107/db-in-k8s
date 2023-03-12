@@ -70,12 +70,10 @@ impl State {
 
     #[instrument(name="execute", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
     async fn execute(&self, request: RequestWrapper<DispatcherRequest>) {
-        
+        let (request, reply_ch) = request.unwrap();
+
         while *self.admin_stop_signal.lock().await{
         }
-        // info!("[WWZ] UNBLOCK");
-        // info!("[WWZ] {:?}", self.dbproxy_manager.read().await.to_vec().len());
-        let (request, reply_ch) = request.unwrap();
 
         Span::current().record("message", &&request.request_meta.to_string()[..]);
         Span::current().record("cmd", &request.command.as_ref());

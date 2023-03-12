@@ -14,9 +14,9 @@ async fn main() {
     let matches = parse_args();
     // Set tracing
     let max_level = match matches.occurrences_of("v") {
-        // 0 => tracing::Level::INFO,
-        // 1 => tracing::Level::DEBUG,
-        0 | _ => tracing::Level::TRACE,
+        0 => tracing::Level::INFO,
+        1 => tracing::Level::DEBUG,
+        2 | _ => tracing::Level::TRACE,
     };
     println!("Verbosity set to {:?}", max_level);
 
