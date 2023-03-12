@@ -62,19 +62,17 @@ pub type TransceiverAddr = ExecutorAddr<TransceiverRequest>;
 pub struct Transceiver {
     dbproxy_addr: SocketAddr,
     request_rx: RequestReceiver<TransceiverRequest>,
-    admin_stop_signal: Arc<Mutex<bool>>,
 }
 
 impl Transceiver {
     /// Converts an `Iterator<Item = dbproxy_port: SocketAddr>` into `Transceiver`
-    pub fn new(queue_size: usize, dbproxy_addr: SocketAddr, admin_stop_signal: Arc<Mutex<bool>>) -> (TransceiverAddr, Self) {
+    pub fn new(queue_size: usize, dbproxy_addr: SocketAddr) -> (TransceiverAddr, Self) {
         let (addr, request_rx) = ExecutorAddr::new(queue_size);
         (
             addr,
             Self {
                 dbproxy_addr,
                 request_rx,
-                admin_stop_signal, 
             },
         )
     }
@@ -89,7 +87,6 @@ impl Executor for Transceiver {
         let Transceiver {
             dbproxy_addr,
             mut request_rx,
-            admin_stop_signal,  
         } = *self;
 
         let socket = TcpStream::connect(dbproxy_addr)
@@ -189,8 +186,6 @@ impl Executor for Transceiver {
                                 info!("conn fifo has {} before Push", queue.len());
                             } else {
                                 trace!("conn fifo has {} before Push", queue.len());
-                            }
-                            while *admin_stop_signal.lock().await{
                             }
                             queue.push_back(request);
                             let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
