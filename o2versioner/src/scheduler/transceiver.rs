@@ -190,7 +190,8 @@ impl Executor for Transceiver {
                             } else {
                                 trace!("conn fifo has {} before Push", queue.len());
                             }
-
+                            while *admin_stop_signal.lock().await{
+                            }
                             queue.push_back(request);
                             let delimited_write = FramedWrite::new(&mut writer, LengthDelimitedCodec::new());
                             let mut serded_write =

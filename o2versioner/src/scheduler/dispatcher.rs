@@ -55,25 +55,20 @@ struct State {
     dbvn_manager: Arc<RwLock<DbVNManager>>,
     dbvn_manager_notify: Arc<Notify>,
     dbproxy_manager: Arc<RwLock<DbproxyManager>>,
-    admin_stop_signal: Arc<Mutex<bool>>,
 }
 
 impl State {
-    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager:  Arc<RwLock<DbproxyManager>>, admin_stop_signal: Arc<Mutex<bool>>) -> Self {
+    fn new(dbvn_manager: Arc<RwLock<DbVNManager>>, dbproxy_manager:  Arc<RwLock<DbproxyManager>>) -> Self {
         Self {
             dbvn_manager,
             dbvn_manager_notify: Arc::new(Notify::new()),
             dbproxy_manager,
-            admin_stop_signal,
         }
     }
 
     #[instrument(name="execute", skip(self, request), fields(message=field::Empty, cmd=field::Empty, op=field::Empty))]
     async fn execute(&self, request: RequestWrapper<DispatcherRequest>) {
         let (request, reply_ch) = request.unwrap();
-
-        while *self.admin_stop_signal.lock().await{
-        }
 
         Span::current().record("message", &&request.request_meta.to_string()[..]);
         Span::current().record("cmd", &request.command.as_ref());
@@ -358,9 +353,8 @@ impl Dispatcher {
         queue_size: usize,
         dbvn_manager: Arc<RwLock<DbVNManager>>,
         dbproxy_manager:  Arc<RwLock<DbproxyManager>>,
-        admin_stop_signal: Arc<Mutex<bool>>,
     ) -> (DispatcherAddr, Dispatcher) {
-        let state = State::new(dbvn_manager, dbproxy_manager, admin_stop_signal);
+        let state = State::new(dbvn_manager, dbproxy_manager);
 
         let (addr, request_rx) = DispatcherAddr::new(queue_size);
         (addr, Dispatcher { state, request_rx })
