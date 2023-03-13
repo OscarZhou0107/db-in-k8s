@@ -2,7 +2,7 @@
 read -p "Please wait for some time to initialize the dashboard... (Press any key to continue)" flag
 echo ===================================Delete Old Deployment==========================================
 kubectl delete -f k8s/deployment
-sleep 10 # Wait for old deployment fully deleted
+sleep 5 # Wait for old deployment fully deleted
 docker container prune
 echo ===================================Starting Dbproxies=============================================
 kubectl apply -f k8s/deployment/dbproxy0-deployment.yaml
