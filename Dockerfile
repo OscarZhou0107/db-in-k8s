@@ -2,6 +2,8 @@ FROM ubuntu:18.04
 
 # WORKDIR /usr/src/db-in-k8s
 
+COPY . .
+
 # RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 RUN apt update -y && apt upgrade -y
 RUN apt install sudo -y
@@ -14,8 +16,6 @@ RUN printf '#!/bin/sh\nexport CARGO_HOME=/opt/cargo\nexec /bin/sh "$@"\n' >/usr/
 RUN chmod +x /usr/local/bin/sh
 RUN sudo apt-get install gcc -y
 RUN apt-get install -y netcat
-
-COPY . .
 # RUN cargo update -p lexical-core
 RUN cargo build
 
