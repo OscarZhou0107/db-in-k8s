@@ -240,12 +240,12 @@ where
                                 
                                 // Reply block only after all outstanding txn are finished in queue
                                 if line == "block" {
-                                    let replicate_toml = String::from("o2versioner/conf.toml");
+                                    let replicate_toml = String::from("o2versioner/conf_dbproxy0.toml");
                                     let replicate_conf = Conf::from_file(replicate_toml);
                                     let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
                                     let address = &replicate_proxy.addr;
                                     let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
-                                    let dbproxy_addr:SocketAddr = server[1];
+                                    let dbproxy_addr:SocketAddr = server[0];
 
                                     thread::sleep(time::Duration::from_millis(100));
                                     loop {

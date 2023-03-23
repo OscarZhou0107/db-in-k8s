@@ -20,6 +20,11 @@ spec:
           image: systems:latest
           command: ["./dbproxy_start.sh"]
           imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: 250m
+            limits:
+              cpu: 800m
           env:
             - name: MY_POD_IP
               valueFrom:
@@ -32,7 +37,7 @@ spec:
               exec:
                 command:
                   - ./preStop.sh
-      terminationGracePeriodSeconds: 3
+      terminationGracePeriodSeconds: 20
 ---
 apiVersion: v1
 kind: Service
