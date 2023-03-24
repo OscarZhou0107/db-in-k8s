@@ -1,0 +1,8 @@
+[[dbproxy]]
+addr = "dbproxy0-deployment-5.dbproxy0-service.default.svc.cluster.local:38877"
+#sql_conf = "host=localhost port=5432 dbname=tpcw3 user=k8s password=Abc@123"
+[dbproxy.db_mock_latency]
+begintx = {mean = 30, stddev = 10}
+endtx = {mean = 20, stddev = 10}
+read = {mean = 20, stddev = 10}
+write = {mean = 30, stddev = 10}
