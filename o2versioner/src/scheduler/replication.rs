@@ -121,7 +121,7 @@ pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:
         trace!("-> {:?}", msg);
         async move {
             transceiver_addr
-                .request_nowait(TransceiverRequest::Dbreplica {
+                .request(TransceiverRequest::Dbreplica {
                     dbproxy_addr: dbproxy_addr.clone(),
                     dbproxy_msg: msg,
                 })

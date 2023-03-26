@@ -29,7 +29,7 @@ sleep 2
 echo ===================================Start Scheduler_sequencer===================================
 cat k8s/deployment/scheduler-deployment.yaml | sed s+{{path}}+$(pwd)+g > k8s/deployment/scheduler-deployment_tmp.yaml
 kubectl apply -f k8s/deployment/scheduler-deployment_tmp.yaml
-sleep 3 # Need time for system to establish connection
+sleep 10 # Need time for system to establish connection
 kubectl scale statefulsets dbproxy0-deployment --replicas=$replicas
 while : ; do
     msg=$(kubectl get pod | grep dbproxy0-deployment | grep -c Running 2>&1)
