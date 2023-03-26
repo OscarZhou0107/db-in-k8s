@@ -90,7 +90,7 @@ pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_
     repdata(dbproxy_manager.clone(), dbvn_manager.clone(), id).await;
 
     // ----- wait for the thread ------//
-    let _join = tokio::join!(transceiver_handle);
+    //let _join = tokio::join!(transceiver_handle);
 }
 
 pub async fn repdata(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, id:char) {

@@ -173,7 +173,6 @@ where
 {
     let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
-    let mut tranceivers = Vec::new();
 
     Span::current().record("message", &&local_addr.to_string()[..]);
     info!("Successfully binded");
@@ -198,7 +197,7 @@ where
 
                             info!("Starting a tranciever thread in the admin control pannel");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()));
+                            connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span().await;
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
@@ -209,20 +208,9 @@ where
 
                             info!("Drop a db proxy from scheduler");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tokio::spawn(drop_connect(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()); 
+                            drop_connect(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span().await; 
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
-                        }
-                        else if line == "replica" {
-                            info!("transfering date from old to new proxy, inform old data proxy to transfer");
-                            //[Oscar] we start the above replica() function in a thread 
-                            tokio::spawn(replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span());
-                        }
-                        else if line == "repdata" {
-                            info!("transfering date from old to new proxy, transfering DbVN hashtable to new db");
-                            //[Oscar] we start the above replica() function in a thread 
-                            let id = line.chars().nth(8).unwrap();
-                            tokio::spawn(repdata(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span());
                         }
                         else if line == "break" {
                             info!("Terminating admin connection from {:?}...", peer_addr);
