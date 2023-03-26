@@ -136,6 +136,7 @@ spec:
         - --secure-port=4443
         command:
         - /metrics-server
+        - --metric-resolution=15s
         - --kubelet-insecure-tls
         - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
         image: k8s.gcr.io/metrics-server/metrics-server:v0.6.2
