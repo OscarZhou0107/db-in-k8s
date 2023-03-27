@@ -12,13 +12,14 @@ use crate::comm::scheduler_dbproxy::*;
 use super::transceiver::*;
 use crate::util::conf::*;
 use crate::util::executor::Executor;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as otherToSocketAddrs};
 use tokio::sync::{RwLock};
 use std::sync::Arc;
 use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
 use super::replication::*;
+use std::{thread, time};
 /* 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     //read the default config
@@ -172,7 +173,6 @@ where
 {
     let mut listener = TcpListener::bind(addr).await.unwrap();
     let local_addr = listener.local_addr().unwrap();
-    let mut tranceivers = Vec::new();
 
     Span::current().record("message", &&local_addr.to_string()[..]);
     info!("Successfully binded");
@@ -197,7 +197,7 @@ where
 
                             info!("Starting a tranciever thread in the admin control pannel");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()));
+                            connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span().await;
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
@@ -212,17 +212,6 @@ where
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
-                        else if line == "replica" {
-                            info!("transfering date from old to new proxy, inform old data proxy to transfer");
-                            //[Oscar] we start the above replica() function in a thread 
-                            tokio::spawn(replica(dbproxy_manager.clone(), dbvn_manager.clone()).in_current_span());
-                        }
-                        else if line == "repdata" {
-                            info!("transfering date from old to new proxy, transfering DbVN hashtable to new db");
-                            //[Oscar] we start the above replica() function in a thread 
-                            let id = line.chars().nth(8).unwrap();
-                            tokio::spawn(repdata(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span());
-                        }
                         else if line == "break" {
                             info!("Terminating admin connection from {:?}...", peer_addr);
                             break;
@@ -236,6 +225,30 @@ where
                                     "admin_command_handler reply message should not contain any newline characters"
                                 );
                                 res += "\n";
+                                
+                                // Reply block only after all outstanding txn are finished in queue
+                                if line == "block" {
+                                    let replicate_toml = String::from("o2versioner/conf_dbproxy0.toml");
+                                    let replicate_conf = Conf::from_file(replicate_toml);
+                                    let replicate_proxy = replicate_conf.dbproxy.get(0).unwrap().clone();
+                                    let address = &replicate_proxy.addr;
+                                    let server: Vec<_> = address.to_socket_addrs().expect("Invalid sequencer addr").collect();
+                                    let dbproxy_addr:SocketAddr = server[0];
+
+                                    thread::sleep(time::Duration::from_millis(100));
+                                    loop {
+                                        let old_db_vn = dbvn_manager.read().await.get(&dbproxy_addr);
+                                        thread::sleep(time::Duration::from_millis(300));
+                                        let new_db_vn = dbvn_manager.read().await.get(&dbproxy_addr);
+                                        // Compare vn number to check if there is new transaction being proceeded
+                                        if (new_db_vn.get_version_sum() == old_db_vn.get_version_sum()) {
+                                            break;
+                                        }
+                                    }
+                                    
+                                }
+
+                                
                                 tcp_write
                                     .write_all(res.as_bytes())
                                     .map_ok_or_else(
