@@ -69,7 +69,10 @@ scaleDown_stablization=$(grep -A 1 'scaleDown' k8s/deployment/dbproxy-hpa.yaml |
 scaleUp_stablization=$(grep -A 1 'scaleUp' k8s/deployment/dbproxy-hpa.yaml | grep 'stabilizationWindowSeconds' | sed 's/[^0-9]*//g')
 scaleDown_periodSeconds=$(grep -A 5 'scaleDown' k8s/deployment/dbproxy-hpa.yaml | grep 'periodSeconds' | sed 's/[^0-9]*//g')
 scaleUp_periodSeconds=$(grep -A 5 'scaleUp' k8s/deployment/dbproxy-hpa.yaml | grep 'periodSeconds' | sed 's/[^0-9]*//g')
-new_name=perf/min$[min_replica]_max$[max_replica]_thre_$[threshold]_SD_$[scaleDown_stablization]_$[scaleDown_periodSeconds]_SU_$[scaleUp_stablization]_$[scaleUp_periodSeconds]
+mix=$(grep -E -o 'mix\", \"[0-9]*' k8s/deployment/load-generator-deployment.yaml | grep -o "[0-9]*")
+clients=$(grep -E -o '0\", \"[0-9]*' k8s/deployment/load-generator-deployment.yaml | grep -o "[0-9]*" | tail -n 1)
+branch=$(git branch --show-current)
+new_name=perf/[$branch]_mix_$[mix]_clients_$[clients]_init_$[replicas]_min$[min_replica]_max$[max_replica]_thre_$[threshold]_SD_$[scaleDown_stablization]_$[scaleDown_periodSeconds]_SU_$[scaleUp_stablization]_$[scaleUp_periodSeconds]
 mv perf/$perf_folder $new_name
 echo "Save to perf folder: $new_name"
 
