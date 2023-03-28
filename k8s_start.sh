@@ -1,5 +1,5 @@
 #!/bin/bash
-read -p "Please wait for some time to initialize the dashboard... (Press any key to continue)" flag
+# read -p "Please wait for some time to initialize the dashboard... (Press any key to continue)" flag
 echo ===================================Delete Old Deployment==========================================
 kubectl delete -f k8s/deployment
 echo "Deleting old containers..."
@@ -10,7 +10,8 @@ while : ; do
         break
     fi
 done
-docker container prune
+yes | docker container prune
+sleep 60
 echo ===================================Start Metrics Server=============================================
 kubectl apply -f k8s/k8s_dashboard/metrics-server.yaml
 echo "Initializing Metrics Server..."
@@ -23,21 +24,27 @@ while : ; do
 done
 kubectl top pod
 echo ===================================Start Dbproxies=============================================
-read -p "Please specify the number of initial DB proxies [1-8]: " replicas
+# read -p "Please specify the number of initial DB proxies [1-8]: " replicas
 kubectl apply -f k8s/deployment/dbproxy0-deployment.yaml
 sleep 2
 echo ===================================Start Scheduler_sequencer===================================
 cat k8s/deployment/scheduler-deployment.yaml | sed s+{{path}}+$(pwd)+g > k8s/deployment/scheduler-deployment_tmp.yaml
 kubectl apply -f k8s/deployment/scheduler-deployment_tmp.yaml
 sleep 10 # Need time for system to establish connection
-kubectl scale statefulsets dbproxy0-deployment --replicas=$replicas
+kubectl scale statefulsets dbproxy0-deployment --replicas=$1
 while : ; do
     msg=$(kubectl get pod | grep dbproxy0-deployment | grep -c Running 2>&1)
-    if [[ $msg == $replicas ]]
+    if [[ $msg == $1 ]]
     then
         break
     fi
 done
+msg=$(kubectl get pod scheduler-deployment-0)
+if [[ ${msg} != *"Running"* ]]
+then
+    echo "Scheduler Failed early..."
+    exit
+fi
 sleep 2
 echo ===================================System Started=================================================
 kubectl get pods # Display the running pods
@@ -52,7 +59,7 @@ while : ; do
     fi
 done
 echo ===================================Start TPC-W====================================================
-read -p "Press any key to start TPC-W..." key
+# read -p "Press any key to start TPC-W..." key
 kubectl apply -f k8s/deployment/load-generator-deployment.yaml
 echo Running TPC-W...
 
@@ -72,13 +79,25 @@ scaleUp_periodSeconds=$(grep -A 5 'scaleUp' k8s/deployment/dbproxy-hpa.yaml | gr
 mix=$(grep -E -o 'mix\", \"[0-9]*' k8s/deployment/load-generator-deployment.yaml | grep -o "[0-9]*")
 clients=$(grep -E -o '0\", \"[0-9]*' k8s/deployment/load-generator-deployment.yaml | grep -o "[0-9]*" | tail -n 1)
 branch=$(git branch --show-current)
-new_name=perf/[$branch]_mix_$[mix]_clients_$[clients]_init_$[replicas]_min$[min_replica]_max$[max_replica]_thre_$[threshold]_SD_$[scaleDown_stablization]_$[scaleDown_periodSeconds]_SU_$[scaleUp_stablization]_$[scaleUp_periodSeconds]
-mv perf/$perf_folder $new_name
-echo "Save to perf folder: $new_name"
+new_name=perf/[$branch]_mix_$[mix]_clients_$[clients]_init_$[$1]_min$[min_replica]_max$[max_replica]_thre_$[threshold]_SD_$[scaleDown_stablization]_$[scaleDown_periodSeconds]_SU_$[scaleUp_stablization]_$[scaleUp_periodSeconds]
+msg=$(kubectl get pod scheduler-deployment-0)
+if [[ ${msg} != *"Running"* ]]
+then
+    mkdir -p $new_name
+    kubectl get pod > $new_name/fail.txt
+    echo $perf_folder >> $new_name/fail.txt
+    echo "Failed..."
+else
+    mv perf/$perf_folder $new_name
+    echo "Save to perf folder: $new_name"
+    # Save HPA scaling event
+    kubectl describe hpa > $new_name/scaling_event_log.txt
+    kubectl get pod >> $new_name/scaling_event_log.txt
+    echo "Save HPA events to $new_name/scaling_event_log.txt"
+fi
 
-# Save HPA scaling event
-kubectl describe hpa > $new_name/scaling_event_log.txt
-echo "Save HPA events to $new_name/scaling_event_log.txt"
+
+
 
 # sleep 10
 # echo ===================================Scale One dbproxy Up===========================================
