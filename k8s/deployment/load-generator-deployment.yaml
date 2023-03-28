@@ -8,7 +8,6 @@ spec:
       containers:
       - name: load-generator
         image: load_generator:latest
-        #command: ["python3", "./client.py", "--port", "2077", "--c_id", "0", "--mix", "2","--ip", "scheduler-deployment-0.scheduler-service.default.svc.cluster.local", "--path", "/usr/src/"]
         command: ["python3", "./launcher.py", "--port", "2077", "--mix", "3", "--range", "0", "200", "--ip", "scheduler-deployment-0.scheduler-service.default.svc.cluster.local", "--mock_db",  "--path", "./"]
         imagePullPolicy: Never
       restartPolicy: Never
