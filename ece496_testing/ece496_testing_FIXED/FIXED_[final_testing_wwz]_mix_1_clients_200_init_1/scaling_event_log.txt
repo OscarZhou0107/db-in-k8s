@@ -1,0 +1,4 @@
+NAME                       READY   STATUS    RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running   0          10m
+load-generator-job-89hvw   0/1     Error     0          10m
+scheduler-deployment-0     1/1     Running   0          10m

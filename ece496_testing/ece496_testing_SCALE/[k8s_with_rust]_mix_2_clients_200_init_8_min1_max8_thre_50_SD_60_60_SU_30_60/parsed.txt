@@ -1,0 +1,57 @@
+Info: ==============================================================
+Info:
+Info: Run: [k8s_with_rust]_mix_2_clients_200_init_8_min1_max8_thre_50_SD_60_60_SU_30_60
+Info:
+Info:
+Info: Successful Request: 259430 / 381233
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (3730.0, 434.7017426273458, 490.33437340030633, 311.04481586967, 260.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.4494899057163782, 1.0547080522426362, 0.015144827010030665, 0.005375)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 6
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.002] [SD: 0.005] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     Err    [Mean: 0.016] [SD: 0.010] [Geomean: 0.011] [Median: 0.017]
+Info: BeginTx                     All    [Mean: 0.013] [SD: 0.011] [Geomean: 0.006] [Median: 0.011]
+Info: Commit                      Ok     [Mean: 0.337] [SD: 0.773] [Geomean: 0.035] [Median: 0.026]
+Info: Commit                      All    [Mean: 0.337] [SD: 0.773] [Geomean: 0.035] [Median: 0.026]
+Info: ReadOnly                    Ok     [Mean: 1.064] [SD: 1.490] [Geomean: 0.076] [Median: 0.055]
+Info: ReadOnly                    All    [Mean: 1.064] [SD: 1.490] [Geomean: 0.076] [Median: 0.055]
+Info: WriteOnly                   Ok     [Mean: 0.007] [SD: 0.018] [Geomean: 0.003] [Median: 0.002]
+Info: WriteOnly                   All    [Mean: 0.007] [SD: 0.018] [Geomean: 0.003] [Median: 0.002]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 0.257] [SD: 0.826] [Geomean: 0.012] [Median: 0.007]
+Info: ReadOnlyEarlyRelease        All    [Mean: 0.257] [SD: 0.826] [Geomean: 0.012] [Median: 0.007]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.003] [SD: 0.003] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.003] [SD: 0.003] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.271] [SD: 0.670] [Geomean: 0.040] [Median: 0.025]
+Info: SingleReadOnly              All    [Mean: 0.271] [SD: 0.670] [Geomean: 0.040] [Median: 0.025]
+Info: All                         Ok     [Mean: 0.449] [SD: 1.055] [Geomean: 0.015] [Median: 0.005]
+Info:
+Info: Request Result Stats
+Info: BeginTx                       43083 Ok  121803 Err     26.13 %
+Info: Commit                        42937 Ok       0 Err    100.00 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                      86115 Ok       0 Err    100.00 %
+Info: WriteOnly                     40548 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease           9095 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease          8781 Ok       0 Err    100.00 %
+Info: SingleReadOnly                28871 Ok       0 Err    100.00 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                          259430 Ok  121803 Err     68.05 %
+Info:
+Info: Dbproxy Stats
+Info: 10.1.4.24:38877 {"country":3053,"cc_xacts":1309,"customer":14897,"author":19814,"orders":1368,"order_line":5067,"item":42717,"shopping_cart":8006,"address":3053,"shopping_cart_line":10581}
+Info: 10.1.4.20:38877 {"country":3053,"cc_xacts":1309,"customer":14897,"author":19814,"orders":1368,"order_line":5067,"item":42717,"shopping_cart":8006,"address":3053,"shopping_cart_line":10581}
+Info: 10.1.4.22:38877 {"country":3053,"cc_xacts":1309,"customer":14897,"author":19814,"orders":1368,"order_line":5067,"item":42717,"shopping_cart":8006,"address":3053,"shopping_cart_line":10581}
+Info: 10.1.4.21:38877 {"country":3053,"cc_xacts":1309,"customer":14897,"author":19814,"orders":1368,"order_line":5067,"item":42717,"shopping_cart":8006,"address":3053,"shopping_cart_line":10581}
+Info: 10.1.4.23:38877 {"country":3053,"cc_xacts":1309,"customer":14897,"author":19814,"orders":1368,"order_line":5067,"item":42717,"shopping_cart":8006,"address":3053,"shopping_cart_line":10581}
+Info: 10.1.4.18:38875 {"country":3053,"cc_xacts":1309,"customer":14897,"author":19814,"orders":1368,"order_line":5067,"item":42717,"shopping_cart":8006,"address":3053,"shopping_cart_line":10581}
+Info:
+Info: ==============================================================

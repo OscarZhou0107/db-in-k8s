@@ -1,0 +1,33 @@
+Info: ==============================================================
+Info:
+Info: Run: [k8s_with_rust]_mix_1_clients_200_init_1_min1_max8_thre_35_SD_60_60_SU_30_60
+Info:
+Info:
+Info: Successful Request: 634563 / 859697
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (5640.0, 1095.3961677887105, 1095.2677682104113, 607.7047833522423, 540.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.17822203934518716, 0.327923609063729, 0.02671062331582162, 0.037576)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 8
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.002] [SD: 0.004] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     Err    [Mean: 0.022] [SD: 0.008] [Geomean: 0.018] [Median: 0.024]
+Info: BeginTx                     All    [Mean: 0.014] [SD: 0.012] [Geomean: 0.006] [Median: 0.021]
+Info: Commit                      Ok     [Mean: 0.159] [SD: 0.250] [Geomean: 0.058] [Median: 0.045]
+Info: Commit                      All    [Mean: 0.159] [SD: 0.250] [Geomean: 0.058] [Median: 0.045]
+Info: ReadOnly                    Ok     [Mean: 0.349] [SD: 0.432] [Geomean: 0.138] [Median: 0.148]
+Info: ReadOnly                    All    [Mean: 0.349] [SD: 0.432] [Geomean: 0.138] [Median: 0.148]
+Info: WriteOnly                   Ok     [Mean: 0.010] [SD: 0.027] [Geomean: 0.004] [Median: 0.003]
+Info: WriteOnly                   All    [Mean: 0.010] [SD: 0.027] [Geomean: 0.004] [Median: 0.003]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 0.128] [SD: 0.335] [Geomean: 0.014] [Median: 0.007]
+Info: ReadOnlyEarlyRelease        All    [Mean: 0.128] [SD: 0.335] [Geomean: 0.014] [Median: 0.007]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.004] [SD: 0.008] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.004] [SD: 0.008] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.138] [SD: 0.245] [Geomean: 0.055] [Median: 0.042]

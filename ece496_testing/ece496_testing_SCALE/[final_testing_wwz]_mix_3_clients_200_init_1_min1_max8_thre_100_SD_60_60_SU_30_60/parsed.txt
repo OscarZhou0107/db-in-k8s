@@ -1,0 +1,52 @@
+Info: ==============================================================
+Info:
+Info: Run: [final_testing_wwz]_mix_3_clients_200_init_1_min1_max8_thre_100_SD_60_60_SU_30_60
+Info:
+Info:
+Info: Successful Request: 144446 / 221967
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (5630.0, 241.26607649908135, 200.96800619889507, 198.77339364305445, 190.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.8160261116334132, 1.9400379172718731, 0.015042783896835908, 0.003827)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 1
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.002] [SD: 0.005] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     Err    [Mean: 0.014] [SD: 0.009] [Geomean: 0.009] [Median: 0.015]
+Info: BeginTx                     All    [Mean: 0.011] [SD: 0.009] [Geomean: 0.005] [Median: 0.013]
+Info: Commit                      Ok     [Mean: 0.117] [SD: 0.560] [Geomean: 0.017] [Median: 0.007]
+Info: Commit                      All    [Mean: 0.117] [SD: 0.560] [Geomean: 0.017] [Median: 0.007]
+Info: ReadOnly                    Ok     [Mean: 2.162] [SD: 2.684] [Geomean: 0.089] [Median: 0.025]
+Info: ReadOnly                    All    [Mean: 2.162] [SD: 2.684] [Geomean: 0.089] [Median: 0.025]
+Info: WriteOnly                   Ok     [Mean: 0.012] [SD: 0.035] [Geomean: 0.004] [Median: 0.003]
+Info: WriteOnly                   All    [Mean: 0.012] [SD: 0.035] [Geomean: 0.004] [Median: 0.003]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 1.658] [SD: 2.485] [Geomean: 0.064] [Median: 0.009]
+Info: ReadOnlyEarlyRelease        All    [Mean: 1.658] [SD: 2.485] [Geomean: 0.064] [Median: 0.009]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.004] [SD: 0.006] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.004] [SD: 0.006] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.245] [SD: 1.207] [Geomean: 0.030] [Median: 0.019]
+Info: SingleReadOnly              All    [Mean: 0.245] [SD: 1.207] [Geomean: 0.030] [Median: 0.019]
+Info: All                         Ok     [Mean: 0.816] [SD: 1.940] [Geomean: 0.015] [Median: 0.004]
+Info:
+Info: Request Result Stats
+Info: BeginTx                       21754 Ok   77521 Err     21.91 %
+Info: Commit                        21556 Ok       0 Err    100.00 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                      45895 Ok       0 Err    100.00 %
+Info: WriteOnly                     26465 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease           7400 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease          7138 Ok       0 Err    100.00 %
+Info: SingleReadOnly                14238 Ok       0 Err    100.00 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                          144446 Ok   77521 Err     65.08 %
+Info:
+Info: Dbproxy Stats
+Info: 10.1.7.240:38875 {"address":8290,"country":8290,"item":21714,"shopping_cart":4920,"cc_xacts":3707,"customer":11764,"orders":3737,"shopping_cart_line":13146,"author":5030,"order_line":3919}
+Info:
+Info: ==============================================================

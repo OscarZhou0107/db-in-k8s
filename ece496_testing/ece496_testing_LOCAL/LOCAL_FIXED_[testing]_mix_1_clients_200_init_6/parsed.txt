@@ -1,0 +1,56 @@
+Info: ==============================================================
+Info:
+Info: Run: LOCAL_FIXED_[testing]_mix_1_clients_200_init_6
+Info:
+Info:
+Info: Successful Request: 719916 / 719916
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (3780.0, 1196.2711864406779, 687.5841526660297, 966.6950782737766, 1220.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.1646822575550481, 0.2450609411832343, 0.03785439123413067, 0.0597085)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 6
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.007] [SD: 0.013] [Geomean: 0.003] [Median: 0.002]
+Info: BeginTx                     All    [Mean: 0.007] [SD: 0.013] [Geomean: 0.003] [Median: 0.002]
+Info: Commit                      Ok     [Mean: 0.193] [SD: 0.246] [Geomean: 0.084] [Median: 0.076]
+Info: Commit                      All    [Mean: 0.193] [SD: 0.246] [Geomean: 0.084] [Median: 0.076]
+Info: ReadOnly                    Ok     [Mean: 0.292] [SD: 0.291] [Geomean: 0.150] [Median: 0.196]
+Info: ReadOnly                    All    [Mean: 0.292] [SD: 0.291] [Geomean: 0.150] [Median: 0.196]
+Info: WriteOnly                   Ok     [Mean: 0.008] [SD: 0.024] [Geomean: 0.004] [Median: 0.003]
+Info: WriteOnly                   All    [Mean: 0.008] [SD: 0.024] [Geomean: 0.004] [Median: 0.003]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 0.103] [SD: 0.233] [Geomean: 0.015] [Median: 0.008]
+Info: ReadOnlyEarlyRelease        All    [Mean: 0.103] [SD: 0.233] [Geomean: 0.015] [Median: 0.008]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.005] [SD: 0.010] [Geomean: 0.004] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.005] [SD: 0.010] [Geomean: 0.004] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.114] [SD: 0.141] [Geomean: 0.066] [Median: 0.062]
+Info: SingleReadOnly              All    [Mean: 0.114] [SD: 0.141] [Geomean: 0.066] [Median: 0.062]
+Info: All                         Ok     [Mean: 0.165] [SD: 0.245] [Geomean: 0.038] [Median: 0.060]
+Info:
+Info: Request Result Stats
+Info: BeginTx                      170722 Ok       0 Err    100.00 %
+Info: Commit                       170722 Ok       0 Err    100.00 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                     250940 Ok       0 Err    100.00 %
+Info: WriteOnly                     27129 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease           6773 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease          6173 Ok       0 Err    100.00 %
+Info: SingleReadOnly                87457 Ok       0 Err    100.00 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                          719916 Ok       0 Err    100.00 %
+Info:
+Info: Dbproxy Stats
+Info: 127.0.0.1:38875 {"country":4327,"orders":2626,"item":169960,"shopping_cart_line":8882,"order_line":31076,"address":4327,"customer":79286,"author":85470,"shopping_cart":5204,"cc_xacts":2426}
+Info: 127.0.0.1:38877 {"address":4327,"shopping_cart_line":8882,"item":169960,"customer":79286,"cc_xacts":2426,"shopping_cart":5204,"country":4327,"order_line":31076,"author":85470,"orders":2626}
+Info: 127.0.0.1:38879 {"customer":79286,"item":169960,"address":4327,"author":85470,"country":4327,"cc_xacts":2426,"order_line":31076,"orders":2626,"shopping_cart":5204,"shopping_cart_line":8882}
+Info: 127.0.0.1:38876 {"author":85470,"cc_xacts":2426,"item":169960,"country":4327,"shopping_cart":5204,"address":4327,"orders":2626,"customer":79286,"shopping_cart_line":8882,"order_line":31076}
+Info: 127.0.0.1:38878 {"shopping_cart_line":8882,"author":85470,"order_line":31076,"country":4327,"address":4327,"orders":2626,"customer":79286,"cc_xacts":2426,"item":169960,"shopping_cart":5204}
+Info: 127.0.0.1:38880 {"author":85470,"customer":79286,"cc_xacts":2426,"orders":2626,"item":169960,"shopping_cart":5204,"address":4327,"order_line":31076,"shopping_cart_line":8882,"country":4327}
+Info:
+Info: ==============================================================

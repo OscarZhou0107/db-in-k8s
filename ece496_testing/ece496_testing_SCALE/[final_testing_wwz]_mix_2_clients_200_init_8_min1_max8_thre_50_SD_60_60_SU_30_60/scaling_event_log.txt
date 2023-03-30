@@ -1,0 +1,43 @@
+Name:                                                  dbproxy-hpa
+Namespace:                                             default
+Labels:                                                <none>
+Annotations:                                           <none>
+CreationTimestamp:                                     Wed, 29 Mar 2023 14:45:32 -0400
+Reference:                                             StatefulSet/dbproxy0-deployment
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  40% (100m) / 50%
+Min replicas:                                          1
+Max replicas:                                          8
+Behavior:
+  Scale Up:
+    Stabilization Window: 30 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+  Scale Down:
+    Stabilization Window: 60 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+StatefulSet pods:   7 current / 6 desired
+Conditions:
+  Type            Status  Reason              Message
+  ----            ------  ------              -------
+  AbleToScale     True    SucceededRescale    the HPA controller was able to update the target scale to 6
+  ScalingActive   True    ValidMetricFound    the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  False   DesiredWithinRange  the desired count is within the acceptable range
+Events:
+  Type    Reason             Age    From                       Message
+  ----    ------             ----   ----                       -------
+  Normal  SuccessfulRescale  7m47s  horizontal-pod-autoscaler  New size: 7; reason: All metrics below target
+  Normal  SuccessfulRescale  17s    horizontal-pod-autoscaler  New size: 6; reason: All metrics below target
+NAME                       READY   STATUS        RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running       0          11m
+dbproxy0-deployment-1      1/1     Running       0          10m
+dbproxy0-deployment-2      1/1     Running       0          10m
+dbproxy0-deployment-3      1/1     Running       0          10m
+dbproxy0-deployment-4      1/1     Running       0          10m
+dbproxy0-deployment-5      1/1     Running       0          10m
+dbproxy0-deployment-6      1/1     Terminating   0          10m
+load-generator-job-mrmd4   0/1     Error         0          10m
+scheduler-deployment-0     1/1     Running       0          11m

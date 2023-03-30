@@ -1,0 +1,48 @@
+Name:                                                  dbproxy-hpa
+Namespace:                                             default
+Labels:                                                <none>
+Annotations:                                           <none>
+CreationTimestamp:                                     Tue, 28 Mar 2023 09:11:34 -0400
+Reference:                                             StatefulSet/dbproxy0-deployment
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  49% (123m) / 25%
+Min replicas:                                          1
+Max replicas:                                          8
+Behavior:
+  Scale Up:
+    Stabilization Window: 30 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+  Scale Down:
+    Stabilization Window: 60 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+StatefulSet pods:   8 current / 8 desired
+Conditions:
+  Type            Status  Reason            Message
+  ----            ------  ------            -------
+  AbleToScale     True    ReadyForNewScale  recommended size matches current size
+  ScalingActive   True    ValidMetricFound  the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  True    TooManyReplicas   the desired replica count is more than the maximum replica count
+Events:
+  Type    Reason             Age    From                       Message
+  ----    ------             ----   ----                       -------
+  Normal  SuccessfulRescale  9m58s  horizontal-pod-autoscaler  New size: 3; reason: cpu resource utilization (percentage of request) above target
+  Normal  SuccessfulRescale  8m58s  horizontal-pod-autoscaler  New size: 4; reason: cpu resource utilization (percentage of request) above target
+  Normal  SuccessfulRescale  7m58s  horizontal-pod-autoscaler  New size: 5; reason: cpu resource utilization (percentage of request) above target
+  Normal  SuccessfulRescale  6m58s  horizontal-pod-autoscaler  New size: 6; reason: cpu resource utilization (percentage of request) above target
+  Normal  SuccessfulRescale  5m58s  horizontal-pod-autoscaler  New size: 7; reason: cpu resource utilization (percentage of request) above target
+  Normal  SuccessfulRescale  4m58s  horizontal-pod-autoscaler  New size: 8; reason: cpu resource utilization (percentage of request) above target
+NAME                       READY   STATUS    RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running   0          11m
+dbproxy0-deployment-1      1/1     Running   0          11m
+dbproxy0-deployment-2      1/1     Running   0          9m58s
+dbproxy0-deployment-3      1/1     Running   0          8m58s
+dbproxy0-deployment-4      1/1     Running   0          7m58s
+dbproxy0-deployment-5      1/1     Running   0          6m58s
+dbproxy0-deployment-6      1/1     Running   0          5m58s
+dbproxy0-deployment-7      1/1     Running   0          4m58s
+load-generator-job-vknkd   1/1     Running   0          10m
+scheduler-deployment-0     1/1     Running   0          11m

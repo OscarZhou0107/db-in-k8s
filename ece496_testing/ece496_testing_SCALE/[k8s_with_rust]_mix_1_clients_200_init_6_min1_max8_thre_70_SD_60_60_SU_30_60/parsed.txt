@@ -1,0 +1,13 @@
+Info: ==============================================================
+Info:
+Info: Run: [k8s_with_rust]_mix_1_clients_200_init_6_min1_max8_thre_70_SD_60_60_SU_30_60
+Info:
+Info:
+Info: Successful Request: 621743 / 649598
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (3940.0, 1038.6618777146675, 861.7879436126613, 661.985254150295, 730.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)

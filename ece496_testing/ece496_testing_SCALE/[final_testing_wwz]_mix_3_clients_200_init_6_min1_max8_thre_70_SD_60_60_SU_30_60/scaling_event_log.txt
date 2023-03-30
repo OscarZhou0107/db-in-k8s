@@ -1,0 +1,40 @@
+Name:                                                  dbproxy-hpa
+Namespace:                                             default
+Labels:                                                <none>
+Annotations:                                           <none>
+CreationTimestamp:                                     Wed, 29 Mar 2023 00:55:31 -0400
+Reference:                                             StatefulSet/dbproxy0-deployment
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  49% (122m) / 70%
+Min replicas:                                          1
+Max replicas:                                          8
+Behavior:
+  Scale Up:
+    Stabilization Window: 30 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+  Scale Down:
+    Stabilization Window: 60 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+StatefulSet pods:   2 current / 2 desired
+Conditions:
+  Type            Status  Reason              Message
+  ----            ------  ------              -------
+  AbleToScale     True    ReadyForNewScale    recommended size matches current size
+  ScalingActive   True    ValidMetricFound    the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  False   DesiredWithinRange  the desired count is within the acceptable range
+Events:
+  Type    Reason             Age    From                       Message
+  ----    ------             ----   ----                       -------
+  Normal  SuccessfulRescale  9m18s  horizontal-pod-autoscaler  New size: 5; reason: All metrics below target
+  Normal  SuccessfulRescale  8m18s  horizontal-pod-autoscaler  New size: 4; reason: All metrics below target
+  Normal  SuccessfulRescale  7m18s  horizontal-pod-autoscaler  New size: 3; reason: All metrics below target
+  Normal  SuccessfulRescale  6m18s  horizontal-pod-autoscaler  New size: 2; reason: All metrics below target
+NAME                       READY   STATUS    RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running   0          11m
+dbproxy0-deployment-1      1/1     Running   0          10m
+load-generator-job-jjqdc   0/1     Error     0          10m
+scheduler-deployment-0     1/1     Running   0          11m

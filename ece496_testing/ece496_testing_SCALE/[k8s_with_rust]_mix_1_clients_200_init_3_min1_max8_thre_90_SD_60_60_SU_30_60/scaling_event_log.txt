@@ -1,0 +1,41 @@
+Name:                                                  dbproxy-hpa
+Namespace:                                             default
+Labels:                                                <none>
+Annotations:                                           <none>
+CreationTimestamp:                                     Tue, 28 Mar 2023 07:41:44 -0400
+Reference:                                             StatefulSet/dbproxy0-deployment
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  2% (5m) / 90%
+Min replicas:                                          1
+Max replicas:                                          8
+Behavior:
+  Scale Up:
+    Stabilization Window: 30 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+  Scale Down:
+    Stabilization Window: 60 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+StatefulSet pods:   5 current / 5 desired
+Conditions:
+  Type            Status  Reason               Message
+  ----            ------  ------               -------
+  AbleToScale     True    ScaleDownStabilized  recent recommendations were higher than current one, applying the highest recent recommendation
+  ScalingActive   True    ValidMetricFound     the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  False   DesiredWithinRange   the desired count is within the acceptable range
+Events:
+  Type    Reason             Age    From                       Message
+  ----    ------             ----   ----                       -------
+  Normal  SuccessfulRescale  10m    horizontal-pod-autoscaler  New size: 4; reason: cpu resource utilization (percentage of request) above target
+  Normal  SuccessfulRescale  8m43s  horizontal-pod-autoscaler  New size: 5; reason: cpu resource utilization (percentage of request) above target
+NAME                       READY   STATUS    RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running   0          11m
+dbproxy0-deployment-1      1/1     Running   0          11m
+dbproxy0-deployment-2      1/1     Running   0          11m
+dbproxy0-deployment-3      1/1     Running   0          10m
+dbproxy0-deployment-4      1/1     Running   0          8m43s
+load-generator-job-nxwn4   0/1     Error     0          10m
+scheduler-deployment-0     1/1     Running   0          11m

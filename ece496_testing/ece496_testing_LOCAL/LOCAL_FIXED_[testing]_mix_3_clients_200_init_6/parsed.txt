@@ -1,0 +1,56 @@
+Info: ==============================================================
+Info:
+Info: Run: LOCAL_FIXED_[testing]_mix_3_clients_200_init_6
+Info:
+Info:
+Info: Successful Request: 272655 / 272655
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (4580.0, 451.04218362282876, 216.38310230422834, 416.928730922971, 370.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.4407064697401478, 1.0084545486672152, 0.011686430481859446, 0.003612)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 6
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.002] [SD: 0.003] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     All    [Mean: 0.002] [SD: 0.003] [Geomean: 0.001] [Median: 0.001]
+Info: Commit                      Ok     [Mean: 0.078] [SD: 0.229] [Geomean: 0.012] [Median: 0.006]
+Info: Commit                      All    [Mean: 0.078] [SD: 0.229] [Geomean: 0.012] [Median: 0.006]
+Info: ReadOnly                    Ok     [Mean: 1.170] [SD: 1.402] [Geomean: 0.065] [Median: 0.012]
+Info: ReadOnly                    All    [Mean: 1.170] [SD: 1.402] [Geomean: 0.065] [Median: 0.012]
+Info: WriteOnly                   Ok     [Mean: 0.005] [SD: 0.018] [Geomean: 0.003] [Median: 0.002]
+Info: WriteOnly                   All    [Mean: 0.005] [SD: 0.018] [Geomean: 0.003] [Median: 0.002]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 0.875] [SD: 1.299] [Geomean: 0.053] [Median: 0.009]
+Info: ReadOnlyEarlyRelease        All    [Mean: 0.875] [SD: 1.299] [Geomean: 0.053] [Median: 0.009]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.003] [SD: 0.001] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.003] [SD: 0.001] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.118] [SD: 0.413] [Geomean: 0.024] [Median: 0.016]
+Info: SingleReadOnly              All    [Mean: 0.118] [SD: 0.413] [Geomean: 0.024] [Median: 0.016]
+Info: All                         Ok     [Mean: 0.441] [SD: 1.008] [Geomean: 0.012] [Median: 0.004]
+Info:
+Info: Request Result Stats
+Info: BeginTx                       40713 Ok       0 Err    100.00 %
+Info: Commit                        40713 Ok       0 Err    100.00 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                      86651 Ok       0 Err    100.00 %
+Info: WriteOnly                     50470 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease          13850 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease         13498 Ok       0 Err    100.00 %
+Info: SingleReadOnly                26760 Ok       0 Err    100.00 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                          272655 Ok       0 Err    100.00 %
+Info:
+Info: Dbproxy Stats
+Info: 127.0.0.1:38877 {"orders":7048,"country":15547,"item":40559,"cc_xacts":6972,"order_line":7368,"address":15547,"author":9454,"shopping_cart":9169,"shopping_cart_line":24583,"customer":21936}
+Info: 127.0.0.1:38879 {"customer":21936,"author":9454,"country":15547,"order_line":7368,"item":40559,"shopping_cart":9169,"address":15547,"orders":7048,"cc_xacts":6972,"shopping_cart_line":24583}
+Info: 127.0.0.1:38876 {"item":40559,"customer":21936,"cc_xacts":6972,"address":15547,"order_line":7368,"shopping_cart_line":24583,"shopping_cart":9169,"country":15547,"orders":7048,"author":9454}
+Info: 127.0.0.1:38880 {"shopping_cart_line":24583,"address":15547,"author":9454,"country":15547,"customer":21936,"shopping_cart":9169,"orders":7048,"cc_xacts":6972,"order_line":7368,"item":40559}
+Info: 127.0.0.1:38875 {"country":15547,"order_line":7368,"cc_xacts":6972,"item":40559,"author":9454,"shopping_cart":9169,"shopping_cart_line":24583,"orders":7048,"customer":21936,"address":15547}
+Info: 127.0.0.1:38878 {"orders":7048,"customer":21936,"order_line":7368,"shopping_cart_line":24583,"cc_xacts":6972,"shopping_cart":9169,"address":15547,"author":9454,"country":15547,"item":40559}
+Info:
+Info: ==============================================================

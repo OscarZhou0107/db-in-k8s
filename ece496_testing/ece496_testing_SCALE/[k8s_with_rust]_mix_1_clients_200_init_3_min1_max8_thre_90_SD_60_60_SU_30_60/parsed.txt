@@ -1,0 +1,56 @@
+Info: ==============================================================
+Info:
+Info: Run: [k8s_with_rust]_mix_1_clients_200_init_3_min1_max8_thre_90_SD_60_60_SU_30_60
+Info:
+Info:
+Info: Successful Request: 707471 / 733473
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (4620.0, 1183.6556801070772, 1138.1439821604833, 653.8507681151408, 600.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.16615789705302408, 0.29545754396087365, 0.02559363205737848, 0.037778)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 5
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.002] [SD: 0.003] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     Err    [Mean: 0.023] [SD: 0.008] [Geomean: 0.021] [Median: 0.024]
+Info: BeginTx                     All    [Mean: 0.005] [SD: 0.008] [Geomean: 0.002] [Median: 0.001]
+Info: Commit                      Ok     [Mean: 0.161] [SD: 0.249] [Geomean: 0.059] [Median: 0.045]
+Info: Commit                      All    [Mean: 0.161] [SD: 0.249] [Geomean: 0.059] [Median: 0.045]
+Info: ReadOnly                    Ok     [Mean: 0.319] [SD: 0.378] [Geomean: 0.129] [Median: 0.118]
+Info: ReadOnly                    All    [Mean: 0.319] [SD: 0.378] [Geomean: 0.129] [Median: 0.118]
+Info: WriteOnly                   Ok     [Mean: 0.009] [SD: 0.024] [Geomean: 0.004] [Median: 0.003]
+Info: WriteOnly                   All    [Mean: 0.009] [SD: 0.024] [Geomean: 0.004] [Median: 0.003]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 0.127] [SD: 0.322] [Geomean: 0.014] [Median: 0.007]
+Info: ReadOnlyEarlyRelease        All    [Mean: 0.127] [SD: 0.322] [Geomean: 0.014] [Median: 0.007]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.004] [SD: 0.007] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.004] [SD: 0.007] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.122] [SD: 0.216] [Geomean: 0.050] [Median: 0.040]
+Info: SingleReadOnly              All    [Mean: 0.122] [SD: 0.216] [Geomean: 0.050] [Median: 0.040]
+Info: All                         Ok     [Mean: 0.166] [SD: 0.295] [Geomean: 0.026] [Median: 0.038]
+Info:
+Info: Request Result Stats
+Info: BeginTx                      167856 Ok   26002 Err     86.59 %
+Info: Commit                       167664 Ok       0 Err    100.00 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                     246510 Ok       0 Err    100.00 %
+Info: WriteOnly                     26687 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease           6653 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease          6061 Ok       0 Err    100.00 %
+Info: SingleReadOnly                86040 Ok       0 Err    100.00 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                          707471 Ok   26002 Err     96.45 %
+Info:
+Info: Dbproxy Stats
+Info: 10.1.3.136:38877 {"cc_xacts":2393,"author":84228,"order_line":30646,"customer":78096,"country":4262,"shopping_cart_line":8748,"item":167454,"shopping_cart":5130,"address":4262,"orders":2589}
+Info: 10.1.3.139:38877 {"cc_xacts":2393,"author":84228,"order_line":30646,"customer":78096,"country":4262,"shopping_cart_line":8748,"item":167454,"shopping_cart":5130,"address":4262,"orders":2589}
+Info: 10.1.3.134:38875 {"cc_xacts":2393,"author":84228,"order_line":30646,"customer":78096,"country":4262,"shopping_cart_line":8748,"item":167454,"shopping_cart":5130,"address":4262,"orders":2589}
+Info: 10.1.3.137:38877 {"cc_xacts":2393,"author":84228,"order_line":30646,"customer":78096,"country":4262,"shopping_cart_line":8748,"item":167454,"shopping_cart":5130,"address":4262,"orders":2589}
+Info: 10.1.3.140:38877 {"cc_xacts":2393,"author":84228,"order_line":30646,"customer":78096,"country":4262,"shopping_cart_line":8748,"item":167454,"shopping_cart":5130,"address":4262,"orders":2589}
+Info:
+Info: ==============================================================

@@ -1,0 +1,37 @@
+Name:                                                  dbproxy-hpa
+Namespace:                                             default
+Labels:                                                <none>
+Annotations:                                           <none>
+CreationTimestamp:                                     Thu, 30 Mar 2023 17:09:14 -0400
+Reference:                                             StatefulSet/dbproxy0-deployment
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  60% (150m) / 100%
+Min replicas:                                          1
+Max replicas:                                          8
+Behavior:
+  Scale Up:
+    Stabilization Window: 30 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+  Scale Down:
+    Stabilization Window: 60 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 1  Period: 60 seconds
+StatefulSet pods:   2 current / 2 desired
+Conditions:
+  Type            Status  Reason              Message
+  ----            ------  ------              -------
+  AbleToScale     True    ReadyForNewScale    recommended size matches current size
+  ScalingActive   True    ValidMetricFound    the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  False   DesiredWithinRange  the desired count is within the acceptable range
+Events:
+  Type    Reason             Age    From                       Message
+  ----    ------             ----   ----                       -------
+  Normal  SuccessfulRescale  8m45s  horizontal-pod-autoscaler  New size: 2; reason: All metrics below target
+NAME                       READY   STATUS    RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running   0          11m
+dbproxy0-deployment-1      1/1     Running   0          10m
+load-generator-job-8tzh2   0/1     Error     0          10m
+scheduler-deployment-0     1/1     Running   0          10m

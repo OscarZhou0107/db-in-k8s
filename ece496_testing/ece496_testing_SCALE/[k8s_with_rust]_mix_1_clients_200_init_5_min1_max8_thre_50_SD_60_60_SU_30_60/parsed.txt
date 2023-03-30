@@ -1,0 +1,59 @@
+Info: ==============================================================
+Info:
+Info: Run: [k8s_with_rust]_mix_1_clients_200_init_5_min1_max8_thre_50_SD_60_60_SU_30_60
+Info:
+Info:
+Info: Successful Request: 87913 / 101389
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (3770.0, 1096.1720698254364, 1081.9543215291533, 599.1732586810974, 420.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.17346955625447885, 0.36163431269726176, 0.025661174472161926, 0.038964)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 6
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.002] [SD: 0.004] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     Err    [Mean: 0.026] [SD: 0.004] [Geomean: 0.025] [Median: 0.025]
+Info: BeginTx                     All    [Mean: 0.011] [SD: 0.012] [Geomean: 0.004] [Median: 0.003]
+Info: Commit                      Ok     [Mean: 0.150] [SD: 0.223] [Geomean: 0.058] [Median: 0.045]
+Info: Commit                      Err    [Mean: 134.473] [SD: 0.013] [Geomean: 134.473] [Median: 134.473]
+Info: Commit                      All    [Mean: 0.163] [SD: 1.337] [Geomean: 0.058] [Median: 0.045]
+Info: ReadOnly                    Ok     [Mean: 0.335] [SD: 0.501] [Geomean: 0.126] [Median: 0.117]
+Info: ReadOnly                    All    [Mean: 0.335] [SD: 0.501] [Geomean: 0.126] [Median: 0.117]
+Info: WriteOnly                   Ok     [Mean: 0.010] [SD: 0.025] [Geomean: 0.004] [Median: 0.003]
+Info: WriteOnly                   All    [Mean: 0.010] [SD: 0.025] [Geomean: 0.004] [Median: 0.003]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 0.165] [SD: 0.384] [Geomean: 0.021] [Median: 0.008]
+Info: ReadOnlyEarlyRelease        All    [Mean: 0.165] [SD: 0.384] [Geomean: 0.021] [Median: 0.008]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.004] [SD: 0.006] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.004] [SD: 0.006] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.161] [SD: 0.330] [Geomean: 0.060] [Median: 0.043]
+Info: SingleReadOnly              Err    [Mean: 256.258] [SD: 43.772] [Geomean: 252.525] [Median: 249.893]
+Info: SingleReadOnly              All    [Mean: 1.005] [SD: 14.884] [Geomean: 0.062] [Median: 0.043]
+Info: All                         Ok     [Mean: 0.173] [SD: 0.362] [Geomean: 0.026] [Median: 0.039]
+Info:
+Info: Request Result Stats
+Info: BeginTx                       20903 Ok   13439 Err     60.87 %
+Info: Commit                        20749 Ok       2 Err     99.99 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                      30411 Ok       0 Err    100.00 %
+Info: WriteOnly                      3481 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease           1008 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease           768 Ok       0 Err    100.00 %
+Info: SingleReadOnly                10593 Ok      35 Err     99.67 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                           87913 Ok   13476 Err     86.71 %
+Info:
+Info: Dbproxy Stats
+Info: 10.1.3.13:38877 {"shopping_cart_line":1,"item":2,"order_line":2,"address":2,"orders":2,"cc_xacts":2,"customer":2,"country":2}
+Info: 10.1.3.18:38877 {"customer":2,"order_line":2,"orders":2,"shopping_cart_line":1,"country":2,"address":2,"cc_xacts":2,"item":2}
+Info: 10.1.3.11:38875 {"address":536,"cc_xacts":295,"item":20655,"customer":9725,"author":10279,"order_line":3752,"shopping_cart":651,"country":536,"orders":315,"shopping_cart_line":1112}
+Info: 10.1.3.14:38877 {"cc_xacts":2,"item":2,"customer":2,"order_line":2,"country":2,"address":2,"shopping_cart_line":1,"orders":2}
+Info: 10.1.3.15:38877 {"customer":2,"address":2,"cc_xacts":2,"order_line":2,"country":2,"item":2,"orders":2,"shopping_cart_line":1}
+Info: 10.1.3.16:38877 {"address":2,"cc_xacts":2,"customer":2,"shopping_cart_line":1,"item":2,"country":2,"orders":2,"order_line":2}
+Info:
+Info: ==============================================================

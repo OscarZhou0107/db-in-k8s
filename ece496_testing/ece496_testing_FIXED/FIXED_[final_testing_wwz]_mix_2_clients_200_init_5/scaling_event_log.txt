@@ -1,0 +1,8 @@
+NAME                       READY   STATUS    RESTARTS   AGE
+dbproxy0-deployment-0      1/1     Running   0          10m
+dbproxy0-deployment-1      1/1     Running   0          10m
+dbproxy0-deployment-2      1/1     Running   0          10m
+dbproxy0-deployment-3      1/1     Running   0          10m
+dbproxy0-deployment-4      1/1     Running   0          10m
+load-generator-job-5kcxb   0/1     Error     0          10m
+scheduler-deployment-0     1/1     Running   0          10m

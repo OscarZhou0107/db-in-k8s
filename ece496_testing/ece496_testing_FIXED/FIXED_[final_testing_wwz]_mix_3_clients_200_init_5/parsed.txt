@@ -1,0 +1,56 @@
+Info: ==============================================================
+Info:
+Info: Run: FIXED_[final_testing_wwz]_mix_3_clients_200_init_5
+Info:
+Info:
+Info: Successful Request: 186853 / 299714
+Info:
+Info: Throughput - Request Completed / Sec
+Info: (peak, mean, stddev, geomean, median)
+Info: (3560.0, 314.5143915165797, 220.33717810927675, 265.80706051834676, 250.0)
+Info:
+Info: Latency - Sec / Request
+Info: (mean, stddev, geomean, median)
+Info: (0.6260214579214677, 1.441566570974954, 0.012494378933092578, 0.003329)
+Info:
+Info: num_clients 200
+Info: num_dbproxy_db 5
+Info:
+Info: Request Latency Stats - Sec / Request
+Info: BeginTx                     Ok     [Mean: 0.001] [SD: 0.005] [Geomean: 0.001] [Median: 0.001]
+Info: BeginTx                     Err    [Mean: 0.018] [SD: 0.019] [Geomean: 0.015] [Median: 0.020]
+Info: BeginTx                     All    [Mean: 0.015] [SD: 0.018] [Geomean: 0.008] [Median: 0.016]
+Info: Commit                      Ok     [Mean: 0.110] [SD: 0.326] [Geomean: 0.014] [Median: 0.006]
+Info: Commit                      All    [Mean: 0.110] [SD: 0.326] [Geomean: 0.014] [Median: 0.006]
+Info: ReadOnly                    Ok     [Mean: 1.668] [SD: 2.017] [Geomean: 0.081] [Median: 0.041]
+Info: ReadOnly                    All    [Mean: 1.668] [SD: 2.017] [Geomean: 0.081] [Median: 0.041]
+Info: WriteOnly                   Ok     [Mean: 0.008] [SD: 0.025] [Geomean: 0.003] [Median: 0.002]
+Info: WriteOnly                   All    [Mean: 0.008] [SD: 0.025] [Geomean: 0.003] [Median: 0.002]
+Info: ReadOnlyEarlyRelease        Ok     [Mean: 1.249] [SD: 1.892] [Geomean: 0.050] [Median: 0.008]
+Info: ReadOnlyEarlyRelease        All    [Mean: 1.249] [SD: 1.892] [Geomean: 0.050] [Median: 0.008]
+Info: WriteOnlyEarlyRelease       Ok     [Mean: 0.003] [SD: 0.002] [Geomean: 0.003] [Median: 0.003]
+Info: WriteOnlyEarlyRelease       All    [Mean: 0.003] [SD: 0.002] [Geomean: 0.003] [Median: 0.003]
+Info: SingleReadOnly              Ok     [Mean: 0.137] [SD: 0.313] [Geomean: 0.028] [Median: 0.017]
+Info: SingleReadOnly              All    [Mean: 0.137] [SD: 0.313] [Geomean: 0.028] [Median: 0.017]
+Info: All                         Ok     [Mean: 0.626] [SD: 1.442] [Geomean: 0.012] [Median: 0.003]
+Info:
+Info: Request Result Stats
+Info: BeginTx                       28092 Ok  112861 Err     19.93 %
+Info: Commit                        27895 Ok       0 Err    100.00 %
+Info: Rollback                          0 Ok       0 Err    100.00 %
+Info: ReadOnly                      59407 Ok       0 Err    100.00 %
+Info: WriteOnly                     34230 Ok       0 Err    100.00 %
+Info: ReadOnlyEarlyRelease           9549 Ok       0 Err    100.00 %
+Info: WriteOnlyEarlyRelease          9255 Ok       0 Err    100.00 %
+Info: SingleReadOnly                18425 Ok       0 Err    100.00 %
+Info: SingleWriteOnly                   0 Ok       0 Err    100.00 %
+Info: All                          186853 Ok  112861 Err     62.34 %
+Info:
+Info: Dbproxy Stats
+Info: 10.1.5.232:38877 {"order_line":5111,"shopping_cart":6337,"orders":4885,"author":6549,"shopping_cart_line":17017,"address":10766,"item":28076,"customer":15190,"country":10766,"cc_xacts":4839}
+Info: 10.1.5.231:38877 {"order_line":5111,"shopping_cart":6337,"orders":4885,"author":6549,"shopping_cart_line":17017,"address":10766,"item":28076,"customer":15190,"country":10766,"cc_xacts":4839}
+Info: 10.1.5.234:38877 {"order_line":5111,"shopping_cart":6337,"orders":4885,"author":6549,"shopping_cart_line":17017,"address":10766,"item":28076,"customer":15190,"country":10766,"cc_xacts":4839}
+Info: 10.1.5.233:38877 {"order_line":5111,"shopping_cart":6337,"orders":4885,"author":6549,"shopping_cart_line":17017,"address":10766,"item":28076,"customer":15190,"country":10766,"cc_xacts":4839}
+Info: 10.1.5.229:38875 {"order_line":5111,"shopping_cart":6337,"orders":4885,"author":6549,"shopping_cart_line":17017,"address":10766,"item":28076,"customer":15190,"country":10766,"cc_xacts":4839}
+Info:
+Info: ==============================================================
