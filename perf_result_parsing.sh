@@ -1,5 +1,5 @@
 #!/bin/bash
-for filename in perf/*mix*
+for filename in $1/*mix*
 do
     if [[ -e $filename/parsed.txt && -s $filename/parsed.txt ]]
     then
