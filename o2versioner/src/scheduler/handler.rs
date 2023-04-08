@@ -12,6 +12,7 @@ use crate::util::executor::Executor;
 use crate::util::tcp;
 use crate::util::common::{create_zip_csv_writer, prepare_lat_logging_dir};
 use bb8::Pool;
+use chrono::Duration;
 use futures::future::Either;
 use futures::pin_mut;
 use futures::prelude::*;
@@ -31,6 +32,9 @@ use unicase::UniCase;
 use tokio::sync::{Mutex, RwLock};
 use std::net::ToSocketAddrs;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::fs::OpenOptions;
+use std::io::Write;
+
 /// Main entrance for the Scheduler
 ///
 /// # Modes
@@ -47,11 +51,35 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// to properly stop the scheduler
 
 //global variable used to keep track of the global average latency 
+use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
+
 static avg_lat: AtomicUsize = AtomicUsize::new(0);
 static num_req: AtomicUsize = AtomicUsize::new(0);
 
+
+lazy_static! {
+    static ref CURRENT_UTC_TIME: Mutex<DateTime<Utc>> = Mutex::new(Utc::now());
+}
+
 #[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Conf) {
+
+    // Open the file in write mode
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_latency.txt");
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_throughtput.txt");
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_timestamps.txt");
+
+
     // Create the main state
     let state = State::new(DbVNManager::from_iter(conf.to_dbproxy_addrs()), conf.clone());
 
@@ -505,23 +533,63 @@ async fn process_msql(
     avg_lat.fetch_add(record.latency as usize, Ordering::Relaxed);
     num_req.fetch_add(1, Ordering::Relaxed);
 
-    if num_req.load(Ordering::Relaxed) % 100 == 0 {
-        let avg_latency = avg_lat.load(Ordering::Relaxed) / 100;
-        println!("Current avg latency in ms: {}", avg_latency);
+    if num_req.load(Ordering::Relaxed) == 1000 {
+        let avg_latency = avg_lat.load(Ordering::Relaxed) as f64 / 1000.0 / 1000.0;
+        println!("Current avg latency in second: {}", avg_latency);
+
         avg_lat.store(0, Ordering::Relaxed);
         num_req.store(0, Ordering::Relaxed);
-        if let Some(perf_log_path) = conf.performance_logging.as_ref() {
-            // Prepare the logging directory
-            let cur_log_dir = prepare_lat_logging_dir(perf_log_path).await;
 
-            // Performance logging
-            let mut perf_csv_path_builder = PathBuf::from(&cur_log_dir);
-            perf_csv_path_builder.push("latency.txt");
-            let perf_csv_path = perf_csv_path_builder.as_path();
-            let mut wrt = std::fs::File::create(perf_csv_path).map(|w| csv::Writer::from_writer(w)).unwrap();
-            wrt.serialize(avg_latency).unwrap();
-            //info!("Dumped latency logging to {}", perf_csv_path.display());
-        }
+        // if let Some(perf_log_path) = conf.performance_logging.as_ref() {
+        //     // Prepare the logging directory
+        //     // let cur_log_dir = prepare_lat_logging_dir(perf_log_path).await;
+        //     // // Performance logging
+        //     // let mut perf_csv_path_builder = PathBuf::from(&cur_log_dir);
+        //     // perf_csv_path_builder.push("latency.txt");
+        //     // let perf_csv_path = perf_csv_path_builder.as_path();
+        //     // let mut wrt = std::fs::File::create(perf_csv_path).map(|w| csv::Writer::from_writer(w)).unwrap();
+        //     // wrt.serialize(avg_latency).unwrap();
+        //     // //info!("Dumped latency logging to {}", perf_csv_path.display());
+        //         // Open the file in append mode
+        // }
+
+        //append avg latency to the end of avg_latency.txt
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_latency.txt")
+        .unwrap();
+
+        // Write the text to the end of the file
+        file.write_all((avg_latency.to_string()+"\n").as_bytes()).unwrap();
+
+        //append avg throughtput to the end of avg_throughtput.txt
+        //calculate the time diff
+        let now = Utc::now();
+        let mut last_utc_time = CURRENT_UTC_TIME.lock().await;
+        let diff: Duration = now.signed_duration_since(*last_utc_time);
+        *last_utc_time = now;
+        let duration = diff.num_milliseconds() as f64 / 1000.0;
+        let avg_throughtput = 1000.0 / duration;
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_throughtput.txt")
+        .unwrap();
+
+        // Write the text to the end of the file
+        file.write_all((avg_throughtput.to_string()+"\n").as_bytes()).unwrap();
+
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_timestamps.txt")
+        .unwrap();
+
+        // Write the text to the end of the file
+        file.write_all((Utc::now().timestamp_millis().to_string()+"\n").as_bytes()).unwrap();
     }
     
 

@@ -216,6 +216,7 @@ class Client:
             # [FIXME] added to avoid crushing when self.curr becomes None sometimes
             if(self.curr==None) :
                 self.curr = 'home'
+                
             retry = False
             curr_index = con_data.states.index(self.curr)
             self.logger.debug("=======================================")

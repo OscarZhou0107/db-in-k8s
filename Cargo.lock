@@ -743,6 +743,7 @@ dependencies = [
  "flate2",
  "futures",
  "itertools",
+ "lazy_static",
  "rand 0.7.3",
  "rand_distr",
  "run_script",
