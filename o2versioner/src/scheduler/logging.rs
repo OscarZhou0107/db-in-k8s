@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::comm::MsqlResponse;
 use crate::core::*;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Duration};
 use futures::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -32,16 +32,17 @@ impl RequestRecordStart {
                 || (req.is_endtx() && res.is_endtx()),
             "Request must match with Response type"
         );
+
         let now = Utc::now();
-        let diff = now - req_timestamp;
-        let lat: i64 = diff.num_microseconds().unwrap();
+        let diff: Duration = now.signed_duration_since(req_timestamp);
+        let lat: i64 = diff.num_milliseconds();
 
         RequestRecord {
             req,
             req_timestamp,
             initial_txvn,
             res: res.clone(),
-            res_timestamp: Utc::now(),
+            res_timestamp: now,
             latency: lat,
             final_txvn: final_txvn.clone(),
         }
