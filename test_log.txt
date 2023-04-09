@@ -1,3 +1,0 @@
-larrywu 31056   0.0  0.0 408637584   1760 s009  S+    2:30pm   0:00.00 grep o2
-larrywu 31007   0.0  0.1 408622512  11184 s009  S+    2:27pm   0:00.86 target/debug/o2versioner --sequencer
-
