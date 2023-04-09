@@ -62,6 +62,8 @@ lazy_static! {
     static ref CURRENT_UTC_TIME: Mutex<DateTime<Utc>> = Mutex::new(Utc::now());
 }
 
+static mut is_blocked:bool = false;
+
 #[instrument(name = "scheduler", skip(conf))]
 pub async fn main(conf: Conf) {
 
@@ -280,8 +282,14 @@ async fn admin(
 
             if cmd_registry.get("block_unblock").unwrap().contains(&command) {
                 let m = if command == UniCase::new("block") {
+                    unsafe {
+                        is_blocked = true;
+                    }
                     scheduler_sequencer::Message::RequestBlock
                 } else {
+                    unsafe {
+                        is_blocked = false;
+                    }
                     scheduler_sequencer::Message::RequestUnblock
                 };
                 let reply = tcp::send_and_receive_single_as_json(&mut sequencer_socket_pool.get().await.unwrap(), m)
@@ -606,6 +614,9 @@ async fn process_msql(
         // .unwrap();
 
         file.write_all(((avg_throughtput as i64).to_string()+" queries/sec\n").as_bytes()).unwrap();
+        if unsafe { is_blocked } == true {
+            file.write_all(("Blocked\n").as_bytes()).unwrap();
+        }
     }
     
 
