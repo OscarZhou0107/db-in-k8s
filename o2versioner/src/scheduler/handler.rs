@@ -69,15 +69,15 @@ pub async fn main(conf: Conf) {
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("./avg_latency.txt");
+        .open("./perf/avg_latency.txt");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("./avg_throughtput.txt");
+        .open("./perf/avg_throughtput.txt");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("./avg_timestamps.txt");
+        .open("./perf/avg_timestamps.txt");
 
 
     // Create the main state
@@ -556,7 +556,7 @@ async fn process_msql(
         let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("./avg_latency.txt")
+        .open("./perf/avg_latency.txt")
         .unwrap();
 
         // Write the text to the end of the file
