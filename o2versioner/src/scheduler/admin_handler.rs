@@ -19,7 +19,6 @@ use tracing::{error, trace};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use run_script::ScriptOptions;
 use super::replication::*;
-use tokio::sync::Mutex;
 /* 
 pub async fn connect_replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>) {
     //read the default config
@@ -164,7 +163,7 @@ pub async fn replica(dbproxy_manager: Arc<RwLock<DbproxyManager>>, _dbvn_manager
 /// with `String` represents the reply response, and `bool` denotes whether to continue the `TcpListener`.
 /// 3. The returned `String` should not have any newline characters
 #[instrument(name="listen", skip(addr, admin_command_handler, dbproxy_manager, dbvn_manager), fields(message=field::Empty))]
-pub async fn start_admin_tcplistener<A, C, Fut>(addr: A, dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>, admin_stop_signal: Arc<Mutex<bool>>, 
+pub async fn start_admin_tcplistener<A, C, Fut>(addr: A, dbproxy_manager: Arc<RwLock<DbproxyManager>>, dbvn_manager:Arc<RwLock<DbVNManager>>,
                                                 mut admin_command_handler: C)
 where
     A: ToSocketAddrs,
@@ -198,7 +197,7 @@ where
 
                             info!("Starting a tranciever thread in the admin control pannel");
                             //[Larry] we start the above connect_replica() function in a thread 
-                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), admin_stop_signal.clone(), id).in_current_span()));
+                            tranceivers.push(tokio::spawn(connect_replica(dbproxy_manager.clone(), dbvn_manager.clone(), id).in_current_span()));
                             
                             //now we need to update the proxy manager struct, so that the dispatcher is aware of the new proxy
                         }
@@ -229,10 +228,6 @@ where
                             break;
                         }
                         else {
-                            if line == "block" { let mut guard = admin_stop_signal.lock().await;
-                                *guard = true;}
-                            else if line == "unblock"{ let mut guard = admin_stop_signal.lock().await;
-                                *guard = true;}
                             //old admin command handlers 
                             let conn = async {
                                 let (mut res, should_continue) = admin_command_handler(line.clone()).await;

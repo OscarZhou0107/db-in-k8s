@@ -2,7 +2,7 @@ use std::env;
 
 use clap::{App, Arg, ArgGroup, ArgMatches};
 use o2versioner::util::conf::Conf;
-use o2versioner::{dbproxy_main, scheduler_main, sequencer_main};
+use o2versioner::{dbproxy_main, scheduler_main, sequencer_main, connect_replica};
 use tracing::info;
 
 pub fn init_logger() {}
@@ -54,12 +54,10 @@ async fn main() {
         let replicate_proxy = replicate_conf.dbproxy.get(index).unwrap().clone();
         dbproxy_main(replicate_proxy).await
     }
-    /* 
     else if matches.is_present("connect-replica") {
         println!("Connecting to a replica...");
         connect_replica().await
     }
-    */
     else if matches.is_present("scheduler") {
         scheduler_main(conf).await
     } else if matches.is_present("sequencer") {
