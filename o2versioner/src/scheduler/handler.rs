@@ -71,15 +71,15 @@ pub async fn main(conf: Conf) {
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("./avg_latency.txt");
+        .open("./perf/avg_latency.txt");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("./avg_throughtput.txt");
+        .open("./perf/avg_throughtput.txt");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("./avg_timestamps.txt");
+        .open("./perf/avg_timestamps.txt");
 
 
     // Create the main state
@@ -547,29 +547,6 @@ async fn process_msql(
         avg_lat.store(0, Ordering::Relaxed);
         num_req.store(0, Ordering::Relaxed);
 
-        // if let Some(perf_log_path) = conf.performance_logging.as_ref() {
-        //     // Prepare the logging directory
-        //     // let cur_log_dir = prepare_lat_logging_dir(perf_log_path).await;
-        //     // // Performance logging
-        //     // let mut perf_csv_path_builder = PathBuf::from(&cur_log_dir);
-        //     // perf_csv_path_builder.push("latency.txt");
-        //     // let perf_csv_path = perf_csv_path_builder.as_path();
-        //     // let mut wrt = std::fs::File::create(perf_csv_path).map(|w| csv::Writer::from_writer(w)).unwrap();
-        //     // wrt.serialize(avg_latency).unwrap();
-        //     // //info!("Dumped latency logging to {}", perf_csv_path.display());
-        //         // Open the file in append mode
-        // }
-
-        //append avg latency to the end of avg_latency.txt
-        let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("./avg_latency.txt")
-        .unwrap();
-
-        // Write the text to the end of the file
-        file.write_all((avg_latency.to_string()+"\n").as_bytes()).unwrap();
-
         //append avg throughtput to the end of avg_throughtput.txt
         //calculate the time diff
         let now = Utc::now();
@@ -579,43 +556,75 @@ async fn process_msql(
         let duration = diff.num_milliseconds() as f64 / 1000.0;
         let avg_throughtput = 1000.0 / duration;
 
-        let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("./perf/avg_throughtput.txt")
-        .unwrap();
+        if unsafe { is_blocked } == false {
+            // if let Some(perf_log_path) = conf.performance_logging.as_ref() {
+            //     // Prepare the logging directory
+            //     // let cur_log_dir = prepare_lat_logging_dir(perf_log_path).await;
+            //     // // Performance logging
+            //     // let mut perf_csv_path_builder = PathBuf::from(&cur_log_dir);
+            //     // perf_csv_path_builder.push("latency.txt");
+            //     // let perf_csv_path = perf_csv_path_builder.as_path();
+            //     // let mut wrt = std::fs::File::create(perf_csv_path).map(|w| csv::Writer::from_writer(w)).unwrap();
+            //     // wrt.serialize(avg_latency).unwrap();
+            //     // //info!("Dumped latency logging to {}", perf_csv_path.display());
+            //         // Open the file in append mode
+            // }
 
-        // Write the text to the end of the file
-        file.write_all((avg_throughtput.to_string()+"\n").as_bytes()).unwrap();
+            //append avg latency to the end of avg_latency.txt
+            let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("./perf/avg_latency.txt")
+            .unwrap();
+
+            // Write the text to the end of the file
+            file.write_all((avg_latency.to_string()+"\n").as_bytes()).unwrap();
+
+            let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("./perf/avg_throughtput.txt")
+            .unwrap();
+
+            // Write the text to the end of the file
+            file.write_all((avg_throughtput.to_string()+"\n").as_bytes()).unwrap();
 
 
-        let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("./perf/avg_timestamps.txt")
-        .unwrap();
+            let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("./perf/avg_timestamps.txt")
+            .unwrap();
 
-        // Write the text to the end of the file
-        file.write_all((Utc::now().timestamp_millis().to_string()+"\n").as_bytes()).unwrap();
+            // Write the text to the end of the file
+            file.write_all((Utc::now().timestamp_millis().to_string()+"\n").as_bytes()).unwrap();
+        
 
-        let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open("./perf/current_performance.txt")
-        .unwrap();
+            let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open("./perf/current_performance.txt")
+            .unwrap();
 
-        file.write_all((((avg_latency * 100f64).floor()/100.0).to_string()+" sec\n").as_bytes()).unwrap();
+            file.write_all((((avg_latency * 100f64).floor()/100.0).to_string()+" sec\n").as_bytes()).unwrap();
 
-        // let mut file = OpenOptions::new()
-        // .write(true)
-        // .truncate(true)
-        // .open("./current_throughput.txt")
-        // .unwrap();
+            // let mut file = OpenOptions::new()
+            // .write(true)
+            // .truncate(true)
+            // .open("./current_throughput.txt")
+            // .unwrap();
 
-        file.write_all(((avg_throughtput as i64).to_string()+" queries/sec\n").as_bytes()).unwrap();
-        if unsafe { is_blocked } == true {
-            file.write_all(("Blocked\n").as_bytes()).unwrap();
+            file.write_all(((avg_throughtput as i64).to_string()+" queries/sec\n").as_bytes()).unwrap();
+        } else {
+            let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open("./perf/current_performance.txt")
+            .unwrap();
+
+            file.write_all(("System Blocked\n").as_bytes()).unwrap();
         }
     }
     

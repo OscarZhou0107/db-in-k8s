@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # load the files 
-timestamp = np.loadtxt('avg_timestamps.txt')
-avg_latency = np.loadtxt('avg_latency.txt')
-avg_throughput = np.loadtxt('avg_throughtput.txt')
+timestamp = np.loadtxt('./perf/avg_timestamps.txt')
+avg_latency = np.loadtxt('./perf/avg_latency.txt')
+avg_throughput = np.loadtxt('./perf/avg_throughtput.txt')
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10,5))
 
