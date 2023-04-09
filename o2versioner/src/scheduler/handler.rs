@@ -69,15 +69,15 @@ pub async fn main(conf: Conf) {
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_latency.txt");
+        .open("./avg_latency.txt");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_throughtput.txt");
+        .open("./avg_throughtput.txt");
     let mut file = OpenOptions::new()
         .write(true)
         .truncate(true)
-        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_timestamps.txt");
+        .open("./avg_timestamps.txt");
 
 
     // Create the main state
@@ -535,7 +535,6 @@ async fn process_msql(
 
     if num_req.load(Ordering::Relaxed) == 1000 {
         let avg_latency = avg_lat.load(Ordering::Relaxed) as f64 / 1000.0 / 1000.0;
-        println!("Current avg latency in second: {}", avg_latency);
 
         avg_lat.store(0, Ordering::Relaxed);
         num_req.store(0, Ordering::Relaxed);
@@ -557,7 +556,7 @@ async fn process_msql(
         let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_latency.txt")
+        .open("./avg_latency.txt")
         .unwrap();
 
         // Write the text to the end of the file
@@ -575,7 +574,7 @@ async fn process_msql(
         let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_throughtput.txt")
+        .open("./avg_throughtput.txt")
         .unwrap();
 
         // Write the text to the end of the file
@@ -585,11 +584,27 @@ async fn process_msql(
         let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("/Users/larrywu/Desktop/Capstone/implementation/avg_timestamps.txt")
+        .open("./avg_timestamps.txt")
         .unwrap();
 
         // Write the text to the end of the file
         file.write_all((Utc::now().timestamp_millis().to_string()+"\n").as_bytes()).unwrap();
+
+        let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("./current_latency.txt")
+        .unwrap();
+
+        file.write_all((avg_latency.to_string()+" sec\n").as_bytes()).unwrap();
+
+        let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open("./current_throughput.txt")
+        .unwrap();
+
+        file.write_all((avg_throughtput.to_string()+" queries/sec\n").as_bytes()).unwrap();
     }
     
 
