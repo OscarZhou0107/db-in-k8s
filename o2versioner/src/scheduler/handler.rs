@@ -579,7 +579,7 @@ async fn process_msql(
         let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("./avg_throughtput.txt")
+        .open("./perf/avg_throughtput.txt")
         .unwrap();
 
         // Write the text to the end of the file
@@ -589,27 +589,28 @@ async fn process_msql(
         let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("./avg_timestamps.txt")
+        .open("./perf/avg_timestamps.txt")
         .unwrap();
 
         // Write the text to the end of the file
         file.write_all((Utc::now().timestamp_millis().to_string()+"\n").as_bytes()).unwrap();
 
         let mut file = OpenOptions::new()
+        .create(true)
         .write(true)
         .truncate(true)
-        .open("./current_latency.txt")
+        .open("./perf/current_performance.txt")
         .unwrap();
 
-        file.write_all((avg_latency.to_string()+" sec\n").as_bytes()).unwrap();
+        file.write_all((((avg_latency * 100f64).floor()/100.0).to_string()+" sec\n").as_bytes()).unwrap();
 
-        let mut file = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open("./current_throughput.txt")
-        .unwrap();
+        // let mut file = OpenOptions::new()
+        // .write(true)
+        // .truncate(true)
+        // .open("./current_throughput.txt")
+        // .unwrap();
 
-        file.write_all((avg_throughtput.to_string()+" queries/sec\n").as_bytes()).unwrap();
+        file.write_all(((avg_throughtput as i64).to_string()+" queries/sec\n").as_bytes()).unwrap();
     }
     
 
